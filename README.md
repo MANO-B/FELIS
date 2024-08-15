@@ -1,4 +1,4 @@
-# FELIS for C-CAT database <img src="FELIS.png" width=50>
+# FELIS for C-CAT database <img src="source/FELIS.png" width=50>
 Functions Especially for LIquid and Solid tumor clinical sequencing, for Japanese only.
 
 ## C-CAT利活用データの解析ソフトウェア
@@ -53,7 +53,7 @@ BiocManager::install(c("ComplexHeatmap"), update=FALSE)
 ・レポートCSV（全データ出力）  
 ・症例CSV（全データ出力）  
 の2つのファイルをダウンロードします。ZIPファイルは解凍してCSVファイルに戻して使用します。  
-<img src="report.png"  height=300>　　<img src="case.png" height=300>
+<img src="source/report.png"  height=300>　　<img src="source/case.png" height=300>
 
 - FELISのダウンロード
 使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。  
@@ -76,7 +76,7 @@ Platform: aarch64-apple-darwin20 (64-bit)
 > library(shiny)
 > runApp('/User/C-CAT/Desktop/felis-cs')
 ```
-<img src="appli_GUI.png"  height=500>
+<img src="source/appli_GUI.png"  height=500>
 
 - ファイルの読み込み
 ダウンロードした症例CSVとレポートCSVを、画面左上のBrowse...ボタンから選択して読み込みます。  
@@ -84,7 +84,7 @@ Platform: aarch64-apple-darwin20 (64-bit)
 
 ## 解析対象の指定  
 多数の項目が設定可能です。  
-<img src="setting.png"  height=300>  
+<img src="source/setting.png"  height=300>  
 
 - Filter by histology  
 　　解析対象とする組織型の絞り込みを行います。  
@@ -123,7 +123,7 @@ Platform: aarch64-apple-darwin20 (64-bit)
    
 ## 解析の実行  
 多数の解析が可能です。  
-<img src="analysis.png"  height=300>  
+<img src="source/analysis.png"  height=300>  <img src="source/examples.png"  height=300> 
 
 - 症例のまとめを表示  
     - 選択した症例のまとめを**Patients summary**タブに表示します。  
