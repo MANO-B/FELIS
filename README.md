@@ -126,13 +126,14 @@ Platform: aarch64-apple-darwin20 (64-bit)
 <img src="analysis.png"  height=300>  
 
 - 症例のまとめを表示  
-　　 選択した症例のまとめを**Patients summary**タブに表示します。  
+    - 選択した症例のまとめを**Patients summary**タブに表示します。  
 - Oncoprintを表示  
-　 　選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
- 　　症例の表を**Per_patient_table**タブに表示します。左上のボタンからダウンロードが可能です。  
-- 相互排他・共変異を表示  
- 　　[Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995)を用いた遺伝子変異感の相互排他性解析結果を**Co-occurrence**タブに表示します。
-    青が相互排他的、赤が共変異の関係にあることを意味します。P<0.001の場合にアスタリスクが表示されます。
+    - 選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
+    症例の表を**Per_patient_table**タブに表示します。左上のボタンからダウンロードが可能です。  
+- 相互排他・共変異を表示
+    - [Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995)を用いた遺伝子変異感の相互排他性解析結果を**Co-occurrence**タブに表示します。  
+    青が相互排他的、赤が共変異の関係にあることを意味します。  
+    P<0.001の場合にアスタリスクが表示されます。  
 - 組織型ごとの各遺伝子の変異率を表示  
 　　 変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を**Mutation in subtypes**タブに表示します。  
 - 遺伝子変異に基づくクラスタリング  
@@ -182,9 +183,33 @@ Platform: aarch64-apple-darwin20 (64-bit)
     - CGP検査後の死亡に関するハザード比のforest plotを**Survival from CGP 5**タブに表示します。  
         多重共線性は評価していませんので、余計な変数が含まれている可能性があります。  
     - 推奨治療を受けられるかについてのロジスティクス回帰分析の結果をforest plotとして**Survival from CGP 6**タブに表示します。  
-        多重共線性は評価していませんので、余計な変数が含まれている可能性があります。  
+        全く推奨治療にたどり着いていない組織型がある場合には数値が表示されません。  
+- 化学療法導入の生存期間解析(時間がかかります)  
+左側切断バイアスを考慮した緩和的化学療法導入後の生存期間解析を実施します。
+Stanを用いたシミュレーションのため解析が数十分のオーダーで時間を要します。
+    - 左側切断バイアスを補正した場合、Number at riskで補正した場合、シミュレーションで補正した場合の生存期間解析を**Survival from CTx 1**タブに表示します。  
+    - 遺伝子変異の有無で群分けをした生存期間解析を**Survival from CTx 1**タブに表示します。  
+        遺伝子変異の解析は、注目する遺伝子があればいずれかに変異があるか否かで群分けされます。  
+        注目する遺伝子がなければもっとも変異頻度が高い遺伝子に変異があるか否かで群分けされます。  
+    - 遺伝子変異の有無でmedian survival の差分(days)を計算した結果を**Survival from CTx 2**タブに表示します。  
+        死亡イベントが少ない場合は結果が表示されません。  
+    - 遺伝子変異の有無で群分けをしたsurvival curveを**Survival from CTx 3**タブに表示します。  
+- Palliative CTxで使用した薬剤リスト(1st-4th line)  
+    - 緩和目的の化学療法の1st-4th lineで使用されたレジメンを抽出し**Drug table**タブに表示します。
+    入力が不正確と思われる場合があるため、傾向をみる程度の使用が望ましいです。  
+    **Select regimens of interest**パネルが出現します。以後の解析で注目する薬剤を選択します。  
+- 上記ボタンで選択した薬剤の奏効性解析  
+Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や組織型の関係性を評価します。  
+    - 注目する薬剤のToTと、その前治療のToTの関係性のwaterfall plotを**Drug analysis 1**タブに表示します。
+    - 注目する薬剤のToTと、その前治療のToTの関係性の散布図を**Drug analysis 1**タブに表示します。
+    - 注目する薬剤のToTと、その前治療のToTのKaplan-Meier survival curveを**Drug analysis 2**タブに表示します。
+    - 注目する薬剤と注目する遺伝子変異の有無に関するToTのKaplan-Meier survival curveを**Drug analysis 2**タブに表示します。
+    - 注目する薬剤と組織型に関するToTのKaplan-Meier survival curveを**Drug analysis 3**タブに表示します。
 
+## 今後の予定
+- RECISTの奏効性とclustering、組織型、遺伝子変異などとの関連性を評価する解析を追加  
+- HER2免疫染色、MSIなどパネル検査前に行われた検査の結果と、パネル検査による遺伝子変異と、どちらがより薬剤奏効性を予測するかの解析を追加  
+- Liquid sequencingにおけるvariant frequencyと薬剤奏効性の関連性の解析を追加  
 
-
-# Version history
+## Version history
 1.0.0: C-CAT database version 20240621に対応  
