@@ -49,7 +49,7 @@ BiocManager::install(c("ComplexHeatmap"), update=FALSE)
 ## FELISの起動と解析ファイルの読み込み
 - 解析ファイルの入手
 まずは解析したい症例の情報をC-CAT利活用検索ポータルからダウンロードします。
-症例を選択した上で、以下の画像の通り  
+設定を英語ではなく日本語バージョンとし、症例を選択した上で、以下の画像の通り  
 ・レポートCSV（全データ出力）  
 ・症例CSV（全データ出力）  
 の2つのファイルをダウンロードします。ZIPファイルは解凍してCSVファイルに戻して使用します。  
@@ -126,14 +126,15 @@ Platform: aarch64-apple-darwin20 (64-bit)
 <img src="analysis.png"  height=300>  
 
 - 症例のまとめを表示  
-　　選択した症例のまとめを**Patients summary**タブに表示します。  
+　　 選択した症例のまとめを**Patients summary**タブに表示します。  
 - Oncoprintを表示  
-　　選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
-　　症例の表を**Per_patient_table**タブに表示します。左上のボタンからダウンロードが可能です。  
+　 　選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
+ 　　症例の表を**Per_patient_table**タブに表示します。左上のボタンからダウンロードが可能です。  
 - 相互排他・共変異を表示  
-　　[Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995)を用いた遺伝子変異感の相互排他性解析結果を**Co-occurrence**タブに表示します。  
+ 　　[Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995)を用いた遺伝子変異感の相互排他性解析結果を**Co-occurrence**タブに表示します。
+    青が相互排他的、赤が共変異の関係にあることを意味します。P<0.001の場合にアスタリスクが表示されます。
 - 組織型ごとの各遺伝子の変異率を表示  
-　　変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を**Mutation in subtypes**タブに表示します。  
+　　 変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を**Mutation in subtypes**タブに表示します。  
 - 遺伝子変異に基づくクラスタリング  
 変異遺伝子に基づくクラスタリングを[UMAP](https://arxiv.org/abs/1802.03426)および[DBSCAN](https://cdn.aaai.org/KDD/1996/KDD96-037.pdf)を用いて実施します。  
     - 各組織型ごとの基礎的情報について**Basic data**タブに表示します。  
@@ -165,6 +166,23 @@ Platform: aarch64-apple-darwin20 (64-bit)
     - 各組織型のCGP検査後の生存期間と治療についての情報の関係を**Post_CGP-treatment**タブに表示します。  
         CGP検査後の生存期間とEvidence level A, B以上, C以上の薬剤がある割合を散布図としました。  
         CGP検査後の生存期間と推奨治療がある割合、推奨治療を受けた割合、推奨治療がある患者が推奨治療を受けた割合を散布図としました。  
+- CGP検査後の生存期間解析  
+遺伝子変異、治療内容、PSなどに着目したCGP検査後の生存期間解析を実施します。
+どのような患者が予後不良で早期のCGP検査が推奨されるかがみえてきます。
+    - 推奨治療の有無や治療内容で群分けをした生存期間解析を**Survival from CGP 1**タブに表示します。  
+        UnrecomTreat(+): 推奨治療以外の治療を受けた患者  
+        RecomTreat(+): 推奨治療を受けた患者  
+        Treat(-): CGP検査後に治療を受けなかった患者  
+    - 組織型、PS、遺伝子変異の有無で群分けをした生存期間解析を**Survival from CGP 2**タブに表示します。  
+        遺伝子変異の解析は、注目する遺伝子があればいずれかに変異があるか否かで群分けされます。  
+        注目する遺伝子がなければもっとも変異頻度が高い遺伝子に変異があるか否かで群分けされます。  
+    - 遺伝子変異の有無で群分けをしたmedian survival (days)を**Survival from CGP 3**タブに表示します。  
+        変異頻度が少ない場合は95％信頼区間が表示されません。  
+    - 遺伝子変異の有無で群分けをしたKaplan-Meier survival curveを**Survival from CGP 4**タブに表示します。  
+    - CGP検査後の死亡に関するハザード比のforest plotを**Survival from CGP 5**タブに表示します。  
+        多重共線性は評価していませんので、余計な変数が含まれている可能性があります。  
+    - 推奨治療を受けられるかについてのロジスティクス回帰分析の結果をforest plotとして**Survival from CGP 6**タブに表示します。  
+        多重共線性は評価していませんので、余計な変数が含まれている可能性があります。  
 
 
 
