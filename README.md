@@ -52,11 +52,11 @@ BiocManager::install(c("ComplexHeatmap"), update=FALSE)
 症例を選択した上で、以下の画像の通り  
 ・レポートCSV（全データ出力）  
 ・症例CSV（全データ出力）  
-の2つのファイルをダウンロードします。  
-<img src="report.png"  height=300>      <img src="case.png" height=300>
+の2つのファイルをダウンロードします。ZIPファイルは解凍してCSVファイルに戻して使用します。  
+<img src="report.png"  height=300>　　<img src="case.png" height=300>
 
 - FELISのダウンロード
-使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。
+使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。  
 ここでは"/User/C-CAT/Desktop/felis-cs"とします。  
 
 - FELISの起動
@@ -76,20 +76,50 @@ Platform: aarch64-apple-darwin20 (64-bit)
 > library(shiny)
 > runApp('/User/C-CAT/Desktop/felis-cs')
 ```
-- How to use in command line
-```
-# download only once
-wget https://raw.githubusercontent.com/MANO-B/MicroSEC/main/MicroSEC.R
-# run the script
-Rscript MicroSEC.R [working/output directory] [sample information tsv file] [progress bar Y/N]
-```  
-- Example
-```
-Rscript MicroSEC.R /mnt/HDD8TB/MicroSEC /mnt/HDD8TB/MicroSEC/source/Sample_list.txt Y  
-```  
-- How to use in R Console
-```
-```
+<img src="appli_GUI.png"  height=500>
+
+- ファイルの読み込み
+ダウンロードした症例CSVとレポートCSVを、画面左上のBrowse...ボタンから選択して読み込みます。  
+複数のファイルを読み込むことも可能です。
+
+- 解析対象の指定
+多数の項目が設定可能です。  
+<img src="setting.png"  height=300>
+- Filter by histology  
+解析対象とする組織型の絞り込みを行います。  
+- まとめて解析する組織型(なければ未選択)  
+　　まとめて解析したい組織型を選択します。  
+- まとめて解析する組織型1の名前  
+　　まとめて解析したい組織型を代表する名前を選択します。  
+- Filter by sex  
+　　解析対象とする性別の絞り込みを行います。  
+- Filter by panel  
+　　解析対象とするがん遺伝子パネル検査の絞り込みを行います。  
+- Minimum patients for each histology  
+　　稀な組織型は発生部位に名前を変更して解析できます。  
+　　解析する組織型の最小症例数を設定します。  
+- Distance value for DBSCAN clustering  
+　　クラスタリング解析において弁別する距離の閾値を設定します。  
+- Age for analysis  
+　　解析対象とする年齢の絞り込みを行います。  
+- Threshold age for oncoprint  
+　　OncoprintでのYoung/Oldの分類の閾値を設定します。  
+- Filter by performance status  
+　　解析対象とするPSの絞り込みを行います。  
+- Filter by smoking status  
+　　解析対象とする喫煙歴の絞り込みを行います。  
+- 注目する遺伝子(なければ未選択)  
+　　Oncoprintや生存期間解析等で優先する遺伝子を選択します。  
+- 注目する遺伝子セット1(なければ未選択)  
+　　とくに注目する遺伝子セットがあれば選択します。  
+- Gene number for oncoprint  
+　　Oncoprintや生存期間解析で対象とする遺伝子の絞り込みを行います。  
+- Distance value for DBSCAN clustering  
+　　解析対象とする組織型の絞り込みを行います。  
+- Distance value for DBSCAN clustering  
+　　解析対象とする組織型の絞り込みを行います。  
+   
+
 
 # Version history
 1.0.0: C-CAT database version 20240621に対応  
