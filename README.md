@@ -135,20 +135,26 @@ Platform: aarch64-apple-darwin20 (64-bit)
 - 組織型ごとの各遺伝子の変異率を表示  
 　　変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を**Mutation in subtypes**タブに表示します。  
 - 遺伝子変異に基づくクラスタリング  
-　　変異遺伝子に基づくクラスタリングを[UMAP](https://arxiv.org/abs/1802.03426)および[DBSCAN](https://cdn.aaai.org/KDD/1996/KDD96-037.pdf)を用いて実施します。
-   各組織型ごとの基礎的情報について**Basic data**タブに表示します。
-       - Driver: がん化変異が一つ以上検出された症例の割合
-       - optionおよびtreat: エキスパートパネルで推奨治療があった・治療を受けた頻度(％)
-       - time_before/after_CGP: 緩和的化学療法開始からCGP検査まで、およびCGP検査から死亡までについてのmedian survival (days)。  
-   __Mutation in subtypes__タブに表示します。  
-   __Mutation in subtypes__タブに表示します。  
-   __Mutation in subtypes__タブに表示します。  
-   __Mutation in subtypes__タブに表示します。  
-   __Mutation in subtypes__タブに表示します。  
-   __Mutation in subtypes__タブに表示します。  
-　　変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を__Mutation in subtypes__タブに表示します。  
-- Filter by histology  
-　　解析対象とする組織型の絞り込みを行います。  
+　 　変異遺伝子に基づくクラスタリングを[UMAP](https://arxiv.org/abs/1802.03426)および[DBSCAN](https://cdn.aaai.org/KDD/1996/KDD96-037.pdf)を用いて実施します。  
+    各組織型ごとの基礎的情報について**Basic data**タブに表示します。  
+        Driver: がん化変異が一つ以上検出された症例の割合  
+        optionおよびtreat: エキスパートパネルで推奨治療があった・治療を受けた頻度(％)  
+        time_before_CGP: 緩和的化学療法開始からCGP検査までのmedian survival (days)。  
+        time_after_CGP: CGP検査から死亡までについてのmedian survival (days)。  
+    各クラスタに集積している組織型や遺伝子変異を**Clustering**タブに表示します。  
+        P<0.05で集積している組織型を、他のクラスタと比較したオッズ比が高い順に3つまで表示します。  
+        P<0.05で集積している遺伝子変異を、他のクラスタと比較したオッズ比が高い順に3つまで表示します。  
+    各クラスタにおける年齢層を**Cluster-age**タブに表示します。  
+    各クラスタにおける組織型を**Cluster-subtypes**タブに表示します。  
+    各組織型が少数のクラスタに集積するのか多数のクラスタに分布するのかをエントロピーとして**Cluster-entropy**タブに表示します。  
+        Shannon entropyで計算しています。低い値ほど集積傾向があります。  
+    クラスタと組織型の関係性についての表を**Cluster-disease_table**タブに表示します。  
+        左上のボタンからダウンロードが可能です。  
+    クラスタと遺伝子変異の関係性についての表を**Cluster-mutation_table**タブに表示します。  
+        左上のボタンからダウンロードが可能です。  
+    各組織型のうちEvidence levelのある薬剤に対応する変異が検出された頻度を**Histlogy-drug_evidence**タブに表示します。  
+        左上のボタンからダウンロードが可能です。  
+    各組織型の化学療法開始からCGP検査まで、およびCGP検査から死亡までの平均生存期間の関係を**Histlogy-drug_evidence**タブに表示します。  
 
 
 
