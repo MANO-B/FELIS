@@ -6,6 +6,8 @@ Functions Especially for LIquid and Solid tumor clinical sequencing, for Japanes
   
 C-CATのデータを用いるに当たってはビッグデータかつリアルワールドデータの解析には特有の問題があり、また一定程度のデータ処理を行うプログラミングの知識が必要になります。GUIを用いたソフトウェアにより解析の敷居を下げることで、臨床医の日常診療におけるクリニカルクエスチョンに基づいた探索的研究を容易とし、C-CAT利活用データの活用を促進するために本ソフトウェアを作成しました。命名にネコの名前縛りがあるようです。
 
+C-CATからデータを入手可能な方のみが本ソフトウェアを使用可能となる現状はご理解ください。  
+
 ## 解析手法は以下の論文に基づきます
 > 1) Tamura T et al., Selection bias due to delayed comprehensive genomic profiling in Japan, Cancer Sci, 114(3):1015-1025, 2023.  
       左側切断バイアスについては[こちらのwebsite](https://github.com/MANO-B/CCAT)も参照ください。
