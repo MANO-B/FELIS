@@ -12,70 +12,41 @@ C-CATのデータを用いるに当たってはビッグデータかつリアル
 > 2) Mochizuki T et al., Factors predictive of second-line chemotherapy in soft tissue sarcoma: An analysis of the National Genomic Profiling Database, Cancer Sci, 115(2):575-588, 2024.  
 
 ## System Requirements
-
 ### Hardware Requirements
-
-The scripts requires only a standard computer with enough RAM to support the operations defined by a user. For minimal performance, this will be a computer with about 4 GB of RAM (depending on the size of BAM file and the number of mutations). For optimal performance, we recommend a computer with the following specs:
-
+数千例の解析であれば問題ありませんが、数万例の解析を行う場合は32GB以上のメモリが必要です。    
+生存期間解析はStanを用いたモンテカルロ法でのシミュレーションを行います。4コア以上でできるだけ高速なCPUの使用が望まれます。  
 RAM: 4+ GB  
-CPU: 2+ cores, 2.6+ GHz/core
-
-The runtimes below are generated using a computer with the recommended specs (16 GB RAM, M1 Macbook air) and internet of speed 40 Mbps.
+CPU: 4+ cores  
+  
+3000例、30遺伝子についての生存期間解析を64 GB RAM, M1MAX MacStudioで行った場合、およそ1時間を要します。  
 
 ### Software Requirements
-
-### Samtools
-
-Samtools is used for pre-processing to remove reads that are not related to mutations. Version 1.12 is what I am using, but I think older versions will work if they support multi-core processing.  
-
-### R language
-
-This script files runs on `R` for Windows, Mac, or Linux, which requires the R version 3.5.0 or later.
-If you use version 3.4 or lower of R, you will have some difficulty installing the packages, but it is not impossible.  
-
-### Package dependencies
-
-Users should install the following packages prior to use the scripts, from an `R` terminal:
-
+#### R language
+適宜[ウェブサイト](https://syunsuke.github.io/r_install_guide_for_beginners/03_installation_of_R.html)を参照しRを導入ください。  
+特にバージョンの指定はありませんが、本ソフトウェアはv4.2.3を使用して作成しました。  
+以下、[コマンドラインからRを起動して作業を行います。](http://kouritsu.biz/installing-r-on-mac/)  
+#### Rstan
+こちらの[RStan Getting Started (Japanese)](https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started-(Japanese))を参照ください。  
 ```
-if (!requireNamespace("BiocManager", quietly = TRUE)){
-    install.packages("BiocManager")
-}
-install.packages(c('stringr', 'dplyr', 'remotes'), dependencies = TRUE)
-BiocManager::install(c("Rsamtools", "Biostrings", "GenomicAlignments", "GenomeInfoDb"), update=FALSE)
+# もしすでにrstanをインストールしているならば次の行を実行してください
+# remove.packages(c("StanHeaders", "rstan"))
 
-# install necessary genomes
-BiocManager::install("BSgenome.Hsapiens.UCSC.hg38", update=FALSE)
-# BiocManager::install("BSgenome.Hsapiens.UCSC.hg19", update=FALSE)
-# BiocManager::install("BSgenome.Mmusculus.UCSC.mm10", update=FALSE)
+install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+```
+#### Shiny
+Webアプリとするために[Shiny](https://shiny.posit.co)を使用しました。
+```
+install.packages("shiny")
+```
+#### Package dependencies
+依存しているパッケージ群を`R`ターミナルからインストールください。  
+初めて実行する場合は相当に時間がかかると思われます。  
+```
+install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'Rediscover', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'BiocManager'), dependencies = TRUE)
+BiocManager::install(c("ComplexHeatmap"), update=FALSE)
 ```
 
-which will install in about 30 minutes on a recommended machine.
-
-### Package Versions
-The program does not use any of the functions specific to the following version of the packages, so there is no problem if you use the latest version of the package.  
-
-```
-> packageVersion("stringr")
-[1] '1.4.0'
-> packageVersion("dplyr")
-[1] '1.0.2'
-> packageVersion("Biostrings")
-[1] '2.54.0'
-> packageVersion("BSgenome.Hsapiens.UCSC.hg38")
-[1] '1.4.1'
-> packageVersion("GenomicAlignments")
-[1] '1.22.1'
-> packageVersion("Rsamtools")
-[1] '2.0.3'
-> packageVersion("remotes")
-[1] '2.5.0'
-> packageVersion("GenomeInfoDb")
-[1] '1.22.1'
-```
-
-## Instructions for Use
-See also https://rdrr.io/cran/MicroSEC/
+## 使用の流れ
 - How to install
 ```
 # Stable version (v2.1.5) from github (recommended)
