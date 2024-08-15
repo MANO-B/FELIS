@@ -48,6 +48,13 @@ BiocManager::install(c("ComplexHeatmap"), update=FALSE)
 
 ## 使用の流れ
 - How to install
+まずは解析したい症例の情報をC-CAT利活用検索ポータルからダウンロードします。
+症例を選択した上で、以下の画像の通り  
+・レポートCSV（全データ出力）  
+・症例CSV（全データ出力）  
+の2つのファイルをダウンロードします。
+<img src="report.png"><img src="case.png">
+
 ```
 # Stable version (v2.1.5) from github (recommended)
 remotes::install_github("MANO-B/MicroSEC", ref = 'v2.1.5')
