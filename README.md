@@ -126,16 +126,27 @@ Platform: aarch64-apple-darwin20 (64-bit)
 <img src="analysis.png"  height=300>  
 
 - 症例のまとめを表示  
-　　選択した症例のまとめを__Patients summary__タブに表示します。  
+　　選択した症例のまとめを**Patients summary**タブに表示します。  
 - Oncoprintを表示  
-　　選択した症例の遺伝子変異を__Oncoprint__タブに表示します。  
-　　症例の表を__Per_patient_table__タブに表示します。  
+　　選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
+　　症例の表を**Per_patient_table**タブに表示します。左上のボタンからダウンロードが可能です。  
 - 相互排他・共変異を表示  
-　　[Rediscover package]()を用いた遺伝子変異感の相互排他性解析結果を__Co-occurrence__タブに表示します。  
-- Filter by histology  
-　　解析対象とする組織型の絞り込みを行います。  
-- Filter by histology  
-　　解析対象とする組織型の絞り込みを行います。  
+　　[Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995)を用いた遺伝子変異感の相互排他性解析結果を**Co-occurrence**タブに表示します。  
+- 組織型ごとの各遺伝子の変異率を表示  
+　　変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を**Mutation in subtypes**タブに表示します。  
+- 遺伝子変異に基づくクラスタリング  
+　　変異遺伝子に基づくクラスタリングを[UMAP](https://arxiv.org/abs/1802.03426)および[DBSCAN](https://cdn.aaai.org/KDD/1996/KDD96-037.pdf)を用いて実施します。
+   各組織型ごとの基礎的情報について**Basic data**タブに表示します。
+       - Driver: がん化変異が一つ以上検出された症例の割合
+       - optionおよびtreat: エキスパートパネルで推奨治療があった・治療を受けた頻度(％)
+       - time_before/after_CGP: 緩和的化学療法開始からCGP検査まで、およびCGP検査から死亡までについてのmedian survival (days)。  
+   __Mutation in subtypes__タブに表示します。  
+   __Mutation in subtypes__タブに表示します。  
+   __Mutation in subtypes__タブに表示します。  
+   __Mutation in subtypes__タブに表示します。  
+   __Mutation in subtypes__タブに表示します。  
+   __Mutation in subtypes__タブに表示します。  
+　　変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を__Mutation in subtypes__タブに表示します。  
 - Filter by histology  
 　　解析対象とする組織型の絞り込みを行います。  
 
