@@ -46,7 +46,7 @@ install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr'
 BiocManager::install(c("ComplexHeatmap"), update=FALSE)
 ```
 
-## 使用の流れ
+## FELISの起動と解析ファイルの読み込み
 - 解析ファイルの入手
 まずは解析したい症例の情報をC-CAT利活用検索ポータルからダウンロードします。
 症例を選択した上で、以下の画像の通り  
@@ -82,13 +82,14 @@ Platform: aarch64-apple-darwin20 (64-bit)
 ダウンロードした症例CSVとレポートCSVを、画面左上のBrowse...ボタンから選択して読み込みます。  
 複数のファイルを読み込むことも可能です。
 
-- 解析対象の指定
+## 解析対象の指定  
 多数の項目が設定可能です。  
-<img src="setting.png"  height=300>
+<img src="setting.png"  height=300>  
+
 - Filter by histology  
-解析対象とする組織型の絞り込みを行います。  
+　　解析対象とする組織型の絞り込みを行います。  
 - まとめて解析する組織型(なければ未選択)  
-　　まとめて解析したい組織型を選択します。  
+　　一つの組織型として扱って解析したい組織型群を選択します。  
 - まとめて解析する組織型1の名前  
 　　まとめて解析したい組織型を代表する名前を選択します。  
 - Filter by sex  
@@ -114,11 +115,31 @@ Platform: aarch64-apple-darwin20 (64-bit)
 　　とくに注目する遺伝子セットがあれば選択します。  
 - Gene number for oncoprint  
 　　Oncoprintや生存期間解析で対象とする遺伝子の絞り込みを行います。  
-- Distance value for DBSCAN clustering  
-　　解析対象とする組織型の絞り込みを行います。  
-- Distance value for DBSCAN clustering  
-　　解析対象とする組織型の絞り込みを行います。  
+　　特に生存期間解析にかかる時間に影響が出ます。  
+- Variants for analysis  
+　　がん化変異のみ解析するか、病的意義に関わらず全ての変異を解析するか選択します。  
+- Oncoprintの表示  
+　　Oncoprintにおけるソートの順序を設定します。  
    
+## 解析の実行  
+多数の解析が可能です。  
+<img src="analysis.png"  height=300>  
+
+- 症例のまとめを表示  
+　　選択した症例のまとめを__Patients summary__タブに表示します。  
+- Oncoprintを表示  
+　　選択した症例の遺伝子変異を__Oncoprint__タブに表示します。  
+　　症例の表を__Per_patient_table__タブに表示します。  
+- 相互排他・共変異を表示  
+　　[Rediscover package]()を用いた遺伝子変異感の相互排他性解析結果を__Co-occurrence__タブに表示します。  
+- Filter by histology  
+　　解析対象とする組織型の絞り込みを行います。  
+- Filter by histology  
+　　解析対象とする組織型の絞り込みを行います。  
+- Filter by histology  
+　　解析対象とする組織型の絞り込みを行います。  
+
+
 
 
 # Version history
