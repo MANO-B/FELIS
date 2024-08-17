@@ -216,4 +216,5 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 - Liquid sequencingにおけるvariant frequencyと薬剤奏効性の関連性の解析を追加  
 
 ## Version history
-1.0.0: C-CAT database version 20240621に対応  
+1.1.0: User Interfaceを改善、EGFRを中心にがん化変異が上手くアノーテーションされていない問題に対応 - 20240817  
+1.0.0: C-CAT database version 20240621に対応 - 20240815  
