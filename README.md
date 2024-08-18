@@ -1,20 +1,20 @@
-# FELIS for C-CAT database <img src="source/FELIS.png" width=50>
+## FELIS for C-CAT database <img src="source/FELIS.png" width=50>
 Functions Especially for LIquid and Solid tumor clinical sequencing, for Japanese only.
 
-## C-CAT利活用データの解析ソフトウェア
+### C-CAT利活用データの解析ソフトウェア
 国立がん研究センターに設置されている[がんゲノム情報管理センター(C-CAT)](https://www.ncc.go.jp/jp/c_cat/use/index.html)には保険診療で行われたがん遺伝子パネル検査(Comprehensive Genomic Profiling, CGP検査)の結果と臨床情報が集約されています。この情報を学術研究や医薬品等の開発を目的とした二次利活用する仕組みがあります。現状では所属施設の倫理審査とC-CATでの倫理審査を経た研究でのみ使用可能であり、また病院やアカデミア以外の組織では年間780万円の利用料金が必要と敷居が高いですが、類似した海外のデータベースである[AACR project GENIE](https://www.aacr.org/professionals/research/aacr-project-genie/)と比較して薬剤の情報や臨床情報が詳しい点で優れており、希少がん・希少フラクションの研究においてこれまでになかった切り口での解析が可能になると考えられています。  
   
 C-CATのデータを用いるに当たってはビッグデータかつリアルワールドデータの解析には特有の問題があり、また一定程度のデータ処理を行うプログラミングの知識が必要になります。GUIを用いたソフトウェアにより解析の敷居を下げることで、臨床医の日常診療におけるクリニカルクエスチョンに基づいた探索的研究を容易とし、C-CAT利活用データの活用を促進するために本ソフトウェアを作成しました。Felisはネコの学名であり、C-CAT関連の命名にはネコの名前縛りがあるようです。
 
 C-CATからデータを入手可能な方のみが本ソフトウェアを使用可能となる現状はご理解ください。  
 
-## 解析手法は以下の論文に基づきます
+### 解析手法は以下の論文に基づきます
 > 1) Tamura T et al., Selection bias due to delayed comprehensive genomic profiling in Japan, Cancer Sci, 114(3):1015-1025, 2023.  
       左側切断バイアスについては[こちらのwebsite](https://github.com/MANO-B/CCAT)も参照ください。
 > 2) Mochizuki T et al., Factors predictive of second-line chemotherapy in soft tissue sarcoma: An analysis of the National Genomic Profiling Database, Cancer Sci, 115(2):575-588, 2024.  
 
-## System Requirements
-### Hardware Requirements
+### System Requirements
+#### Hardware Requirements
 数千例の解析であれば問題ありませんが、数万例の解析を行う場合は32GB以上のメモリが必要です。    
 生存期間解析はStanを用いたモンテカルロ法でのシミュレーションを行います。4コア以上でできるだけ高速なCPUの使用が望まれます。  
 RAM: 4+ GB  
@@ -22,12 +22,12 @@ CPU: 4+ cores
   
 3000例、30遺伝子についての生存期間解析を64 GB RAM, M1MAX MacStudioで行った場合、およそ1時間を要します。  
 
-### Software Requirements
-#### R language
+#### Software Requirements
+##### R language
 適宜[ウェブサイト](https://syunsuke.github.io/r_install_guide_for_beginners/03_installation_of_R.html)を参照しRを導入ください。  
 特にバージョンの指定はありませんが、本ソフトウェアはv4.3.2を使用して作成しました。  
 以下、[コマンドラインからRを起動して作業を行います。](http://kouritsu.biz/installing-r-on-mac/)  
-#### Rstan
+##### Rstan
 こちらの[RStan Getting Started (Japanese)](https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started-(Japanese))を参照ください。  
 ```
 # もしすでにrstanをインストールしているならば次の行を実行してください
@@ -35,12 +35,12 @@ CPU: 4+ cores
 
 install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 ```
-#### Shiny
+##### Shiny
 Webアプリとするために[Shiny](https://shiny.posit.co)を使用しました。
 ```
 install.packages("shiny")
 ```
-#### Package dependencies
+##### Package dependencies
 依存しているパッケージ群を`R`ターミナルからインストールください。  
 初めて実行する場合は相当に時間がかかると思われます。  
 ```
@@ -48,7 +48,7 @@ install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr'
 BiocManager::install(c("ComplexHeatmap"), update=FALSE)
 ```
 
-## FELISの起動と解析ファイルの読み込み
+### FELISの起動
 - 解析ファイルの入手
 まずは解析したい症例の情報をC-CAT利活用検索ポータルからダウンロードします。
 設定を英語ではなく日本語バージョンとし、症例を選択した上で、以下の画像の通り  
@@ -78,13 +78,19 @@ Platform: aarch64-apple-darwin20 (64-bit)
 > library(shiny)
 > runApp('/User/C-CAT/Desktop/felis-cs')
 ```
-<img src="source/appli_GUI.png"  height=500>
+<img src="source/appli_GUI.png"  height=500>  
 
-- ファイルの読み込み
+
+
+### 解析ファイルの読み込み
+Input C-CAT raw fileタブを開きます。  
 ダウンロードした症例CSVとレポートCSVを、画面左上のBrowse...ボタンから選択して読み込みます。  
-複数のファイルを読み込むことも可能です。
+複数のファイルを選択肢読み込むことも可能です。  
+その他、オプションとして薬剤や組織型を変更する対応表の入力も可能です。  
 
-## 解析対象の指定  
+### 解析対象の指定  
+Input C-CAT raw fileタブを開きます。  
+ファイル読み込み・解析設定開始ボタンを押すと設定項目が表示されます。  
 多数の項目が設定可能です。  
 <img src="source/setting.png"  height=300>  
 
@@ -123,23 +129,26 @@ Platform: aarch64-apple-darwin20 (64-bit)
 - Oncoprintの表示  
 　　Oncoprintにおけるソートの順序を設定します。  
    
-## 解析の実行  
+##$ 解析の実行  
+Analysisタブを開きます。  
 多数の解析が可能です。  
+各ボタンに対応したタブに結果が表示されます。  
 <img src="source/analysis.png"  height=300>  <img src="source/examples.png"  height=300> 
 
 - 症例のまとめを表示  
-    - 選択した症例のまとめを**Patients summary**タブに表示します。  
+    - 選択した症例のまとめを**症例のまとめ**タブに表示します。  
 - Oncoprintを表示  
     - 選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
     症例の表を**Per_patient_table**タブに表示します。左上のボタンからダウンロードが可能です。  
 - 相互排他・共変異を表示
-    - [Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995)を用いた遺伝子変異感の相互排他性解析結果を**Co-occurrence**タブに表示します。  
+    - [Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995)を用いた遺伝子変異感の相互排他性解析結果を**相互排他・共変異**タブに表示します。  
     青が相互排他的、赤が共変異の関係にあることを意味します。  
     P<0.001の場合にアスタリスクが表示されます。  
 - 組織型ごとの各遺伝子の変異率を表示  
-　　 変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を**Mutation in subtypes**タブに表示します。  
+　　 変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を**組織型ごとの変異**タブに表示します。  
 - 遺伝子変異に基づくクラスタリング  
-変異遺伝子に基づくクラスタリングを[UMAP](https://arxiv.org/abs/1802.03426)および[DBSCAN](https://cdn.aaai.org/KDD/1996/KDD96-037.pdf)を用いて実施します。  
+変異遺伝子に基づくクラスタリングを[UMAP](https://arxiv.org/abs/1802.03426)および[DBSCAN](https://cdn.aaai.org/KDD/1996/KDD96-037.pdf)を用いて実施します。
+結果は**クラスタリング**タブ以下に表示します。  
     - 各組織型ごとの基礎的情報について**Basic data**タブに表示します。  
         Driver: がん化変異が一つ以上検出された症例の割合  
         optionおよびtreat: エキスパートパネルで推奨治療があった・治療を受けた頻度(％)  
@@ -172,6 +181,7 @@ Platform: aarch64-apple-darwin20 (64-bit)
 - CGP検査後の生存期間解析  
 遺伝子変異、治療内容、PSなどに着目したCGP検査後の生存期間解析を実施します。
 どのような患者が予後不良で早期のCGP検査が推奨されるかがみえてきます。
+結果は**CGP後の生存期間**タブ以下に表示します。  
     - 推奨治療の有無や治療内容で群分けをした生存期間解析を**Survival from CGP 1**タブに表示します。  
         UnrecomTreat(+): 推奨治療以外の治療を受けた患者  
         RecomTreat(+): 推奨治療を受けた患者  
@@ -190,6 +200,7 @@ Platform: aarch64-apple-darwin20 (64-bit)
 - 化学療法導入の生存期間解析(時間がかかります)  
 左側切断バイアスを考慮した緩和的化学療法導入後の生存期間解析を実施します。
 Stanを用いたシミュレーションのため解析が数十分のオーダーで時間を要します。
+結果は**CTx後の生存期間**タブ以下に表示します。  
     - 左側切断バイアスを補正した場合、Number at riskで補正した場合、シミュレーションで補正した場合の生存期間解析を**Survival from CTx 1**タブに表示します。  
     - 遺伝子変異の有無で群分けをした生存期間解析を**Survival from CTx 1**タブに表示します。  
         遺伝子変異の解析は、注目する遺伝子があればいずれかに変異があるか否かで群分けされます。  
@@ -198,24 +209,26 @@ Stanを用いたシミュレーションのため解析が数十分のオーダ�
         死亡イベントが少ない場合は結果が表示されません。  
     - 遺伝子変異の有無で群分けをしたsurvival curveを**Survival from CTx 3**タブに表示します。  
 - Palliative CTxで使用した薬剤リスト(1st-4th line)  
-    - 緩和目的の化学療法の1st-4th lineで使用されたレジメンを抽出し**Drug table**タブに表示します。
+    - 緩和目的の化学療法の1st-4th lineで使用されたレジメンを抽出し**薬剤奏効性・Drug table**タブに表示します。
     入力が不正確と思われる場合があるため、傾向をみる程度の使用が望ましいです。  
     **Select regimens of interest**パネルが出現します。以後の解析で注目する薬剤を選択します。  
 - 上記ボタンで選択した薬剤の奏効性解析  
 Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や組織型の関係性を評価します。  
-    - 注目する薬剤のToTと、その前治療のToTの関係性のwaterfall plotを**Drug analysis 1**タブに表示します。
-    - 注目する薬剤のToTと、その前治療のToTの関係性の散布図を**Drug analysis 1**タブに表示します。
-    - 注目する薬剤のToTと、その前治療のToTのKaplan-Meier survival curveを**Drug analysis 2**タブに表示します。
-    - 注目する薬剤と注目する遺伝子変異の有無に関するToTのKaplan-Meier survival curveを**Drug analysis 2**タブに表示します。
-    - 注目する薬剤と組織型に関するToTのKaplan-Meier survival curveを**Drug analysis 3**タブに表示します。
-
-## 今後の予定
+結果は**薬剤奏効性**タブ以下に表示します。  
+    - 注目する薬剤のToTと、その前治療のToTの関係性のwaterfall plotを**Drug analysis 1**タブに表示します。  
+    - 注目する薬剤のToTと、その前治療のToTの関係性の散布図を**Drug analysis 1**タブに表示します。  
+    - 注目する薬剤のToTと、その前治療のToTのKaplan-Meier survival curveを**Drug analysis 2**タブに表示します。  
+    - 注目する薬剤と注目する遺伝子変異の有無に関するToTのKaplan-Meier survival curveを**Drug analysis 2**タブに表示します。  
+    - 注目する薬剤と組織型に関するToTのKaplan-Meier survival curveを**Drug analysis 3**タブに表示します。  
+- ソフトの使用法などを**説明**タブに表示します。
+　　
+### 今後の予定
 - Pathway間の相互排他性解析を追加  
 - RECISTの奏効性とclustering、組織型、遺伝子変異などとの関連性を評価する解析を追加  
 - HER2免疫染色、MSIなどパネル検査前に行われた検査の結果と、パネル検査による遺伝子変異と、どちらがより薬剤奏効性を予測するかの解析を追加  
 - Liquid sequencingにおけるvariant frequencyと薬剤奏効性の関連性の解析を追加  
 
-## Version history
+### Version history
 1.1.1: 診断が1種類しかない場合に生じるエラーを修正 - 20240818  
 1.1.0: User Interfaceを改善、EGFRを中心にがん化変異が上手くアノーテーションされていない問題に対応 - 20240817  
 1.0.0: C-CAT database version 20240621に対応 - 20240815  
