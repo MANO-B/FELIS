@@ -127,8 +127,8 @@ Input C-CAT raw fileタブを開きます。
 - Variants for analysis  
 　　がん化変異のみ解析するか、病的意義に関わらず全ての変異を解析するか選択します。
 - Fusion geneの扱い
-   パートナー遺伝子が多数ある場合には一つ一つの数が少なくなります。  
-   NTRK fusion, ALK fusionのようにまとめて解析するかどうか選択します。  
+　　パートナー遺伝子が多数ある場合には一つ一つの数が少なくなります。  
+　　NTRK fusion, ALK fusionのようにまとめて解析するかどうか選択します。  
 - Oncoprintの表示  
 　　Oncoprintにおけるソートの順序を設定します。
 - 解析対象とする治療ライン
