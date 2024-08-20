@@ -125,9 +125,15 @@ Input C-CAT raw fileタブを開きます。
 　　Oncoprintや生存期間解析で対象とする遺伝子の絞り込みを行います。  
 　　特に生存期間解析にかかる時間に影響が出ます。  
 - Variants for analysis  
-　　がん化変異のみ解析するか、病的意義に関わらず全ての変異を解析するか選択します。  
+　　がん化変異のみ解析するか、病的意義に関わらず全ての変異を解析するか選択します。
+- Fusion geneの扱い
+   パートナー遺伝子が多数ある場合には一つ一つの数が少なくなります。  
+   NTRK fusion, ALK fusionのようにまとめて解析するかどうか選択します。  
 - Oncoprintの表示  
-　　Oncoprintにおけるソートの順序を設定します。  
+　　Oncoprintにおけるソートの順序を設定します。
+- 解析対象とする治療ライン
+   解析対象とする薬剤のラインを指定します。
+   1st-lineのみ指定すると、前治療との比較が実施されません。  
    
 ### 解析の実行  
 Analysisタブを開きます。  
@@ -216,7 +222,8 @@ Stanを用いたシミュレーションのため解析が数十分のオーダ�
 Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や組織型の関係性を評価します。  
 結果は**薬剤奏効性**タブ以下に表示します。  
     - 注目する薬剤のToTと、その前治療のToTの関係性のwaterfall plotを**Drug analysis 1**タブに表示します。  
-    - 注目する薬剤のToTと、その前治療のToTの関係性の散布図を**Drug analysis 1**タブに表示します。  
+    - 注目する薬剤のToTと、その前治療のToTの関係性の散布図を**Drug analysis 1**タブに表示します。
+        打ち切り症例は除いています。  
     - 注目する薬剤のToTと、その前治療のToTのKaplan-Meier survival curveを**Drug analysis 2**タブに表示します。  
     - 注目する薬剤と注目する遺伝子変異の有無に関するToTのKaplan-Meier survival curveを**Drug analysis 2**タブに表示します。  
     - 注目する薬剤と組織型に関するToTのKaplan-Meier survival curveを**Drug analysis 3**タブに表示します。  
