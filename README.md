@@ -246,6 +246,7 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 - Liquid sequencingにおけるvariant frequencyと薬剤奏効性の関連性の解析を追加  
 
 ### Version history
+1.2.0: User interfaceを改善、性別が1つしかない組織型でのエラーを修正 - 20240821  
 1.1.2: 薬剤奏効性に関する解析を追加 - 20240820  
 1.1.1: 診断が1種類しかない場合に生じるエラーを修正 - 20240818  
 1.1.0: User Interfaceを改善、EGFRを中心にがん化変異が上手くアノーテーションされていない問題に対応 - 20240817  
