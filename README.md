@@ -165,7 +165,7 @@ Analysisタブを開きます。
         P<0.05で集積している遺伝子変異を、他のクラスタと比較したオッズ比が高い順に3つまで表示します。  
     - 各クラスタにおける年齢層を**クラスタと年齢の関係図**タブに表示します。  
     - 各クラスタにおける組織型を**クラスタと組織型の関係図**タブに表示します。  
-    - 各組織型が少数のクラスタに集積するのか多数のクラスタに分布するのかをエントロピーとして**Cluster-entropy**タブに表示します。  
+    - 各組織型が少数のクラスタに集積するのか多数のクラスタに分布するのかをエントロピーとして**組織型が少数のクラスタにまとまるか**タブに表示します。  
         Shannon entropyで計算しています。低い値ほど集積傾向があります。  
     - クラスタと組織型の関係性についての表を**クラスタと組織型の表**タブに表示します。  
         左上のボタンからダウンロードが可能です。  
@@ -207,13 +207,13 @@ Analysisタブを開きます。
 左側切断バイアスを考慮した緩和的化学療法導入後の生存期間解析を実施します。
 Stanを用いたシミュレーションのため解析が数十分のオーダーで時間を要します。
 結果は**CTx後の生存期間**タブ以下に表示します。  
-    - 左側切断バイアスを補正した場合、Number at riskで補正した場合、シミュレーションで補正した場合の生存期間解析を**Survival from CTx 1**タブに表示します。  
+    - 左側切断バイアスを補正した場合、Number at riskで補正した場合、シミュレーションで補正した場合の生存期間解析を**左側切断バイアスを補正したCTx後の全生存期間**タブに表示します。  
     - 遺伝子変異の有無で群分けをした生存期間解析を**左側切断バイアスを補正したCTx後の全生存期間**タブに表示します。  
         遺伝子変異の解析は、注目する遺伝子があればいずれかに変異があるか否かで群分けされます。  
         注目する遺伝子がなければもっとも変異頻度が高い遺伝子に変異があるか否かで群分けされます。  
-    - 遺伝子変異の有無でmedian survival の差分(days)を計算した結果を**Survival from CTx 2**タブに表示します。  
+    - 遺伝子変異の有無でmedian survival の差分(days)を計算した結果を**遺伝子変異と全生存期間, forest plot**タブに表示します。  
         死亡イベントが少ない場合は結果が表示されません。  
-    - 遺伝子変異の有無で群分けをしたsurvival curveを**Survival from CTx 3**タブに表示します。  
+    - 遺伝子変異の有無で群分けをしたsurvival curveを**遺伝子変異と全生存期間, KM-curve**タブに表示します。  
 - Palliative CTxで使用した薬剤リスト(1st-4th line)  
     - 緩和目的の化学療法の1st-4th lineで使用されたレジメンを抽出し**薬剤奏効性・Drug table**タブに表示します。
     入力が不正確と思われる場合があるため、傾向をみる程度の使用が望ましいです。  
@@ -221,12 +221,22 @@ Stanを用いたシミュレーションのため解析が数十分のオーダ�
 - 上記ボタンで選択した薬剤の奏効性解析  
 Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や組織型の関係性を評価します。  
 結果は**薬剤奏効性**タブ以下に表示します。  
-    - 注目する薬剤のToTと、その前治療のToTの関係性のwaterfall plotを**Drug analysis 1**タブに表示します。  
-    - 注目する薬剤のToTと、その前治療のToTの関係性の散布図を**Drug analysis 1**タブに表示します。
+    - 注目する薬剤の情報を治療ライン別にまとめて**薬剤の使用状況, 治療ライン別**タブに表示します。  
+    - 注目する薬剤の情報を治療効果別にまとめて**薬剤の使用状況, 治療効果別**タブに表示します。  
+    - 注目する薬剤のToTと、その前治療のToTの関係性のwaterfall plotと散布図を**指定治療とその前治療のTime on treatment,　散布図**タブに表示します。  
+    - 注目する薬剤のToTと、その前治療のToTの関係性の散布図を**指定治療とその前治療のTime on treatment,　散布図**タブに表示します。
         打ち切り症例は除いています。  
-    - 注目する薬剤のToTと、その前治療のToTのKaplan-Meier survival curveを**Drug analysis 2**タブに表示します。  
-    - 注目する薬剤と注目する遺伝子変異の有無に関するToTのKaplan-Meier survival curveを**Drug analysis 2**タブに表示します。  
-    - 注目する薬剤と組織型に関するToTのKaplan-Meier survival curveを**Drug analysis 3**タブに表示します。  
+    - 注目する薬剤のToTと、その前治療のToT・他の薬剤のToTとの比較、遺伝子変異とToTの関係についてのKaplan-Meier survival curveを**指定治療とその前治療のTime on treatment, KM-curve**タブに表示します。  
+    - 注目する薬剤と組織型に関するToTのKaplan-Meier survival curveを**組織型ごとのTime on treatment**タブに表示します。  
+    - 注目する薬剤と遺伝子変異の有無に関するToTのmedian OSのforest plotを**遺伝子変異ごとのTime on treatment, forest plot**タブに表示します。  
+    - 注目する薬剤と遺伝子変異の有無に関するToTのKaplan-Meier survival curveを**遺伝子変異ごとのTime on treatment, KM-curve**タブに表示します。  
+    - 治療中断に至る要因のHazard ratioの表を**Time on treatmentに関するHazard ratio**タブに表示します。  
+    - Objective responseに至る要因のOdds ratioのforest plotを**ORRに関するOdds ratio, forest plot**タブに表示します。  
+    - Objective responseに至る要因のOdds ratioの表を**ORRに関するOdds ratio, 表**タブに表示します。  
+    - Disease controlに至る要因のOdds ratioのforest plotを**DCRに関するOdds ratio, forest plot**タブに表示します。  
+    - Disease controlに至る要因のOdds ratioの表を**DCRに関するOdds ratio, 表**タブに表示します。  
+    - 組織型ごとの奏効性の表を**組織型とRECIST**タブに表示します。  
+    - 遺伝子変異ごとの奏効性の表を**遺伝子変異とRECIST**タブに表示します。  
 - ソフトの使用法などを**説明**タブに表示します。
 　　
 ### 今後の予定
