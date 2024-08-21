@@ -44,7 +44,7 @@ install.packages("shiny")
 依存しているパッケージ群を`R`ターミナルからインストールください。  
 初めて実行する場合は相当に時間がかかると思われます。  
 ```
-install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'Rediscover', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','BiocManager'), dependencies = TRUE)
+install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'Rediscover', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'BiocManager'), dependencies = TRUE)
 BiocManager::install(c("ComplexHeatmap"), update=FALSE)
 ```
 
@@ -83,13 +83,13 @@ Platform: aarch64-apple-darwin20 (64-bit)
 
 
 ### 解析ファイルの読み込み
-Input C-CAT raw fileタブを開きます。  
+**Input C-CAT files**タブを開きます。  
 ダウンロードした症例CSVとレポートCSVを、画面左上のBrowse...ボタンから選択して読み込みます。  
 複数のファイルを選択肢読み込むことも可能です。  
 その他、オプションとして薬剤や組織型を変更する対応表の入力も可能です。  
 
 ### 解析対象の指定  
-Input C-CAT raw fileタブを開きます。  
+**Input C-CAT raw file**タブを開きます。  
 ファイル読み込み・解析設定開始ボタンを押すと設定項目が表示されます。  
 多数の項目が設定可能です。  
 <img src="source/setting.png"  height=300>  
