@@ -59,7 +59,7 @@ BiocManager::install(c("ComplexHeatmap"), update=FALSE)
 の2つのファイルをダウンロードします。ZIPファイルは解凍してCSVファイルに戻して使用します。  
 <img src="source/report.png"  height=300>　　<img src="source/case.png" height=300>
 
-- FELISのダウンロード
+- FELISのダウンロード  
 使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。  
 ここでは"/User/C-CAT/Desktop/felis-cs"とします。  
 
