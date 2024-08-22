@@ -292,7 +292,8 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 - Pathway間の相互排他性解析を追加  
 - RECISTの奏効性とclustering、組織型、遺伝子変異などとの関連性を評価する解析を追加  
 - HER2免疫染色、MSIなどパネル検査前に行われた検査の結果と、パネル検査による遺伝子変異と、どちらがより薬剤奏効性を予測するかの解析を追加  
-- Liquid sequencingにおけるvariant frequencyと薬剤奏効性の関連性の解析を追加  
+- Liquid sequencingにおけるvariant frequencyと薬剤奏効性の関連性の解析を追加
+- VUSも含めて組織型間での変異集積パターンの相違を評価  
 
 ### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
 C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
