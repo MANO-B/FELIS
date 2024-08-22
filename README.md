@@ -96,21 +96,22 @@ Platform: aarch64-apple-darwin20 (64-bit)
 多数の項目が設定可能です。  
 <img src="source/setting.png"  height=300>  
 
+#### 組織型に関するフィルタ  
 - Filter by histology  
 　　解析対象とする組織型の絞り込みを行います。  
 - まとめて解析する組織型(なければ未選択)  
 　　一つの組織型として扱って解析したい組織型群を選択します。  
-- まとめて解析する組織型1の名前  
+- まとめて解析する組織型の名前  
 　　まとめて解析したい組織型を代表する名前を選択します。  
+- Minimum patients for each histology  
+　　稀な組織型は発生部位に名前を変更して解析できます。  
+　　解析する組織型の最小症例数を設定します。  
+  
+#### 臨床事項に関するフィルタ  
 - Filter by sex  
 　　解析対象とする性別の絞り込みを行います。  
 - Filter by panel  
 　　解析対象とするがん遺伝子パネル検査の絞り込みを行います。  
-- Minimum patients for each histology  
-　　稀な組織型は発生部位に名前を変更して解析できます。  
-　　解析する組織型の最小症例数を設定します。  
-- Distance value for DBSCAN clustering  
-　　クラスタリング解析において弁別する距離の閾値を設定します。  
 - Age for analysis  
 　　解析対象とする年齢の絞り込みを行います。  
 - Threshold age for oncoprint  
@@ -119,20 +120,28 @@ Platform: aarch64-apple-darwin20 (64-bit)
 　　解析対象とするPSの絞り込みを行います。  
 - Filter by smoking status  
 　　解析対象とする喫煙歴の絞り込みを行います。  
+  
+#### 遺伝子に関するフィルタ  
 - 注目する遺伝子(なければ未選択)  
 　　Oncoprintや生存期間解析等で優先する遺伝子を選択します。  
 - 注目する遺伝子セット1(なければ未選択)  
 　　とくに注目する遺伝子セットがあれば選択します。  
+  
+#### 変異の種類に関するフィルタ  
+  
+#### その他の設定  
 - Gene number for oncoprint  
 　　Oncoprintや生存期間解析で対象とする遺伝子の絞り込みを行います。  
 　　特に生存期間解析にかかる時間に影響が出ます。  
+- Oncoprintの表示  
+　　Oncoprintにおけるソートの順序を設定します。
 - Variants for analysis  
 　　がん化変異のみ解析するか、病的意義に関わらず全ての変異を解析するか選択します。
 - Fusion geneの扱い
 　　パートナー遺伝子が多数ある場合には一つ一つの数が少なくなります。  
 　　NTRK fusion, ALK fusionのようにまとめて解析するかどうか選択します。  
-- Oncoprintの表示  
-　　Oncoprintにおけるソートの順序を設定します。
+- Distance value for DBSCAN clustering  
+　　クラスタリング解析において弁別する距離の閾値を設定します。  
 - 解析対象とする治療ライン  
 　　解析対象とする薬剤のラインを指定します。  
 　　1st-lineのみ指定すると、前治療との比較が実施されません。  
