@@ -83,9 +83,6 @@ Type 'q()' to exit R.
 > runApp('/User/C-C-CAT/Desktop/felis-cs')
 ```
   
-
-
-
 ### Reading analysis files.
 **Input C-CAT files** tab.  
 Select and load the downloaded case CSV and report CSV from the Browse... button in the upper left corner of the screen. button in the upper left corner of the screen.  
@@ -176,4 +173,139 @@ Displays a summary of the selected cases in the **Case Summary** tab.
 #### View Oncoprint  
 - Displays the genetic variants of the selected case in the **Oncoprint** tab.  
 Displays a table of cases in the **Clinical and mutation information per patient** tab. You can download the file from the button in the upper left corner.  
+
+  
+#### Display Mutual Exclusion/Co-mutation
+- The results of the mutual exclusivity analysis of gene mutation senses using the [Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995) are displayed in the **Mutual Exclusion/Co-mutation** tab.  
+    Blue means that the relationship is mutually exclusive and red means that the relationship is co-mutation.  
+    An asterisk is displayed if P<0.001.  
+  
+#### Displays the mutation rate of each gene per histological type  
+- For genes with high mutation frequency, the frequency of gene mutation per tissue type is displayed in the **Mutation per tissue type** tab.  
+  
+#### Clustering based on gene mutation  
+Clustering based on mutated genes is performed using [UMAP](https://arxiv.org/abs/1802.03426) and [DBSCAN](https://cdn.aaai.org/KDD/1996/KDD96-037.pdf).
+Results are displayed under the **Clustering** tab.  
+- Basic information for each histology is displayed under the **Basic data** tab.  
+    - Driver: Percentage of cases with at least one carcinogenic mutation detected.  
+    - option_and_treat: Frequency (%) of cases that received treatment recommended by the expert panel.  
+    - time_before_CGP: median survival (days) from the start of palliative chemotherapy to CGP testing.  
+    - time_after_CGP: median survival (days) from CGP testing to death.  
+- The histological types and genetic variants clustered in each cluster are displayed in the **Clustered histological types and variants** tab.  
+    The histotypes clustered at P<0.05 are displayed in order of their odds ratios compared to the other clusters, up to three.  
+    Genetic variants with P<0.05 are displayed in descending order of odds ratio compared to other clusters, up to 3.  
+- Age groups in each cluster are displayed in the **Cluster and Age Relationship Diagram** tab.  
+- Organizational type for each cluster is displayed in the **Cluster and Organizational Type Relationship Diagram** tab.  
+- The entropy of the clusters is displayed in the **Organizational Types Clustered in Fewer Clusters** tab to indicate whether the organizational types are clustered in a few clusters or in many clusters.  
+    The entropy is calculated by Shannon entropy. The lower the value, the more clustered it tends to be.  
+- A table of the relationship between clusters and organizational types is displayed in the **Clusters and Organizational Types Table** tab.  
+    You can download it from the button on the upper left.  
+- A table of the relationship between clusters and genetic variation is displayed in the **Table of Clusters and Genetic Variation** tab.  
+    It can be downloaded by clicking the button in the upper left corner.  
+- The frequency of mutations detected in each histology corresponding to drugs with Evidence level is displayed in the **Frequency of patients with targeted therapy per histology** tab.  
+    Consistent with high Evidence level: Patients with both Evidence level A and B drugs are designated as A.  
+- The relationship between mean survival from start of chemotherapy to CGP testing and from CGP testing to death for each histology is displayed on the **Pre-CGP and Post-CGP Duration Relationship** tab.  
+- The relationship between the number of cases of each histology and information about treatment is displayed on the **Number of Patients per Histology and Treatment Attainment Rate** tab.  
+    The number of patients and the percentage with Evidence level A, B or higher, and C or higher drugs are shown as a scatterplot.  
+    Scatterplot of number of patients and percentage with recommended treatment, percentage with recommended treatment, and percentage of patients with recommended treatment who received the recommended treatment.  
+- The relationship between time to CGP testing and information about treatment for each histology type is displayed in the **Time to CGP and Percent Treatment Reached** tab.  
+    Scatterplot of time to CGP and percentage of patients with Evidence level A, B or higher, and C or higher drugs.  
+    Scatter plots of time to CGP testing and percentage with recommended treatment, percentage with recommended treatment, and percentage of patients with recommended treatment who received the recommended treatment.  
+- The relationship between survival after CGP testing and information about treatment for each histology type is displayed in the **Survival After CGP and Treatment Attainment** tab.  
+    Scatterplot of survival after CGP and percentage of patients with Evidence level A, B or higher, and C or higher drugs.  
+    Scatter plots of survival after CGP testing and percentage of patients with recommended treatment, percentage of patients who received recommended treatment, and percentage of patients with recommended treatment who received recommended treatment.    
+  
+#### Survival analysis after CGP testing  
+Survival analysis after CGP testing focusing on gene mutation, treatment details, PS, etc.
+A 95% confidence interval will be calculated using log-log transformation.  
+It shows which patients have a poor prognosis and early CGP testing is recommended.  
+The results are displayed under the tab **Survival after CGP**.  
+- Survival analysis grouped by treatment recommendations is displayed under the **Survival and Treatment after CGP** tab.  
+    UnrecomTreat(+): Patients who received treatment other than recommended treatment  
+    RecomTreat(+): Patients who received the recommended treatment  
+    Treat(-): Patients who did not receive any treatment after CGP testing  
+- Survival analysis grouped by histology, PS, and presence/absence of genetic mutations is displayed in the **Survival and PS after CGP** tab.  
+    For gene mutation analysis, if there is a gene of interest, the patients are grouped according to whether or not they have a mutation in one of the genes.  
+    If there is no gene of interest, the mutations are grouped according to whether or not the gene with the highest mutation frequency is mutated.  
+- The median survival (days) of the patients grouped by gene mutation is displayed in the **Survival and gene mutation after CGP, forest plot** tab.  
+    If the mutation frequency is small, the 95% confidence interval is not displayed.  
+- Kaplan-Meier survival curves grouped by gene mutation are displayed in the **Survival after CGP and Gene Mutation, KM-curve** tab.  
+- A forest plot of the hazard ratio for death after CGP testing is displayed in the **Hazard ratio for survival after CGP, forest plot** tab.  
+    Factors that match more than 95% are considered multicollinear and are excluded.
+    Factors with more than 95% concordance are excluded as multicollinearity.  
+    If a factor has no mortality events, the result is not displayed.  
+- The results of the logistic regression analysis of the factors that led patients to the **recommended treatment** are displayed as a forest plot in the tab **Factors leading to the recommended treatment, forest plot**.  
+    If there are factors that have not reached the recommended treatment at all, no values will be displayed.  
+- Displays a summary table on the **Factors leading to recommended treatment, table** tab with a summary of the factors leading to **patients receiving recommended treatment**.  
+  
+#### Survival analysis of chemotherapy induction (takes time)  
+Perform a survival analysis after palliative chemotherapy induction with left-sided cutting bias.
+The analysis takes time in the order of tens of minutes due to the simulation using Stan.
+Results are displayed under the **Survival after CTx** tab.  
+- Survival analysis for the cases corrected for left-sided truncation bias, corrected for number at risk, and corrected for simulation is displayed under the tab **Overall Survival after CTx corrected for left-sided truncation bias**.  
+- Survival analysis with grouping by gene mutation is displayed in the **Overall Survival After CTx Corrected for Left-Sided Cutting Bias** tab.  
+    The gene mutation analysis is grouped by whether or not any of the genes of interest have a mutation.  
+    If there is no gene of interest, the patients are grouped according to whether or not the gene with the highest mutation frequency has a mutation.  
+- The difference (days) of median survival is calculated for each gene mutation and the result is displayed in the **Gene mutation and overall survival, forest plot** tab.  
+    If there are few mortality events, the results will not be displayed.  
+- Survival curves, grouped by gene mutation, are displayed in the **Gene mutation and overall survival, KM-curve** tab.  
+  
+#### List of drugs used in Palliative CTx (1st-4th line)  
+- Regimens used in the 1st-4th line of palliative chemotherapy are extracted and displayed in the **Drug response and Drug table** tab.
+The input may appear to be inaccurate, so it should be used only to see trends.  
+**Select regimens of interest** panel will appear. Select regimens of interest for subsequent analysis.  
+  
+#### Response analysis of the drug selected by the above button  
+Evaluate the relationship between the duration of drug response and genetic mutations and histology with a focus on Treatment on time (ToT).  
+Results are displayed under the **Drug Response** tab.  
+- Information on all drugs is summarized by line of therapy and displayed under the **Drug Usage, by Line of Therapy** tab.  
+- All drug information is summarized by therapeutic effect and displayed under the **Drug Usage, By Therapeutic Effect** tab.  
+- The information of drugs in the specified line is summarized by mutation pattern and displayed in the **Drug Usage in the Specified Line, by Mutation Pattern** tab.  
+- The information of the drug for the specified line is summarized by tissue type and displayed in the **Drug Usage for the Specified Line, by Tissue Type** tab.  
+- The drug information of the specified line is summarized by gene mutation of interest and displayed in the **Drug Usage of the Specified Line, by Gene Mutation** tab.  
+- Information on the specified line and the specified drug with ToT information is summarized by mutation pattern and displayed in the **Specified line with ToT information, usage of the specified drug, by mutation pattern** tab.  
+- The information on the designated line and the designated drug with ToT information is summarized by tissue type and displayed in the **Display of the designated line and the designated drug with ToT information, by tissue type** tab.  
+- Information on designated lines and designated drugs with ToT information is summarized by gene mutation of interest and displayed in the **Display of designated lines and designated drugs with ToT information, by gene mutation** tab.  
+- Information on the designated line and the designated drug with RESICT information is summarized by mutation pattern and displayed in the **Display of the designated line and the designated drug with RESICT information, by mutation pattern** tab.  
+- Information on designated lines and designated drugs with RESICT information is summarized by tissue type and displayed in the **Display of designated lines and designated drugs with RESICT information, by tissue type** tab.  
+- Information on designated lines and designated drugs with RESICT information is summarized by gene mutation of interest and displayed in the **Display of designated lines and designated drugs with RESICT information, by gene mutation** tab.  
+- Displays waterfall plots and scatter plots of the relationship between the ToT of the drug of interest and the ToT of its previous treatment in the **Time on treatment, scatter plots** tab for the specified treatment and its previous treatment.  
+- Scatter plots of the relationship between the ToT of the drug of interest and the ToT of its previous treatment are displayed in the **Time on treatment, scatter plots** tab for the specified treatment and its previous treatment.
+    Censored cases are excluded.  
+- A Kaplan-Meier survival curve of the ToT of the drug of interest compared to the ToT of its previous treatment and the ToT of other drugs, and the relationship between gene mutation and ToT is displayed in the **Time on treatment for the specified treatment and its previous treatment, KM-curve** tab.  
+- Displays Kaplan-Meier survival curves for the relationship between ToT and genes and mutation patterns of interest in the **Time on treatment, KM-curve** tab for each gene and mutation of interest.  
+- Displays Kaplan-Meier survival curves for the ToT for the drug and tissue type of interest in the **Time on treatment by tissue type** tab.  
+- Displays the median OS forest plot of the ToT for the drug of interest and the gene mutation in the **Time on treatment, forest plot** tab for each gene mutation.  
+- Displays the Kaplan-Meier survival curve of the ToT for the drug and gene mutation of interest in the **Time on treatment by gene mutation, KM-curve** tab.  
+- Displays a table of Hazard ratios for factors leading to treatment discontinuation in the **Hazard ratio for time on treatment** tab.  
+- Displays a forest plot of Odds ratio for factors leading to Objective response in the **Odds ratio for ORR, forest plot** tab.  
+- Displays a table of Odds ratio of factors leading to Objective response in the **Odds ratio for ORR, table** tab.  
+- Displays a forest plot of Odds ratio leading to disease control in the **Odds ratio for DCR, forest plot** tab.  
+- Displays a table of Odds ratio of factors leading to disease control in the **Odds ratio for DCR, table** tab.  
+- Displays a table of response by mutation pattern in the **Mutation pattern and RECIST** tab.  
+    Calculate 95% confidence intervals using the Clopper-Pearson method.  
+- A table of responses by histology is displayed in the **HISTOTYPE AND RECIST** tab.  
+- A table of response by gene mutation is displayed on the **Gene Mutation and RECIST** tab.  
+  
+#### Displays instructions on how to use the software, etc. on the **DISCUSSION** tab.
+　　
+### Future Plans
+- Add mutual exclusivity analysis between pathways  
+- Add analysis to evaluate the association of RECIST response with clustering, histology, genetic mutations, etc.  
+- Added an analysis to determine which is more predictive of drug response, genetic mutations from panel testing or results of tests performed prior to panel testing, such as HER2 immunostaining, MSI, etc.  
+- Added analysis of the association between variant frequency and drug response in liquid sequencing.
+- Evaluated differences in mutation clustering patterns between tissue types, including VUS.  
+
+### Recommended FELIS versions for each version of the C-CAT database  
+Since column names may be added or changed in each version of the C-CAT data, the appropriate version of FELIS is required.  
+C-CAT database version 20240621: FELIS version 1.2.2  
+  
+### Version history
+1.2.2: Added analysis by gene mutation pattern, corrected miscounting of total cases in survival analysis - 20240822  
+1.2.1: Added support for analysis by gene mutation pattern, such as Exon19 mutation and TKD mutation - 20240821  
+1.2.0: Improved user interface, corrected error in tissue types with only one gender - 20240821  
+1.1.2: Added analysis of drug response - 20240820  
+1.1.1: Fix error with only one diagnosis - 20240818  
+1.1.0: Improved User Interface, addresses problem of poorly annotated oncogenic mutations, especially EGFR - 20240817  
+1.0.0: Support C-CAT database version 20240621 - 20240815  
   
