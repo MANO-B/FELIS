@@ -1,5 +1,5 @@
 ## FELIS for C-CAT database <img src="source/FELIS.png" width=50>
-Functions Especially for LIquid and Solid tumor clinical sequencing, for Japanese only.  
+Functions Especially for LIquid and Solid tumor clinical sequencing, for Japanese only [(English version of this README file)](https://github.com/MANO-B/FELIS/blob/main/README_ENG.md).  
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
 
 
