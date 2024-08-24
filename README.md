@@ -46,7 +46,7 @@ install.packages("shiny")
 依存しているパッケージ群を`R`ターミナルからインストールください。  
 初めて実行する場合は相当に時間がかかると思われます。  
 ```
-install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'Rediscover', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'BiocManager'), dependencies = TRUE)
+install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'Rediscover', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'BiocManager'), dependencies = TRUE)
 BiocManager::install(c("maftools"), update=FALSE)
 BiocManager::install(c("ComplexHeatmap"), update=FALSE)
 ```
@@ -301,6 +301,7 @@ C-CATのデータはバージョンごとに列名が追加・変更されるこ
 C-CAT database version 20240621: FELIS version 1.2.2  
   
 ### Version history
+1.2.5: 大量サンプルの読み込みの高速化のためread.csvからfreadに変更 - 20240824  
 1.2.4: as.Date関係のエラーとNULLの処理に関する問題に対応 - 20240824  
 1.2.3: Rのバージョンによってas.Date, summaryの挙動が異なっていた問題に対応 - 20240823  
 1.2.2: 遺伝子変異パターンごとの解析を追加、生存期間解析での全症例数のカウント間違いを修正 - 20240822  
