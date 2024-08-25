@@ -37,7 +37,13 @@ CPU: 4+ cores
 ```
 ## MacOSの場合
 ## githubに登録し、PATを入手する
-## ターミナルでCommand Line Tools for Xcodeのインストールを行う　
+### 1. Sign in github.
+### 2. Access Settings - Developer Settings in the Dashboard.
+### 3. Generate a Personal access token (classic) without any checkboxes.
+### 4. Copy the generated token.
+## ターミナルで以下のコマンドを実行しCommand Line Tools for Xcodeのインストールを行う　
+### xcode-select --install
+## Rコンソールで以下のコマンドを実行する
 install.packages("remotes")
 remotes::install_github("coatless-mac/macrtools", auth_token = "入手したPAT")
 options(timeout=1000)
@@ -53,6 +59,7 @@ install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption
 
 ## Windowsの場合
 ## Rtoolsをインストールする
+## Rコンソールで以下のコマンドを実行する
 install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 ```
 ##### Shiny
