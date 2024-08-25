@@ -31,9 +31,9 @@ CPU: 4+ cores
 以下、[コマンドラインからRを起動して作業を行います。](http://kouritsu.biz/installing-r-on-mac/)  
 ##### Rstan
 こちらの[RStan Getting Started (Japanese)](https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started-(Japanese))を参照ください。  
-- MacOSでのインストールには[Xcode CLT](https://qiita.com/payreikit/items/4bb0f863afc7b56d0809)が必要で、さらに[macrtools](https://mac.thecoatlessprofessor.com/macrtools/)を[github](https://github.com)からインストールする関係でgithubへのアカウント登録が必要です。  
-[こちらのウェブサイト](https://qiita.com/tsutsumin_pro/items/52a483d67c9b9e490d76)を参照ください。  
-生存期間解析が不要であれば、Rstanをインストールしないという選択も可能です。  
+- MacOSでのインストールには[Xcode CLT](https://qiita.com/payreikit/items/4bb0f863afc7b56d0809)が必要で、さらに[macrtools](https://mac.thecoatlessprofessor.com/macrtools/)を[github](https://github.com)からインストールする関係でgithubへのアカウント登録が必要です。[こちらのウェブサイト](https://qiita.com/tsutsumin_pro/items/52a483d67c9b9e490d76)を参照ください。生存期間解析が不要であれば、Rstanをインストールしないという選択も可能です。  
+- WindowsでのインストールはRのバージョンに合わせて[Rtools](https://github.com/stan-dev/rstan/wiki/Configuring-C---Toolchain-for-Windows)をインストールください。  
+- Linuxでのインストールは[適宜](https://github.com/stan-dev/rstan/wiki/Configuring-C-Toolchain-for-Linux)実施ください。  
 ```
 ## MacOSの場合
 ## githubに登録し、PATを入手する
@@ -51,7 +51,9 @@ cat(paste("\nCXX17FLAGS += -O3 -mtune=native -arch", arch, "-ftemplate-depth-256
     file = M, sep = "\n", append = FALSE)
 install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 
-
+## Windowsの場合
+## Rtoolsをインストールする
+install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 ```
 ##### Shiny
 Webアプリとするために[Shiny](https://shiny.posit.co)を使用しました。
