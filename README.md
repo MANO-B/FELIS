@@ -326,6 +326,7 @@ C-CATのデータはバージョンごとに列名が追加・変更されるこ
 C-CAT database version 20240621: FELIS version 1.2.6  
   
 ### Version history
+1.2.7: Survival curveの表示の調整 - 20240825  
 1.2.6: read_csv関連のエラーを修正、NAの処理を修正しWarningが出ないように修正 - 20240825  
 1.2.5: 大量サンプルの読み込みの高速化のためread.csvからread_csvに変更 - 20240824  
 1.2.4: as.Date関係のエラーとNULLの処理に関する問題に対応 - 20240824  
