@@ -71,9 +71,14 @@ install.packages("shiny")
 依存しているパッケージ群を`R`ターミナルからインストールください。  
 初めて実行する場合は相当に時間がかかると思われます。  
 ```
-install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'Rediscover', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'BiocManager'), dependencies = TRUE)
+install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'Rediscover', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'ggrepel', 'httr', 'plyr', 'BiocManager'), dependencies = TRUE)
 BiocManager::install(c("maftools"), update=FALSE)
 BiocManager::install(c("ComplexHeatmap"), update=FALSE)
+BiocManager::install("drawProteins", update=FALSE)
+
+# drawProteinsのインストールが上手くいかない場合
+# githubのサインイン、PATの発行を行った上で以下を実行
+# remotes::install_github('brennanpincardiff/drawProteins', auth_token = "入手したPAT")
 ```
 
 ### FELISの起動
@@ -153,8 +158,13 @@ Platform: aarch64-apple-darwin20 (64-bit)
 - 注目する遺伝子セット1(なければ未選択)  
 　　とくに注目する遺伝子セットがあれば選択します。  
 - 変異に基づいて症例選択するか  
-　　変異を有する症例・有さない症例のみを選択して解析可能です。  
-  
+　　変異を有する症例・有さない症例のみを選択して解析可能です。
+- Lolliplotを描画する遺伝子(なければ未選択)  
+　　注目する遺伝子を選択してください。描画にはInternet接続が必要です。
+　　[Mutplot](https://github.com/VivianBailey/Mutplot)のスクリプトを使用しています。  
+- Threshold mutation count for lolliplot
+　　頻度の高い変異を強調するための設定です。  
+　　
 #### 変異の種類に関するフィルタ  
 - 注目する遺伝子(なければ未選択)  
 　　特に変異の部位やパターンなどを詳細にみたい遺伝子を選択します。  
@@ -199,8 +209,9 @@ Analysisタブを開きます。
   
 #### Oncoprintを表示  
 - 選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
-症例の表を**患者ごとの臨床情報と変異情報**タブに表示します。左上のボタンからダウンロードが可能です。  
-  
+- 選択した遺伝子のLolliplotを**Lolliplot**タブに表示します。Internet接続が必要です。  
+症例の表を**患者ごとの臨床情報と変異情報**タブに表示します。左上のボタンからダウンロードが可能です。
+    
 #### 相互排他・共変異を表示
 - [Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995)を用いた遺伝子変異感の相互排他性解析結果を**相互排他・共変異**タブに表示します。  
     青が相互排他的、赤が共変異の関係にあることを意味します。  
@@ -328,6 +339,7 @@ C-CATのデータはバージョンごとに列名が追加・変更されるこ
 C-CAT database version 20240621: FELIS version 1.2.6  
   
 ### Version history
+1.2.8: Lolliplotを追加 - 20240826  
 1.2.7: Survival curveの表示の調整 - 20240825  
 1.2.6: read_csv関連のエラーを修正、NAの処理を修正しWarningが出ないように修正 - 20240825  
 1.2.5: 大量サンプルの読み込みの高速化のためread.csvからread_csvに変更 - 20240824  
