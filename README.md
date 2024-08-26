@@ -311,6 +311,7 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 - 注目する薬剤のToTと、その前治療のToT・他の薬剤のToTとの比較、遺伝子変異とToTの関係についてのKaplan-Meier survival curveを**指定治療とその前治療のTime on treatment, KM-curve**タブに表示します。  
 - ToTと注目する遺伝子、注目する変異パターンの関係についてのKaplan-Meier survival curveを**注目する遺伝子・変異ごとのTime on treatment, KM-curve**タブに表示します。  
 - 注目する薬剤と組織型に関するToTのKaplan-Meier survival curveを**組織型ごとのTime on treatment**タブに表示します。  
+- 注目する薬剤と遺伝子変異クラスタに関するToTのKaplan-Meier survival curveを**遺伝子変異クラスタごとのTime on treatment**タブに表示します。  
 - 注目する薬剤と遺伝子変異の有無に関するToTのmedian OSのforest plotを**遺伝子変異ごとのTime on treatment, forest plot**タブに表示します。  
 - 注目する薬剤と遺伝子変異の有無に関するToTのKaplan-Meier survival curveを**遺伝子変異ごとのTime on treatment, KM-curve**タブに表示します。  
 - 治療中断に至る要因のHazard ratioの表を**Time on treatmentに関するHazard ratio**タブに表示します。  
@@ -318,6 +319,7 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 - Objective responseに至る要因のOdds ratioの表を**ORRに関するOdds ratio, 表**タブに表示します。  
 - Disease controlに至る要因のOdds ratioのforest plotを**DCRに関するOdds ratio, forest plot**タブに表示します。  
 - Disease controlに至る要因のOdds ratioの表を**DCRに関するOdds ratio, 表**タブに表示します。  
+- 遺伝子変異クラスタごとの奏効性の表を**遺伝子変異クラスタとRECIST**タブに表示します。  
 - 変異パターンごとの奏効性の表を**変異パターンとRECIST**タブに表示します。  
     Clopper–Pearson法を用いて95%信頼区間を算出します。  
 - 組織型ごとの奏効性の表を**組織型とRECIST**タブに表示します。  
@@ -328,7 +330,6 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 　　
 ### 今後の予定
 - Pathway間の相互排他性解析を追加  
-- RECISTの奏効性/生存期間とclusteringとの関連性を評価する解析を追加
 - 診断時からの生存期間解析を追加(診断時のstageが登録されている症例が増えればその群分けを追加)  
 - HER2免疫染色、MSIなどパネル検査前に行われた検査の結果と、パネル検査による遺伝子変異と、どちらがより薬剤奏効性を予測するかの解析を追加  
 - Liquid sequencingにおけるvariant frequencyと薬剤奏効性の関連性の解析を追加  
@@ -336,9 +337,10 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 
 ### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
 C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
-C-CAT database version 20240621: FELIS version 1.2.8  
+C-CAT database version 20240621: FELIS version 1.3.0  
   
 ### Version history
+1.3.0: RECISTの奏効性/生存期間とclusteringとの関連性を評価する解析を追加 - 20240826  
 1.2.8: Lolliplotを追加、Oncoprintで短縮型変異を独立 - 20240826  
 1.2.7: Survival curveの表示の調整 - 20240825  
 1.2.6: read_csv関連のエラーを修正、NAの処理を修正しWarningが出ないように修正 - 20240825  
