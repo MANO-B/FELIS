@@ -336,7 +336,7 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 
 ### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
 C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
-C-CAT database version 20240621: FELIS version 1.2.6  
+C-CAT database version 20240621: FELIS version 1.2.8  
   
 ### Version history
 1.2.8: Lolliplotを追加、Oncoprintで短縮型変異を独立 - 20240826  
