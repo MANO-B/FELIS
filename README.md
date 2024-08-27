@@ -348,10 +348,11 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 
 ### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
 C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
-C-CAT database version 20240621: FELIS version 1.3.1  
+C-CAT database version 20240621: FELIS version 1.3.2  
   
 ### Version history
-1.3.1: Clusteringのbasic figureのTMBの表示を修正。安定動作版、しばらく更新予定なし - 20240827  
+1.3.2: 推奨治療到達に関するノモグラムを作成 - 20240827  
+1.3.1: Clusteringのbasic figureのTMBの表示を修正。安定動作版。 - 20240827  
 1.3.0: RECISTの奏効性/生存期間とclusteringとの関連性を評価する解析を追加 - 20240826  
 1.2.8: Lolliplotを追加、Oncoprintで短縮型変異を独立 - 20240826  
 1.2.7: Survival curveの表示の調整 - 20240825  
