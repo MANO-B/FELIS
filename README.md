@@ -81,6 +81,10 @@ BiocManager::install("drawProteins", update=FALSE)
 # remotes::install_github('brennanpincardiff/drawProteins', auth_token = "入手したPAT")
 ```
 
+##### Rの設定  
+[Rstudio](https://posit.co/download/rstudio-desktop/)の使用をお勧めします。  
+Figureの日本語表示が上手くいかない場合は[こちら](https://ill-identified.hatenablog.com/entry/2021/09/10/231230)を参照ください。  
+  
 ### FELISの起動
 - 解析ファイルの入手
 まずは解析したい症例の情報をC-CAT利活用検索ポータルからダウンロードします。
@@ -340,6 +344,7 @@ C-CATのデータはバージョンごとに列名が追加・変更されるこ
 C-CAT database version 20240621: FELIS version 1.3.0  
   
 ### Version history
+1.3.1: Clusteringのbasic figureのTMBの表示を修正 - 20240827  
 1.3.0: RECISTの奏効性/生存期間とclusteringとの関連性を評価する解析を追加 - 20240826  
 1.2.8: Lolliplotを追加、Oncoprintで短縮型変異を独立 - 20240826  
 1.2.7: Survival curveの表示の調整 - 20240825  
