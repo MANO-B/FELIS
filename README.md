@@ -78,7 +78,14 @@ BiocManager::install("drawProteins", update=FALSE)
 
 # drawProteinsのインストールが上手くいかない場合
 # githubのサインイン、PATの発行を行った上で以下を実行
-# remotes::install_github('brennanpincardiff/drawProteins', auth_token = "入手したPAT")
+install.packages("remotes")
+remotes::install_github('brennanpincardiff/drawProteins', auth_token = "入手したPAT")
+
+# Rのバージョンによりrmsのインストールが上手くいかない場合
+# versionは以下URLを確認し適宜変更ください
+# https://cran.r-project.org/src/contrib/Archive/rms/
+install.packages("remotes")
+remotes::install_version(package = "rms", version = "6.7.0", dependencies = FALSE)
 ```
 
 ##### Rの設定  
