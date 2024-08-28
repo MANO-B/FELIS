@@ -71,7 +71,7 @@ install.packages("shiny")
 依存しているパッケージ群を`R`ターミナルからインストールください。  
 初めて実行する場合は相当に時間がかかると思われます。  
 ```
-install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'Rediscover', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'ggrepel', 'httr', 'plyr', 'rms', 'dcurves', 'Matching', 'blorr', 'BiocManager'), dependencies = TRUE)
+install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'Rediscover', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'ggrepel', 'httr', 'plyr', 'rms', 'dcurves', 'Matching', 'blorr', 'broom', 'survRM2', 'rsample', 'BiocManager'), dependencies = TRUE)
 BiocManager::install(c("maftools"), update=FALSE)
 BiocManager::install(c("ComplexHeatmap"), update=FALSE)
 BiocManager::install("drawProteins", update=FALSE)
@@ -261,7 +261,8 @@ Analysisタブを開きます。
     CGP検査までの期間と推奨治療がある割合、推奨治療を受けた割合、推奨治療がある患者が推奨治療を受けた割合を散布図としました。  
 - 各組織型のCGP検査後の生存期間と治療についての情報の関係を**CGP後の生存期間と治療到達率**タブに表示します。  
     CGP検査後の生存期間とEvidence level A, B以上, C以上の薬剤がある割合を散布図としました。  
-    CGP検査後の生存期間と推奨治療がある割合、推奨治療を受けた割合、推奨治療がある患者が推奨治療を受けた割合を散布図としました。    
+    CGP検査後の生存期間と推奨治療がある割合、推奨治療を受けた割合、推奨治療がある患者が推奨治療を受けた割合を散布図としました。
+  [Decision curve analysis](https://mskcc-epi-bio.github.io/decisioncurveanalysis/index.html)
   
 #### CGP検査後の生存期間解析  
 遺伝子変異、治療内容、PSなどに着目したCGP検査後の生存期間解析を実施します。
@@ -348,9 +349,10 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 
 ### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
 C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
-C-CAT database version 20240621: FELIS version 1.3.2  
+C-CAT database version 20240621: FELIS version 1.4.0  
   
 ### Version history
+1.4.0: Dicision curve analysisを追加 - 20240828  
 1.3.2: 推奨治療到達に関するノモグラムを作成 - 20240827  
 1.3.1: Clusteringのbasic figureのTMBの表示を修正。安定動作版。 - 20240827  
 1.3.0: RECISTの奏効性/生存期間とclusteringとの関連性を評価する解析を追加 - 20240826  
