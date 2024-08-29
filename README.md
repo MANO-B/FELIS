@@ -330,9 +330,7 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 - 注目する薬剤と遺伝子変異の有無に関するToTのmedian OSのforest plotを**遺伝子変異ごとのTime on treatment, forest plot**タブに表示します。  
 - 注目する薬剤と遺伝子変異の有無に関するToTのKaplan-Meier survival curveを**遺伝子変異ごとのTime on treatment, KM-curve**タブに表示します。  
 - 治療中断に至る要因のHazard ratioの表を**Time on treatmentに関するHazard ratio**タブに表示します。  
-- Objective responseに至る要因のOdds ratioのforest plotを**ORRに関するOdds ratio, forest plot**タブに表示します。  
 - Objective responseに至る要因のOdds ratioの表を**ORRに関するOdds ratio, 表**タブに表示します。  
-- Disease controlに至る要因のOdds ratioのforest plotを**DCRに関するOdds ratio, forest plot**タブに表示します。  
 - Disease controlに至る要因のOdds ratioの表を**DCRに関するOdds ratio, 表**タブに表示します。  
 - 遺伝子変異クラスタごとの奏効性の表を**遺伝子変異クラスタとRECIST**タブに表示します。  
 - 変異パターンごとの奏効性の表を**変異パターンとRECIST**タブに表示します。  
