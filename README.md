@@ -224,7 +224,8 @@ Analysisタブを開きます。
   
 #### Oncoprintを表示  
 - 選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
-- 選択した遺伝子のLolliplotを**Lolliplot**タブに表示します。Internet接続が必要です。  
+- 選択した遺伝子のLolliplotを**Lolliplot**タブに表示します。Internet接続が必要です。
+    上手く表示されない場合はsource/UniProt.txtにUniprot IDを追記してください。  
 - 症例の表を**患者ごとの臨床情報と変異情報**タブに表示します。左上のボタンからダウンロードが可能です。  
     
 #### 相互排他・共変異を表示
