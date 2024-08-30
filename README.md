@@ -12,7 +12,7 @@ docker pull ikegamitky/felis:v1.4.1 --platform linux/amd64
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
 ```
-docker run -d -p 3838:3838 ikegamitky/felis:1.4.1 shiny-server
+docker run -d --rm -p 3838:3838 ikegamitky/felis:1.4.1 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
   
 ### C-CAT利活用データの解析ソフトウェア
