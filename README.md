@@ -8,6 +8,7 @@ Dockerの使用法は[Windows向け](https://qiita.com/hoshimado/items/51c99ccae
 CPUは4コア、メモリは[可及的に大きく設定](https://dojo.docker.jp/t/topic/52)ください。  
 FELIS docker file (amd64 architecture) can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/felis/tags).  
 ```
+# 適宜sudoで実施ください
 docker pull ikegamitky/felis:1.4.1 --platform linux/amd64
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
