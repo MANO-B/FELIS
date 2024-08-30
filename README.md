@@ -379,6 +379,7 @@ C-CAT database version 20240820: FELIS version 1.4.3
 C-CAT database version 20240621: FELIS version 1.4.3  
   
 ### Version history
+1.4.4: tidybayes packageが必要であったため追記 - 20240830  
 1.4.3: C-CAT database version 20240820に対応を確認、clustering関連のエラーを修正 - 20240830  
 1.4.2: Closed環境でのlolliplotの簡易表示に対応 - 20240830  
 1.4.1: Dockerに対応 - 20240830  
