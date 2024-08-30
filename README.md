@@ -2,7 +2,20 @@
 Functions Especially for LIquid and Solid tumor clinical sequencing, for Japanese only [(English version of this README file)](https://github.com/MANO-B/FELIS/blob/main/README_ENG.md).  
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
 
-
+##### Docker file
+Dockerを使用可能であれば面倒なインストール作業をせずにすぐに使用開始可能です。  
+Dockerの使用法は[Windows向け](https://qiita.com/hoshimado/items/51c99ccaee3d4222d99d)や[MacOS向け](https://www.kagoya.jp/howto/cloud/container/dockerformac/)を参照ください。  
+CPUは4コア、メモリは[可及的に大きく設定](https://dojo.docker.jp/t/topic/52)ください。  
+FELIS docker file (amd64 architecture) can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/felis/tags).  
+```
+docker pull ikegamitky/felis:v1.4.1 --platform linux/amd64
+```
+　　
+使用時は以下のコマンドを入力するとブラウザでFELISが起動します。  
+```
+docker run -p 15430:15430 felis:1.4.1
+```
+  
 ### C-CAT利活用データの解析ソフトウェア
 国立がん研究センターに設置されている[がんゲノム情報管理センター(C-CAT)](https://www.ncc.go.jp/jp/c_cat/use/index.html)には保険診療で行われたがん遺伝子パネル検査(Comprehensive Genomic Profiling, CGP検査)の結果と臨床情報が集約されています。この情報を学術研究や医薬品等の開発を目的とした二次利活用する仕組みがあります。現状では所属施設の倫理審査とC-CATでの倫理審査を経た研究でのみ使用可能であり、また病院やアカデミア以外の組織では年間780万円の利用料金が必要と敷居が高いですが、類似した海外のデータベースである[AACR project GENIE](https://www.aacr.org/professionals/research/aacr-project-genie/)と比較して薬剤の情報や臨床情報が詳しい点で優れており、希少がん・希少フラクションの研究においてこれまでになかった切り口での解析が可能になると考えられています。  
   
@@ -71,10 +84,11 @@ install.packages("shiny")
 依存しているパッケージ群を`R`ターミナルからインストールください。  
 初めて実行する場合は相当に時間がかかると思われます。  
 ```
-install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'Rediscover', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'ggrepel', 'httr', 'plyr', 'rms', 'dcurves', 'Matching', 'blorr', 'broom', 'survRM2', 'rsample', 'BiocManager'), dependencies = TRUE)
+install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'ggrepel', 'httr', 'plyr', 'rms', 'dcurves', 'Matching', 'blorr', 'broom', 'survRM2', 'rsample', 'BiocManager'), dependencies = TRUE)
 BiocManager::install("maftools", update=FALSE)
 BiocManager::install("ComplexHeatmap", update=FALSE)
 BiocManager::install("drawProteins", update=FALSE)
+install.packages("Rediscover")
 
 # drawProteinsのインストールが上手くいかない場合
 # githubのサインイン、PATの発行を行った上で以下を実行
@@ -102,7 +116,11 @@ Figureの日本語表示が上手くいかない場合は[こちら](https://ill
 <img src="source/report.png"  height=300>　　<img src="source/case.png" height=300>
 
 - FELISのダウンロード  
-使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。  
+使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。
+```
+wget https://github.com/MANO-B/FELIS/raw/main/felis_v1.4.1.zip
+unzip felis_v1.4.1.zip
+```  
 ここでは"/User/C-CAT/Desktop/felis-cs"とします。  
 
 - FELISの起動
