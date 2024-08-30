@@ -93,6 +93,7 @@ BiocManager::install("maftools", update=FALSE)
 BiocManager::install("ComplexHeatmap", update=FALSE)
 BiocManager::install("drawProteins", update=FALSE)
 install.packages("Rediscover")
+install.packages("tidybayes")
 
 # drawProteinsのインストールが上手くいかない場合
 # githubのサインイン、PATの発行を行った上で以下を実行
