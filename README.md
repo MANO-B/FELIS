@@ -126,7 +126,7 @@ Figureの日本語表示が上手くいかない場合は[こちら](https://ill
 wget https://github.com/MANO-B/FELIS/raw/main/felis_v1.4.3.zip
 unzip felis_v1.4.3.zip
 ```  
-ここでは"/User/C-CAT/Desktop/felis-cs"とします。  
+ここでは"/srv/shiny-server/felis-cs"とします。  
 
 - FELISの起動
 以下のコマンドでWebアプリが起動します。  
@@ -144,7 +144,7 @@ Platform: aarch64-apple-darwin20 (64-bit)
 'q()' と入力すれば R を終了します。
 
 > library(shiny)
-> runApp('/User/C-CAT/Desktop/felis-cs')
+> runApp('/srv/shiny-server/felis-cs', launch.browser=T)
 ```
 <img src="source/appli_GUI.png"  height=500>  
 
