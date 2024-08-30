@@ -5,7 +5,7 @@ Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://o
 ##### Docker file
 Dockerを使用可能であれば面倒なインストール作業をせずにすぐに使用開始可能です。  
 Dockerの使用法は[Windows向け](https://qiita.com/hoshimado/items/51c99ccaee3d4222d99d)や[MacOS向け](https://www.kagoya.jp/howto/cloud/container/dockerformac/)を参照ください。  
-CPUは4コア、メモリは[可及的に大きく設定](https://dojo.docker.jp/t/topic/52)ください。  
+Docker desktop使用時は、CPUは4コア以上、メモリは[可及的に大きく設定](https://dojo.docker.jp/t/topic/52)ください。  
 FELIS docker file (amd64 architecture) can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/felis/tags).  
 ```
 # 適宜sudoで実施ください
@@ -374,9 +374,10 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 
 ### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
 C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
-C-CAT database version 20240621: FELIS version 1.4.0  
+C-CAT database version 20240621: FELIS version 1.4.1  
   
 ### Version history
+1.4.1: Dockerに対応 - 20240830  
 1.4.0: Dicision curve analysisを追加 - 20240828  
 1.3.2: 推奨治療到達に関するノモグラムを作成 - 20240827  
 1.3.1: Clusteringのbasic figureのTMBの表示を修正。安定動作版。 - 20240827  
