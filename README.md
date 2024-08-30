@@ -15,9 +15,9 @@ docker pull ikegamitky/felis:1.4.1 --platform linux/amd64
 ```
 docker run -d --rm -p 3838:3838 ikegamitky/felis:1.4.1 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
-サーバーでFELISを起動した場合はポートフォワードをしてください。
+サーバーでFELISを起動した場合は、別のターミナルから以下コマンドでポートフォワードを行い、ブラウザで **[http://localhost:4949](http://localhost:4949)** にアクセスするとFELISが起動します。  
 ```
-ssh -R 3838:localhost:3838 username@servername
+ssh -R 4949:localhost:3838 username@servername
 ```
   
 ### C-CAT利活用データの解析ソフトウェア
