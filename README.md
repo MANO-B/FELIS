@@ -10,10 +10,9 @@ FELIS docker file (amd64 architecture) can be downloadable via [Docker-hub](http
 ```
 docker pull ikegamitky/felis:v1.4.1 --platform linux/amd64
 ```
-　　
-使用時は以下のコマンドを入力するとブラウザでFELISが起動します。  
+使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
 ```
-docker run -p 15430:15430 felis:1.4.1
+docker run -d -p 3838:3838 ikegamitky/felis:1.4.1 shiny-server
 ```
   
 ### C-CAT利活用データの解析ソフトウェア
