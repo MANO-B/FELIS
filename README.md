@@ -8,11 +8,15 @@ Dockerの使用法は[Windows向け](https://qiita.com/hoshimado/items/51c99ccae
 CPUは4コア、メモリは[可及的に大きく設定](https://dojo.docker.jp/t/topic/52)ください。  
 FELIS docker file (amd64 architecture) can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/felis/tags).  
 ```
-docker pull ikegamitky/felis:v1.4.1 --platform linux/amd64
+docker pull ikegamitky/felis:1.4.1 --platform linux/amd64
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
 ```
 docker run -d --rm -p 3838:3838 ikegamitky/felis:1.4.1 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
+```
+サーバーでFELISを起動した場合はポートフォワードをしてください。
+```
+ssh -R 3838:localhost:3838 username@servername
 ```
   
 ### C-CAT利活用データの解析ソフトウェア
