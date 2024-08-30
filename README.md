@@ -9,11 +9,11 @@ Docker desktop使用時は、CPUは4コア以上、メモリは[可及的に大�
 FELIS docker file (amd64 architecture) can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/felis/tags).  
 ```
 # 適宜sudoで実施ください
-docker pull ikegamitky/felis:1.4.1 --platform linux/amd64
+docker pull ikegamitky/felis:1.4.2 --platform linux/amd64
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
 ```
-docker run -d --rm -p 3838:3838 ikegamitky/felis:1.4.1 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
+docker run -d --rm -p 3838:3838 ikegamitky/felis:1.4.2 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
 サーバーでFELISを起動した場合は、別のターミナルから以下コマンドでポートフォワードを行い、ブラウザで **[http://localhost:4949](http://localhost:4949)** にアクセスするとFELISが起動します。  
 ```
