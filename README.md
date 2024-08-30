@@ -122,8 +122,8 @@ Figureの日本語表示が上手くいかない場合は[こちら](https://ill
 - FELISのダウンロード  
 使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。
 ```
-wget https://github.com/MANO-B/FELIS/raw/main/felis_v1.4.1.zip
-unzip felis_v1.4.1.zip
+wget https://github.com/MANO-B/FELIS/raw/main/felis_v1.4.2.zip
+unzip felis_v1.4.2.zip
 ```  
 ここでは"/User/C-CAT/Desktop/felis-cs"とします。  
 
