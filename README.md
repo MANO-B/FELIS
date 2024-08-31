@@ -10,11 +10,20 @@ Docker desktop使用時は、CPUは4コア以上、メモリは[可及的に大�
 FELIS docker file (amd64 architecture) can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/felis/tags).  
 ```
 # 適宜sudoで実施ください
-docker pull ikegamitky/felis:1.5.0 --platform linux/amd64
+# For Intel or AMD CPU
+docker pull ikegamitky/felis:1.5.1 --platform linux/amd64
+
+# For Apple silicon
+docker pull ikegamitky/felis-mac:1.5.1
+
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
 ```
-docker run -d --rm -p 3838:3838 ikegamitky/felis:1.5.0 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
+# For Intel or AMD CPU
+docker run -d --rm -p 3838:3838 ikegamitky/felis:1.5.1 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
+
+# For Apple silicon
+docker run -d --rm -p 3838:3838 ikegamitky/felis-mac:1.5.1 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
 サーバーでFELISを起動した場合は、別のターミナルから以下コマンドでポートフォワードを行い、ブラウザで **[http://localhost:4949](http://localhost:4949)** にアクセスするとFELISが起動します。  
 ```
@@ -124,8 +133,8 @@ Figureの日本語表示が上手くいかない場合は[こちら](https://ill
 - FELISのダウンロード  
 使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。
 ```
-wget https://github.com/MANO-B/FELIS/raw/main/felis_v1.5.0.zip
-unzip felis_v1.5.0.zip
+wget https://github.com/MANO-B/FELIS/raw/main/felis_v1.5.1.zip
+unzip felis_v1.5.1.zip
 ```  
 ここでは"/srv/shiny-server/felis-cs"とします。  
 
@@ -382,6 +391,7 @@ C-CAT database version 20240820: FELIS version 1.5.0
 C-CAT database version 20240621: FELIS version 1.5.0  
   
 ### Version history
+1.5.1: Apple silicon用のDocker fileを作成 - 20240901  
 1.5.0: 表記を英語に変更、図表の説明文を追記、生存期間の差をRMSTで評価 - 20240831  
 1.4.4: tidybayes packageが必要であったため追記 - 20240830  
 1.4.3: C-CAT database version 20240820に対応を確認、clustering関連のエラーを修正 - 20240830  
