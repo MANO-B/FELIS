@@ -226,7 +226,7 @@ Platform: aarch64-apple-darwin20 (64-bit)
 　　Oncoprintにおけるソートの順序を設定します。
 - Variants for analysis  
 　　がん化変異のみ解析するか、病的意義に関わらず全ての変異を解析するか選択します。
-- How to analyze fusion genes
+- How to analyze fusion genes  
 　　パートナー遺伝子が多数ある場合には一つ一つの数が少なくなります。  
 　　NTRK fusion, ALK fusionのようにまとめて解析するかどうか選択します。  
 - Distance value for DBSCAN clustering  
