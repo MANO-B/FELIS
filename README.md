@@ -7,7 +7,7 @@ Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://o
 Dockerを使用可能であれば面倒なインストール作業をせずにすぐに使用開始可能です。  
 Dockerの使用法は[Windows向け](https://qiita.com/hoshimado/items/51c99ccaee3d4222d99d)や[MacOS向け](https://www.kagoya.jp/howto/cloud/container/dockerformac/)を参照ください。  
 Docker desktop使用時は、CPUは4コア以上、メモリは[可及的に大きく設定](https://dojo.docker.jp/t/topic/52)ください。  
-FELIS docker file (amd64 architecture) can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/).  
+FELIS docker file can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/).  
 ```
 # 適宜sudoで実施ください
 # For Intel or AMD CPU
@@ -15,7 +15,6 @@ docker pull ikegamitky/felis:1.5.1 --platform linux/amd64
 
 # For Apple silicon
 docker pull ikegamitky/felis-mac:1.5.1
-
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
 ```
@@ -25,9 +24,10 @@ docker run -d --rm -p 3838:3838 ikegamitky/felis:1.5.1 R --no-echo -e 'library(s
 # For Apple silicon
 docker run -d --rm -p 3838:3838 ikegamitky/felis-mac:1.5.1 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
-サーバーでFELISを起動した場合は、別のターミナルから以下コマンドでポートフォワードを行い、ブラウザで **[http://localhost:4949](http://localhost:4949)** にアクセスするとFELISが起動します。  
+サーバーでFELISを起動する場合は、ターミナルから以下コマンドでポートフォワードを行い、ブラウザで **[http://localhost:4949](http://localhost:4949)** にアクセスするとFELISが起動します。  
 ```
 ssh -L 4949:localhost:3838 username@servername
+docker run -d --rm -p 3838:3838 ikegamitky/felis:1.5.1 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
   
 ### C-CAT利活用データの解析ソフトウェア
