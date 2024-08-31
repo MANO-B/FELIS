@@ -1,5 +1,6 @@
 ## FELIS for C-CAT database <img src="source/FELIS.png" width=50>
-Functions Especially for LIquid and Solid tumor clinical sequencing, for Japanese only [(English version of this README file)](https://github.com/MANO-B/FELIS/blob/main/README_ENG.md).  
+Functions Especially for LIquid and Solid tumor clinical sequencing.  
+[(English version of this README file)](https://github.com/MANO-B/FELIS/blob/main/README_ENG.md).  
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
 
 ##### Docker file
@@ -9,11 +10,11 @@ Docker desktop使用時は、CPUは4コア以上、メモリは[可及的に大�
 FELIS docker file (amd64 architecture) can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/felis/tags).  
 ```
 # 適宜sudoで実施ください
-docker pull ikegamitky/felis:1.4.4 --platform linux/amd64
+docker pull ikegamitky/felis:1.5.0 --platform linux/amd64
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
 ```
-docker run -d --rm -p 3838:3838 ikegamitky/felis:1.4.4 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
+docker run -d --rm -p 3838:3838 ikegamitky/felis:1.5.0 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
 サーバーでFELISを起動した場合は、別のターミナルから以下コマンドでポートフォワードを行い、ブラウザで **[http://localhost:4949](http://localhost:4949)** にアクセスするとFELISが起動します。  
 ```
@@ -123,8 +124,8 @@ Figureの日本語表示が上手くいかない場合は[こちら](https://ill
 - FELISのダウンロード  
 使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。
 ```
-wget https://github.com/MANO-B/FELIS/raw/main/felis_v1.4.3.zip
-unzip felis_v1.4.3.zip
+wget https://github.com/MANO-B/FELIS/raw/main/felis_v1.5.0.zip
+unzip felis_v1.5.0.zip
 ```  
 ここでは"/srv/shiny-server/felis-cs"とします。  
 
@@ -157,17 +158,17 @@ Platform: aarch64-apple-darwin20 (64-bit)
 その他、オプションとして薬剤や組織型を変更する対応表の入力も可能です。  
 
 ### 解析対象の指定  
-**Input C-CAT raw file**タブを開きます。  
-ファイル読み込み・解析設定開始ボタンを押すと設定項目が表示されます。  
+**Setting**タブを開きます。  
+**Start file loading/analysis settings**ボタンを押すと設定項目が表示されます。  
 多数の項目が設定可能です。  
 <img src="source/setting.png"  height=300>  
 
 #### 組織型に関するフィルタ  
 - Filter by histology  
 　　解析対象とする組織型の絞り込みを行います。  
-- まとめて解析する組織型(なければ未選択)  
-　　一つの組織型として扱って解析したい組織型群を選択します。  
-- まとめて解析する組織型の名前  
+- Histology type to be analyzed  
+　　一つの組織型として扱って解析したい組織型群を選択します(なければ未選択)。  
+- Name for histology type  
 　　まとめて解析したい組織型を代表する名前を選択します。  
 - Minimum patients for each histology  
 　　稀な組織型は発生部位に名前を変更して解析できます。  
@@ -190,30 +191,31 @@ Platform: aarch64-apple-darwin20 (64-bit)
 　　検査を実施した年の絞り込みを行います。  
   
 #### 遺伝子に関するフィルタ  
-- 注目する遺伝子(なければ未選択)  
+- Genes of interest (if any)  
 　　Oncoprintや生存期間解析等で優先する遺伝子を選択します。  
-- 注目する遺伝子セット1(なければ未選択)  
+- Gene-set of interest (if any)  
 　　とくに注目する遺伝子セットがあれば選択します。  
-- 変異に基づいて症例選択するか  
+- Case selection based on the mutations  
 　　変異を有する症例・有さない症例のみを選択して解析可能です。
-- Lolliplotを描画する遺伝子(なければ未選択)  
-　　注目する遺伝子を選択してください。描画にはInternet接続が必要です。
+- Genes for lolliplot (if any)  
+　　注目する遺伝子を選択してください。完全な描画にはInternet接続が必要です。  
+　　Internet接続がない場合は簡易表示します。  
 　　[Mutplot](https://github.com/VivianBailey/Mutplot)のスクリプトを使用しています。  
 - Threshold mutation count for lolliplot
 　　頻度の高い変異を強調するための設定です。  
 　　
 #### 変異の種類に関するフィルタ  
-- 注目する遺伝子(なければ未選択)  
+- Gene to analyze (if any)  
 　　特に変異の部位やパターンなどを詳細にみたい遺伝子を選択します。  
 　　例：EGFR TKD変異  
-- 変異の種類  
+- Variants  
 　　一つの変異パターンとしてまとめて解析する変異を選択します。  
-- 変異の種類の名称  
+- Name for variants  
 　　変異パターンを命名します。  
-- 注目遺伝子の病的意義の扱い  
+- Pathological significance of the genes    
 　　この遺伝子のみ解析対象とする病的意義を変更可能です。  
-- 指定した変異を独立して扱うか  
-　　指定した変異のみを一つの遺伝子として扱います。  
+- Treat specified variants independently?  
+　　指定した変異のみを一つの遺伝子として扱うことが可能です。  
 　　例：EGFR TKD変異をEGFR_TKD遺伝子にリネーム  
   
 #### その他の設定  
@@ -224,149 +226,150 @@ Platform: aarch64-apple-darwin20 (64-bit)
 　　Oncoprintにおけるソートの順序を設定します。
 - Variants for analysis  
 　　がん化変異のみ解析するか、病的意義に関わらず全ての変異を解析するか選択します。
-- Fusion geneの扱い
+- How to analyze fusion genes
 　　パートナー遺伝子が多数ある場合には一つ一つの数が少なくなります。  
 　　NTRK fusion, ALK fusionのようにまとめて解析するかどうか選択します。  
 - Distance value for DBSCAN clustering  
 　　クラスタリング解析において弁別する距離の閾値を設定します。  
-- 解析対象とする治療ライン  
+- Timing for RMST measuring  
+　　Restricted mean survival time解析を行う時点を指定します。  
+- CTx lines to analyze  
 　　解析対象とする薬剤のラインを指定します。  
 　　1st-lineのみ指定すると、前治療との比較が実施されません。  
    
 ### 解析の実行  
 Analysisタブを開きます。  
-多数の解析が可能です。  
+多数の解析が可能です。説明文が適宜最下部に表示されます。  
 各ボタンに対応したタブに結果が表示されます。  
 表示された図は.pngの拡張子で保存可能です。  
 <img src="source/analysis.png"  height=300>  <img src="source/examples.png"  height=300> 
   
 #### 症例のまとめを表示  
-選択した症例のまとめを**症例のまとめ**タブに表示します。  
-- 変異パターンで分類して**Patients summary, 変異パターン別**タブに表示します。  
-- 組織型で分類して**Patients summary, 組織型別**タブに表示します。  
+選択した症例のまとめを**Case summary**タブに表示します。  
+- 変異パターンで分類して**Summarized by mutation pattern**タブに表示します。  
+- 組織型で分類して**Summarized by histology**タブに表示します。  
   
 #### Oncoprintを表示  
 - 選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
-- 選択した遺伝子のLolliplotを**Lolliplot**タブに表示します。Internet接続が必要です。
+- 選択した遺伝子のLolliplotを**Lolliplot for the selected gene**タブに表示します。Internet接続が必要です。
     上手く表示されない場合はsource/UniProt.txtに[Uniprot ID](https://www.uniprot.org)を追記してください。  
-- 症例の表を**患者ごとの臨床情報と変異情報**タブに表示します。左上のボタンからダウンロードが可能です。  
+- 症例の表を**Table of clinical and mutation information per patient**タブに表示します。左上のボタンからダウンロードが可能です。  
     
 #### 相互排他・共変異を表示
-- [Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995)を用いた遺伝子変異感の相互排他性解析結果を**相互排他・共変異**タブに表示します。  
+- [Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995)を用いた遺伝子変異感の相互排他性解析結果を**Mutual exclusivity**タブに表示します。  
     青が相互排他的、赤が共変異の関係にあることを意味します。  
     P<0.001の場合にアスタリスクが表示されます。  
   
 #### 組織型ごとの各遺伝子の変異率を表示  
-- 変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を**組織型ごとの変異**タブに表示します。  
+- 変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を**Variation by histology**タブに表示します。  
   
 #### 遺伝子変異に基づくクラスタリング  
 変異遺伝子に基づくクラスタリングを[UMAP](https://arxiv.org/abs/1802.03426)および[DBSCAN](https://cdn.aaai.org/KDD/1996/KDD96-037.pdf)を用いて実施します。
-結果は**クラスタリング**タブ以下に表示します。  
+結果は**Clustering analysis**タブ以下に表示します。  
 - 各組織型ごとの基礎的情報について**Basic data**タブに表示します。  
     - Driver: がん化変異が一つ以上検出された症例の割合  
     - optionおよびtreat: エキスパートパネルで推奨治療があった・治療を受けた頻度(％)  
     - time_before_CGP: 緩和的化学療法開始からCGP検査までのmedian survival (days)。  
     - time_after_CGP: CGP検査から死亡までについてのmedian survival (days)。  
-- 各クラスタに集積している組織型や遺伝子変異を**クラスタに集積した組織型と変異の図**タブに表示します。  
+- 各クラスタに集積している組織型や遺伝子変異を**UMAP clustering based on mutations**タブに表示します。  
     P<0.05で集積している組織型を、他のクラスタと比較したオッズ比が高い順に3つまで表示します。  
     P<0.05で集積している遺伝子変異を、他のクラスタと比較したオッズ比が高い順に3つまで表示します。  
-- 各クラスタにおける年齢層を**クラスタと年齢の関係図**タブに表示します。  
-- 各クラスタにおける組織型を**クラスタと組織型の関係図**タブに表示します。  
-- 各組織型が少数のクラスタに集積するのか多数のクラスタに分布するのかをエントロピーとして**組織型が少数のクラスタにまとまるか**タブに表示します。  
+- 各クラスタにおける年齢層を**Cluster and age relationship**タブに表示します。  
+- 各クラスタにおける組織型を**Cluster and histology relationship**タブに表示します。  
+- 各組織型が少数のクラスタに集積するのか多数のクラスタに分布するのかをエントロピーとして**Heterogeneity within histologic types**タブに表示します。  
     Shannon entropyで計算しています。低い値ほど集積傾向があります。  
-- クラスタと組織型の関係性についての表を**クラスタと組織型の表**タブに表示します。  
+- クラスタと組織型の関係性についての表を**Table of clusters and histologies**タブに表示します。  
     左上のボタンからダウンロードが可能です。  
-- クラスタと遺伝子変異の関係性についての表を**クラスタと遺伝子変異の表**タブに表示します。  
+- クラスタと遺伝子変異の関係性についての表を**Table of clusters and genetic variants**タブに表示します。  
     左上のボタンからダウンロードが可能です。  
-- 各組織型のうちEvidence levelのある薬剤に対応する変異が検出された頻度を**組織型ごとの標的治療がある患者の頻度**タブに表示します。  
+- 各組織型のうちEvidence levelのある薬剤に対応する変異が検出された頻度を**Frequency of patients with targeted therapy**タブに表示します。  
     高いEvidence levelに統一：Evidence level Aの薬剤とBの薬剤の両方がある患者はAとしています。  
-- 各組織型の化学療法開始からCGP検査まで、およびCGP検査から死亡までの平均生存期間の関係を**CGP前とCGP後の期間の関係**タブに表示します。  
-- 各組織型の症例数と治療についての情報の関係を**組織型ごとの患者数と治療到達率**タブに表示します。  
+- 各組織型の化学療法開始からCGP検査まで、およびCGP検査から死亡までの平均生存期間の関係を**Relationship between pre-CGP and post-CGP periods**タブに表示します。  
+- 各組織型の症例数と治療についての情報の関係を**Patients per histology and treatment reach rate**タブに表示します。  
     患者数とEvidence level A, B以上, C以上の薬剤がある割合を散布図としました。  
     患者数と推奨治療がある割合、推奨治療を受けた割合、推奨治療がある患者が推奨治療を受けた割合を散布図としました。  
-- 各組織型のCGP検査までの期間と治療についての情報の関係を**CGPまでの期間と治療到達率**タブに表示します。  
-- 各組織型のCGP検査後の生存期間と治療についての情報の関係を**CGP後の生存期間と治療到達率**タブに表示します。  
-- 各組織型の平均年齢と治療についての情報の関係を**CGP後の生存期間と治療到達率**タブに表示します。  
+- 各組織型のCGP検査までの期間と治療についての情報の関係を**Pre-CGP period and treatment reach rate**タブに表示します。  
+- 各組織型のCGP検査後の生存期間と治療についての情報の関係を**Post-CGP period and treatment reach rate**タブに表示します。  
+- 各組織型の平均年齢と治療についての情報の関係を**Age and treatment reach rate**タブに表示します。  
   
 #### CGP検査後の生存期間解析  
 遺伝子変異、治療内容、PSなどに着目したCGP検査後の生存期間解析を実施します。
 log-log transformationを用いて95%信頼区間を算出します。  
 どのような患者が予後不良で早期のCGP検査が推奨されるかがみえてきます。  
-結果は**CGP後の生存期間**タブ以下に表示します。  
-- 推奨治療の有無や治療内容で群分けをした生存期間解析を**CGP後の生存期間と治療**タブに表示します。  
+結果は**Survival after CGP**タブ以下に表示します。  
+- 推奨治療の有無や治療内容で群分けをした生存期間解析を**Survival and treatment after CGP**タブに表示します。  
     UnrecomTreat(+): 推奨治療以外の治療を受けた患者  
     RecomTreat(+): 推奨治療を受けた患者  
     Treat(-): CGP検査後に治療を受けなかった患者  
-- 組織型、PS、遺伝子変異の有無で群分けをした生存期間解析を**CGP後の生存期間と過去の治療歴**タブに表示します。  
-- 過去の治療の最良総合効果や治療コース数で群分けをした生存期間解析を**CGP後の生存期間とPS**タブに表示します。  
+- 組織型、PS、遺伝子変異の有無で群分けをした生存期間解析を**Survival after CGP and performance status**タブに表示します。  
+- 過去の治療の最良総合効果や治療コース数で群分けをした生存期間解析を**Survival after CGP and previous treatment**タブに表示します。  
     遺伝子変異の解析は、注目する遺伝子があればいずれかに変異があるか否かで群分けされます。  
-- 遺伝子変異の有無で群分けをしたmedian survival (days)を**CGP後の生存期間と遺伝子変異, forest plot**タブに表示します。  
+- 遺伝子変異の有無で群分けをしたmedian survival (days)を**Survival after CGP and mutations, forest plot**タブに表示します。  
     変異頻度が少ない場合は95％信頼区間が表示されません。  
-- 遺伝子変異の有無で群分けをしたKaplan-Meier survival curveを**CGP後の生存期間と遺伝子変異, KM-curve**タブに表示します。  
-- CGP検査後の死亡に関するハザード比のforest plotを**CGP後の生存期間のHazard ratio, forest plot**タブに表示します。  
+- 遺伝子変異の有無で群分けをしたKaplan-Meier survival curveを**Survival after CGP and mutations, KM-curve**タブに表示します。  
+- CGP検査後の死亡に関するハザード比のforest plotを**Hazard ratio for survival after CGP**タブに表示します。  
     95%以上一致する因子は多重共線性があると判断し除外しています。  
     死亡イベントが2以下の因子は結果が表示されません。  
-- 推奨治療を受けるかどうかを予測するノモグラムを**推奨治療を受ける要因, ノモグラム**タブに表示します。  
-- **推奨治療がある患者が**推奨治療を受けるかどうかを予測するノモグラムを**推奨治療がある患者が推奨治療を受ける要因, ノモグラム**タブに表示します。  
-- 推奨治療を受けるかどうかの因子を**推奨治療を受ける要因, オッズ比**タブに表示します。  
-- **推奨治療がある患者が**推奨治療を受けるかどうかの因子を**推奨治療がある患者が推奨治療を受ける要因, オッズ比**タブに表示します。  
-- 推奨治療を受けるかどうかのノモグラムの性能を[Decision curve analysis](https://mskcc-epi-bio.github.io/decisioncurveanalysis/index.html)で評価し**推奨治療を受ける要因, 図/表**タブに表示します。  
+- 推奨治療を受けるかどうかを予測するノモグラムを**Factors leading to Treatment, pre-CGP, Nomogram**タブに表示します。  
+- **推奨治療がある患者が**推奨治療を受けるかどうかを予測するノモグラムを**Factors leading to Treatment, post-CGP, Nomogram**タブに表示します。  
+- 推奨治療を受けるかどうかの因子を**Factors leading to Treatment, pre-CGP, Odds ratio**タブに表示します。  
+- **推奨治療がある患者が**推奨治療を受けるかどうかの因子を**Factors leading to Treatment, post-CGP, Odds ratio**タブに表示します。  
+- 推奨治療を受けるかどうかのノモグラムの性能を[Decision curve analysis](https://mskcc-epi-bio.github.io/decisioncurveanalysis/index.html)で評価し**Factors leading to Treatment, decision curve**タブに表示します。  
+- Decision curve analysisの詳細を**Factors leading to Treatment, table**タブに表示します。  
     
 
 #### 化学療法導入の生存期間解析(時間がかかります)  
 左側切断バイアスを考慮した緩和的化学療法導入後の生存期間解析を実施します。
 Stanを用いたシミュレーションのため解析が数十分のオーダーで時間を要します。
-結果は**CTx後の生存期間**タブ以下に表示します。  
-- 左側切断バイアスを補正した場合、Number at riskで補正した場合、シミュレーションで補正した場合の生存期間解析を**左側切断バイアスを補正したCTx後の全生存期間**タブに表示します。  
-- 遺伝子変異の有無で群分けをした生存期間解析を**左側切断バイアスを補正したCTx後の全生存期間**タブに表示します。  
+結果は**Survival after CTx**タブ以下に表示します。  
+- 左側切断バイアスを補正した場合、Number at riskで補正した場合、シミュレーションで補正した場合の生存期間解析を**Survival corrected for left-truncation bias**タブに表示します。  
+- 注目する遺伝子の変異の有無で群分けをした生存期間解析を**Survival corrected for left-truncation bias**タブに表示します。  
     遺伝子変異の解析は、注目する遺伝子があればいずれかに変異があるか否かで群分けされます。  
     注目する遺伝子がなければもっとも変異頻度が高い遺伝子に変異があるか否かで群分けされます。  
-- 遺伝子変異の有無でmedian survival の差分(days)を計算した結果を**遺伝子変異と全生存期間, forest plot**タブに表示します。  
+- 遺伝子変異の有無でmedian survival の差分(days)を計算した結果を**Genetic variants and survival, forest plot**タブに表示します。  
     死亡イベントが少ない場合は結果が表示されません。  
-- 遺伝子変異の有無で群分けをしたsurvival curveを**遺伝子変異と全生存期間, KM-curve**タブに表示します。  
+- 遺伝子変異の有無で群分けをしたsurvival curveを**Genetic variants and survival, KM-curve**タブに表示します。  
   
 #### Palliative CTxで使用した薬剤リスト(1st-4th line)  
-- 緩和目的の化学療法の1st-4th lineで使用されたレジメンを抽出し**薬剤奏効性・Drug table**タブに表示します。
+- 緩和目的の化学療法の1st-4th lineで使用されたレジメンを抽出し**Analysis**タブ中に表示します。
+以後の解析で注目する薬剤を選択します。  
 入力が不正確と思われる場合があるため、傾向をみる程度の使用が望ましいです。  
-**Select regimens of interest**パネルが出現します。以後の解析で注目する薬剤を選択します。  
   
 #### 上記ボタンで選択した薬剤の奏効性解析  
 Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や組織型の関係性を評価します。  
-結果は**薬剤奏効性**タブ以下に表示します。  
-- 全薬剤の情報を治療ライン別にまとめて**薬剤の使用状況, 治療ライン別**タブに表示します。  
-- 全薬剤の情報を治療効果別にまとめて**薬剤の使用状況, 治療効果別**タブに表示します。  
-- 指定ラインの薬剤の情報を変異パターン別にまとめて**指定ラインの薬剤の使用状況, 変異パターン別**タブに表示します。  
-- 指定ラインの薬剤の情報を組織型別にまとめて**指定ラインの薬剤の使用状況, 組織型別**タブに表示します。  
-- 指定ラインの薬剤の情報を注目する遺伝子変異別にまとめて**指定ラインの薬剤の使用状況, 遺伝子変異別**タブに表示します。  
-- ToTの情報がある指定ライン・指定薬剤の情報を変異パターン別にまとめて**ToTの情報がある指定ライン・指定薬剤の使用状況, 変異パターン別**タブに表示します。  
-- ToTの情報がある指定ライン・指定薬剤の情報を組織型別にまとめて**ToTの情報がある指定ライン・指定薬剤の使用状況, 組織型別**タブに表示します。  
-- ToTの情報がある指定ライン・指定薬剤の情報を注目する遺伝子変異別にまとめて**ToTの情報がある指定ライン・指定薬剤の使用状況, 遺伝子変異別**タブに表示します。  
-- RESICTの情報がある指定ライン・指定薬剤の情報を変異パターン別にまとめて**RESICTの情報がある指定ライン・指定薬剤の使用状況, 変異パターン別**タブに表示します。  
-- RESICTの情報がある指定ライン・指定薬剤の情報を組織型別にまとめて**RESICTの情報がある指定ライン・指定薬剤の使用状況, 組織型別**タブに表示します。  
-- RESICTの情報がある指定ライン・指定薬剤の情報を注目する遺伝子変異別にまとめて**RESICTの情報がある指定ライン・指定薬剤の使用状況, 遺伝子変異別**タブに表示します。  
-- 注目する薬剤のToTと、その前治療のToTの関係性のwaterfall plotと散布図を**指定治療とその前治療のTime on treatment,　散布図**タブに表示します。  
-- 注目する薬剤のToTと、その前治療のToTの関係性の散布図を**指定治療とその前治療のTime on treatment,　散布図**タブに表示します。
+結果は**Drug response**タブ以下に表示します。  
+- 全薬剤の情報を治療ライン別にまとめて**Drug use, by line of treatment**タブに表示します。  
+- 全薬剤の情報を治療効果別にまとめて**Drug use, by treatment effect**タブに表示します。  
+- 指定ラインの薬剤の情報を変異パターン別にまとめて**Use of designated line agents, by mutation pattern**タブに表示します。  
+- 指定ラインの薬剤の情報を組織型別にまとめて**Use of designated line agents, by histology**タブに表示します。  
+- 指定ラインの薬剤の情報を注目する遺伝子変異別にまとめて**Use of designated line agents, by mutated genes**タブに表示します。  
+- ToTの情報がある指定ライン・指定薬剤の情報を変異パターン別にまとめて**Use of designated lines and drugs with ToT information, by mutation pattern**タブに表示します。  
+- ToTの情報がある指定ライン・指定薬剤の情報を組織型別にまとめて**Use of designated lines and drugs with ToT information, by histology**タブに表示します。  
+- ToTの情報がある指定ライン・指定薬剤の情報を注目する遺伝子変異別にまとめて**Use of designated lines and drugs with ToT information, by mutated genes**タブに表示します。  
+- RESICTの情報がある指定ライン・指定薬剤の情報を変異パターン別にまとめて**Use of designated lines and drugs with RECIST information, by mutation pattern**タブに表示します。  
+- RESICTの情報がある指定ライン・指定薬剤の情報を組織型別にまとめて**Use of designated lines and drugs with RECIST information, by histology**タブに表示します。  
+- RESICTの情報がある指定ライン・指定薬剤の情報を注目する遺伝子変異別にまとめて**Use of designated lines and drugs with RECIST information, by mutated genes**タブに表示します。  
+- 注目する薬剤のToTと、その前治療のToTの関係性のwaterfall plotと散布図を**Time on treatment and pre-treatment for the specified treatment, scatter plot**タブに表示します。  
     打ち切り症例は除いています。  
-- 注目する薬剤のToTと、その前治療のToT・他の薬剤のToTとの比較、遺伝子変異とToTの関係についてのKaplan-Meier survival curveを**指定治療とその前治療のTime on treatment, KM-curve**タブに表示します。  
-- ToTと注目する遺伝子、注目する変異パターンの関係についてのKaplan-Meier survival curveを**注目する遺伝子・変異ごとのTime on treatment, KM-curve**タブに表示します。  
-- 注目する薬剤と組織型に関するToTのKaplan-Meier survival curveを**組織型ごとのTime on treatment**タブに表示します。  
-- 注目する薬剤と遺伝子変異クラスタに関するToTのKaplan-Meier survival curveを**遺伝子変異クラスタごとのTime on treatment**タブに表示します。  
-- 注目する薬剤と遺伝子変異の有無に関するToTのmedian OSのforest plotを**遺伝子変異ごとのTime on treatment, forest plot**タブに表示します。  
-- 注目する薬剤と遺伝子変異の有無に関するToTのKaplan-Meier survival curveを**遺伝子変異ごとのTime on treatment, KM-curve**タブに表示します。  
-- 治療中断に至る要因のHazard ratioの表を**Time on treatmentに関するHazard ratio**タブに表示します。  
-- Objective responseに至る要因のOdds ratioの表を**ORRに関するOdds ratio, 表**タブに表示します。  
-- Disease controlに至る要因のOdds ratioの表を**DCRに関するOdds ratio, 表**タブに表示します。  
-- 遺伝子変異クラスタごとの奏効性の表を**遺伝子変異クラスタとRECIST**タブに表示します。  
-- 変異パターンごとの奏効性の表を**変異パターンとRECIST**タブに表示します。  
+- 注目する薬剤のToTと、その前治療のToT・他の薬剤のToTとの比較、遺伝子変異とToTの関係についてのKaplan-Meier survival curveを**Time on treatment and pre-treatment for the specified treatment, KM-curve**タブに表示します。  
+- 注目する薬剤と組織型に関するToTのKaplan-Meier survival curveを**Time on treatment by tissue type, KM-curve**タブに表示します。  
+- 注目する薬剤と遺伝子変異クラスタに関するToTのKaplan-Meier survival curveを**Time on treatment by gene mutation cluster, KM-curve**タブに表示します。  
+- 注目する薬剤と遺伝子変異の有無に関するToTのmedian OSのforest plotを**Time on treatment by mutated genes, forest plot**タブに表示します。  
+- 注目する薬剤と遺伝子変異の有無に関するToTのKaplan-Meier survival curveを**Time on treatment by mutated genes, KM-curve**タブに表示します。  
+- ToTと注目する遺伝子、注目する変異パターンの関係についてのKaplan-Meier survival curveを**Time on treatment and mutations of interest, KM-curve**タブに表示します。  
+- 治療中断に至る要因のHazard ratioの表を**Hazard ratio on time on treatment**タブに表示します。  
+- Objective responseに至る要因のOdds ratioの表を**Odds ratio on objective response rate**タブに表示します。  
+- Disease controlに至る要因のOdds ratioの表を**Odds ratio on disease control rate**タブに表示します。  
+- 遺伝子変異クラスタごとの奏効性の表を**Mutation clustering and RECIST**タブに表示します。  
     Clopper–Pearson法を用いて95%信頼区間を算出します。  
-- 組織型ごとの奏効性の表を**組織型とRECIST**タブに表示します。  
-- 遺伝子変異ごとの奏効性の表を**遺伝子変異とRECIST**タブに表示します。  
+- 変異パターンごとの奏効性の表を**Mutation pattern and RECIST**タブに表示します。  
+- 組織型ごとの奏効性の表を**Histology and RECIST**タブに表示します。  
+- 遺伝子変異ごとの奏効性の表を**Mutated genes and RECIST**タブに表示します。  
   
 #### 説明
-ソフトの使用法などを**説明**タブに表示します。  
+ソフトの使用法などを**Instruction**タブに表示します。  
 　　
 ### 今後の予定
-- 生存期間の差をRMSTで評価  
 - Pathway間の相互排他性解析を追加  
 - 診断時からの生存期間解析を追加(診断時のstageが登録されている症例が増えればその群分けを追加)  
 - HER2免疫染色、MSIなどパネル検査前に行われた検査の結果と、パネル検査による遺伝子変異と、どちらがより薬剤奏効性を予測するかの解析を追加  
@@ -375,10 +378,11 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 
 ### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
 C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
-C-CAT database version 20240820: FELIS version 1.4.4  
-C-CAT database version 20240621: FELIS version 1.4.4  
+C-CAT database version 20240820: FELIS version 1.5.0  
+C-CAT database version 20240621: FELIS version 1.5.0  
   
 ### Version history
+1.5.0: 表記を英語に変更、図表の説明文を追記、生存期間の差をRMSTで評価 - 20240831  
 1.4.4: tidybayes packageが必要であったため追記 - 20240830  
 1.4.3: C-CAT database version 20240820に対応を確認、clustering関連のエラーを修正 - 20240830  
 1.4.2: Closed環境でのlolliplotの簡易表示に対応 - 20240830  
