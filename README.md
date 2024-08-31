@@ -7,7 +7,7 @@ Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://o
 Dockerを使用可能であれば面倒なインストール作業をせずにすぐに使用開始可能です。  
 Dockerの使用法は[Windows向け](https://qiita.com/hoshimado/items/51c99ccaee3d4222d99d)や[MacOS向け](https://www.kagoya.jp/howto/cloud/container/dockerformac/)を参照ください。  
 Docker desktop使用時は、CPUは4コア以上、メモリは[可及的に大きく設定](https://dojo.docker.jp/t/topic/52)ください。  
-FELIS docker file (amd64 architecture) can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/felis/tags).  
+FELIS docker file (amd64 architecture) can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/).  
 ```
 # 適宜sudoで実施ください
 # For Intel or AMD CPU
