@@ -1,6 +1,6 @@
 ## FELIS for C-CAT database <img src="source/FELIS.png" width=50>
-Functions Especially for LIquid and Solid tumor clinical sequencing.  
-[(English version of this README file)](https://github.com/MANO-B/FELIS/blob/main/README_ENG.md).  
+Functions Especially for LIquid and Solid tumor clinical sequencing for C-CAT database.  
+[English version of this README file](https://github.com/MANO-B/FELIS/blob/main/README_ENG.md).  
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
 
 ##### Docker file
@@ -10,10 +10,10 @@ Docker desktop使用時は、CPUは4コア以上、メモリは[可及的に大�
 FELIS docker file can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/).  
 ```
 # 適宜sudoで実施ください
-# For Intel or AMD CPU
+# For Intel or AMD CPU (Amd64 architecture)
 docker pull ikegamitky/felis:1.5.1 --platform linux/amd64
 
-# For Apple silicon
+# For Apple silicon (Arm architecture)
 docker pull ikegamitky/felis-mac:1.5.1
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
@@ -29,6 +29,7 @@ docker run -d --rm -p 3838:3838 ikegamitky/felis-mac:1.5.1 R --no-echo -e 'libra
 ssh -L 4949:localhost:3838 username@servername
 docker run -d --rm -p 3838:3838 ikegamitky/felis:1.5.1 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
+Dockerを使用する場合は**解析ファイルの読み込み**セクションまで飛ばしてください。  
   
 ### C-CAT利活用データの解析ソフトウェア
 国立がん研究センターに設置されている[がんゲノム情報管理センター(C-CAT)](https://www.ncc.go.jp/jp/c_cat/use/index.html)には保険診療で行われたがん遺伝子パネル検査(Comprehensive Genomic Profiling, CGP検査)の結果と臨床情報が集約されています。この情報を学術研究や医薬品等の開発を目的とした二次利活用する仕組みがあります。現状では所属施設の倫理審査とC-CATでの倫理審査を経た研究でのみ使用可能であり、また病院やアカデミア以外の組織では年間780万円の利用料金が必要と敷居が高いですが、類似した海外のデータベースである[AACR project GENIE](https://www.aacr.org/professionals/research/aacr-project-genie/)と比較して薬剤の情報や臨床情報が詳しい点で優れており、希少がん・希少フラクションの研究においてこれまでになかった切り口での解析が可能になると考えられています。  
@@ -96,7 +97,8 @@ install.packages("shiny")
 ```
 ##### Package dependencies
 依存しているパッケージ群を`R`ターミナルからインストールください。  
-初めて実行する場合は相当に時間がかかると思われます。  
+初めて実行する場合は相当に時間がかかります(最短で2時間程度、慣れていないとインストールの完遂は困難です)。  
+依存するライブラリ群を必要に応じてapt/brewなどでinstallすることになり大変ですので、Dockerの使用が望まれます。  
 ```
 install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'ggrepel', 'httr', 'plyr', 'rms', 'dcurves', 'Matching', 'blorr', 'broom', 'survRM2', 'rsample', 'BiocManager'), dependencies = TRUE)
 BiocManager::install("maftools", update=FALSE)
@@ -122,14 +124,6 @@ remotes::install_version(package = "rms", version = "6.7.0", dependencies = FALS
 Figureの日本語表示が上手くいかない場合は[こちら](https://ill-identified.hatenablog.com/entry/2021/09/10/231230)を参照ください。  
   
 ### FELISの起動
-- 解析ファイルの入手
-まずは解析したい症例の情報をC-CAT利活用検索ポータルからダウンロードします。
-設定を英語ではなく日本語バージョンとし、症例を選択した上で、以下の画像の通り  
-・レポートCSV（全データ出力）  
-・症例CSV（全データ出力）  
-の2つのファイルをダウンロードします。ZIPファイルは解凍してCSVファイルに戻して使用します。  
-<img src="source/report.png"  height=300>　　<img src="source/case.png" height=300>
-
 - FELISのダウンロード  
 使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。
 ```
@@ -158,9 +152,15 @@ Platform: aarch64-apple-darwin20 (64-bit)
 ```
 <img src="source/appli_GUI.png"  height=500>  
 
-
-
 ### 解析ファイルの読み込み
+- 解析ファイルの入手
+まずは解析したい症例の情報をC-CAT利活用検索ポータルからダウンロードします。
+設定を英語ではなく日本語バージョンとし、症例を選択した上で、以下の画像の通り  
+・レポートCSV（全データ出力）  
+・症例CSV（全データ出力）  
+の2つのファイルをダウンロードします。ZIPファイルは解凍してCSVファイルに戻して使用します。  
+<img src="source/report.png"  height=300>　　<img src="source/case.png" height=300>
+
 **Input C-CAT files**タブを開きます。  
 ダウンロードした症例CSVとレポートCSVを、画面左上のBrowse...ボタンから選択して読み込みます。  
 複数のファイルを選択肢読み込むことも可能です。  
@@ -387,11 +387,10 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 
 ### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
 C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
-C-CAT database version 20240820: FELIS version 1.5.0  
-C-CAT database version 20240621: FELIS version 1.5.0  
+C-CAT database version 20240820 & 20240621: FELIS version 1.5.1  
   
 ### Version history
-1.5.1: Apple silicon用のDocker fileを作成 - 20240901  
+1.5.1: Apple silicon用のDocker fileを作成, gtsummary packageのbugに対応 - 20240901  
 1.5.0: 表記を英語に変更、図表の説明文を追記、生存期間の差をRMSTで評価 - 20240831  
 1.4.4: tidybayes packageが必要であったため追記 - 20240830  
 1.4.3: C-CAT database version 20240820に対応を確認、clustering関連のエラーを修正 - 20240830  
