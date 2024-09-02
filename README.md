@@ -24,6 +24,7 @@ CPU: 4+ cores
   
 3000例、30遺伝子についての生存期間解析を64 GB RAM, M1MAX MacStudioで行った場合、およそ1時間を要します。  
 
+#### Software Requirements
 #### Docker file
 Dockerを使用可能であれば面倒なインストール作業をせずにすぐに使用開始可能です。  
 Dockerの使用法は[Windows向け](https://qiita.com/hoshimado/items/51c99ccaee3d4222d99d)や[MacOS向け](https://www.kagoya.jp/howto/cloud/container/dockerformac/)を参照ください。  
@@ -54,7 +55,6 @@ docker run -d -p 3838:3838 ikegamitky/felis:1.5.1 nohup shiny-server
 ```
 Dockerを使用する場合は**解析ファイルの読み込み**セクションまで飛ばしてください。  
   
-#### Software Requirements
 ##### R language
 適宜[ウェブサイト](https://syunsuke.github.io/r_install_guide_for_beginners/03_installation_of_R.html)を参照しRを導入ください。  
 特にバージョンの指定はありませんが、本ソフトウェアはv4.3.2を使用して作成しました。  
