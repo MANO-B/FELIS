@@ -33,24 +33,24 @@ FELIS docker file can be downloadable via [Docker-hub](https://hub.docker.com/r/
 ```
 # 適宜sudoで実施ください
 # For Intel or AMD CPU (Amd64 architecture)
-docker pull ikegamitky/felis:1.5.2 --platform linux/amd64
+docker pull ikegamitky/felis:1.5.4 --platform linux/amd64
 
 # For Apple silicon (Arm architecture)
-docker pull ikegamitky/felis-mac:1.5.2
+docker pull ikegamitky/felis-mac:1.5.4
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
 ```
 # For Intel or AMD CPU
-docker run -d --rm -p 3838:3838 ikegamitky/felis:1.5.2 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
+docker run -d --rm -p 3838:3838 ikegamitky/felis:1.5.4 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 
 # For Apple silicon
-docker run -d --rm -p 3838:3838 ikegamitky/felis-mac:1.5.2 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
+docker run -d --rm -p 3838:3838 ikegamitky/felis-mac:1.5.4 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
 サーバーでFELISを起動する場合、ターミナルから以下のコマンドを入力後はssh接続は不要です。  
 接続先のIPアドレスが172.25.100.1であれば、ブラウザで **[172.25.100.1:3838](http://172.25.100.1:3838)** にアクセスするとFELISが起動します。  
 ```
 # ssh username@servername
-docker run -d -p 3838:3838 ikegamitky/felis:1.5.2 nohup shiny-server
+docker run -d -p 3838:3838 ikegamitky/felis:1.5.4 nohup shiny-server
 # exit
 ```
 Dockerを使用する場合は**解析ファイルの読み込み**セクションまで飛ばしてください。  
@@ -129,8 +129,8 @@ Figureの日本語表示が上手くいかない場合は[こちら](https://ill
 - FELISのダウンロード  
 使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。
 ```
-wget https://github.com/MANO-B/FELIS/raw/main/felis_v1.5.2.zip
-unzip felis_v1.5.2.zip
+wget https://github.com/MANO-B/FELIS/raw/main/felis_v1.5.4.zip
+unzip felis_v1.5.4.zip
 ```  
 ここでは"/srv/shiny-server/felis-cs"とします。  
 
@@ -394,6 +394,7 @@ C-CATのデータはバージョンごとに列名が追加・変更されるこ
 C-CAT database version 20240820 & 20240621: FELIS version 1.5.2  
   
 ### Version history
+1.5.4: Shiny-serverでの動作を調整 - 20240902  
 1.5.2: ダミーデータで解析のトライアルを可能に - 20240902  
 1.5.1: Apple silicon用のDocker fileを作成, gtsummary packageのbugに対応 - 20240901  
 1.5.0: 表記を英語に変更、図表の説明文を追記、生存期間の差をRMSTで評価 - 20240831  
