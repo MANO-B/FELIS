@@ -29,36 +29,21 @@ CPU: 4+ cores
 Dockerを使用可能であれば面倒なインストール作業をせずにすぐに使用開始可能です。  
 Dockerの使用法は[Windows向け](https://qiita.com/hoshimado/items/51c99ccaee3d4222d99d)や[MacOS向け](https://www.kagoya.jp/howto/cloud/container/dockerformac/)を参照ください。  
 Docker desktop使用時は、CPUは4コア以上、メモリは[可及的に大きく設定](https://dojo.docker.jp/t/topic/52)ください。  
-FELIS docker file can be downloadable via [Docker-hub](https://hub.docker.com/r/ikegamitky/).  
+FELISのDocker fileは[Docker-hub](https://hub.docker.com/r/ikegamitky/)に登録しています。  
 ```
 # 適宜sudoで実施ください
-# For Intel or AMD CPU (Amd64 architecture)
-docker pull ikegamitky/felis:1.5.4 --platform linux/amd64
-
-# For Apple silicon (Arm architecture)
-docker pull ikegamitky/felis-mac:1.5.4
+docker pull ikegamitky/felis:latest
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
 ```
-# For Intel or AMD CPU
-docker run -d --rm -p 3838:3838 ikegamitky/felis:1.5.4 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
-
-# For Apple silicon
-docker run -d --rm -p 3838:3838 ikegamitky/felis-mac:1.5.4 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
+docker run -d --rm -p 3838:3838 ikegamitky/felis:latest R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
 サーバーでFELISを起動する場合、ターミナルから以下のコマンドを入力後はssh接続は不要です。  
 接続先のIPアドレスが172.25.100.1であれば、ブラウザで **[172.25.100.1:3838](http://172.25.100.1:3838)** にアクセスするとFELISが起動します。  
 ```
-# For Intel or AMD CPU (Amd64 architecture)
 # ssh username@servername
-docker run -d -p 3838:3838 ikegamitky/felis:1.5.4 nohup shiny-server
+docker run -d -p 3838:3838 ikegamitky/felis:latest nohup shiny-server
 # exit
-
-# For Apple silicon (Arm architecture)
-# ssh username@servername
-docker run -d -p 3838:3838 ikegamitky/felis-mac:1.5.4 nohup shiny-server
-# exit
-
 ```
 Dockerを使用する場合は**解析ファイルの読み込み**セクションまで飛ばしてください。  
   
@@ -136,8 +121,8 @@ Figureの日本語表示が上手くいかない場合は[こちら](https://ill
 - FELISのダウンロード  
 使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。
 ```
-wget https://github.com/MANO-B/FELIS/raw/main/felis_v1.5.4.zip
-unzip felis_v1.5.4.zip
+wget https://github.com/MANO-B/FELIS/raw/main/felis_latest.zip
+unzip felis_latest.zip
 ```  
 ここでは"/srv/shiny-server/felis-cs"とします。  
 
