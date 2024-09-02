@@ -39,7 +39,7 @@ docker pull ikegamitky/felis:latest
 docker run -d --rm -p 3838:3838 ikegamitky/felis:latest R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
 サーバーでFELISを起動する場合、ターミナルから以下のコマンドを入力後はssh接続は不要です。  
-接続先のIPアドレスが172.25.100.1であれば、ブラウザで **[172.25.100.1:3838](http://172.25.100.1:3838)** にアクセスするとFELISが起動します。  
+接続先のIPアドレスが172.25.100.1であれば、ブラウザで **[http://172.25.100.1:3838](http://172.25.100.1:3838)** にアクセスするとFELISが起動します。  
 ```
 # ssh username@servername
 docker run -d -p 3838:3838 ikegamitky/felis:latest nohup shiny-server
