@@ -45,10 +45,12 @@ docker run -d --rm -p 3838:3838 ikegamitky/felis:1.5.1 R --no-echo -e 'library(s
 # For Apple silicon
 docker run -d --rm -p 3838:3838 ikegamitky/felis-mac:1.5.1 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
 ```
-サーバーでFELISを起動する場合は、ターミナルから以下コマンドでポートフォワードを行い、ブラウザで **[http://localhost:4949](http://localhost:4949)** にアクセスするとFELISが起動します。  
+サーバーでFELISを起動する場合、ターミナルから以下のコマンドを入力後はssh接続は不要です。  
+接続先のIPアドレスが172.25.100.1であれば、ブラウザで **[172.25.100.1:3838](http://172.25.100.1:3838)** にアクセスするとFELISが起動します。  
 ```
-ssh -L 4949:localhost:3838 username@servername
-docker run -d --rm -p 3838:3838 ikegamitky/felis:1.5.1 R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
+# ssh username@servername
+docker run -d -p 3838:3838 ikegamitky/felis:1.5.1 nohup shiny-server
+# exit
 ```
 Dockerを使用する場合は**解析ファイルの読み込み**セクションまで飛ばしてください。  
   
