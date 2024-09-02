@@ -49,9 +49,16 @@ docker run -d --rm -p 3838:3838 ikegamitky/felis-mac:1.5.4 R --no-echo -e 'libra
 サーバーでFELISを起動する場合、ターミナルから以下のコマンドを入力後はssh接続は不要です。  
 接続先のIPアドレスが172.25.100.1であれば、ブラウザで **[172.25.100.1:3838](http://172.25.100.1:3838)** にアクセスするとFELISが起動します。  
 ```
+# For Intel or AMD CPU (Amd64 architecture)
 # ssh username@servername
 docker run -d -p 3838:3838 ikegamitky/felis:1.5.4 nohup shiny-server
 # exit
+
+# For Apple silicon (Arm architecture)
+# ssh username@servername
+docker run -d -p 3838:3838 ikegamitky/felis-mac:1.5.4 nohup shiny-server
+# exit
+
 ```
 Dockerを使用する場合は**解析ファイルの読み込み**セクションまで飛ばしてください。  
   
