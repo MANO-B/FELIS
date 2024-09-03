@@ -208,7 +208,7 @@ Platform: aarch64-apple-darwin20 (64-bit)
 　　注目する遺伝子を選択してください。完全な描画にはInternet接続が必要です。  
 　　Internet接続がない場合は簡易表示します。  
 　　[Mutplot](https://github.com/VivianBailey/Mutplot)のスクリプトを使用しています。  
-- Threshold mutation count for lolliplot
+- Threshold mutation count for lolliplot  
 　　頻度の高い変異を強調するための設定です。  
 　　
 #### 変異の種類に関するフィルタ  
