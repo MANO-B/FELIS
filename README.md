@@ -5,7 +5,7 @@ Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://o
 
 ### Trial Website
 [Shinyapps.io](https://1onvji-mano0b.shinyapps.io/felis-cs/)で機能制限版(v1.5.5)での動作確認が可能です。  
-1GBメモリの環境のため頻繁にメモリ不足でクラッシュします。  
+1GBメモリの環境のため頻繁にメモリ不足でクラッシュします。基本的には以下に記載の手順のとおりLocal環境で実行ください。  
 計算資源の限界のためCGP検査後の生存期間解析およびOdds比・ハザード比の多変量解析はLocalでのみ実行可能です。  
 
 ### C-CAT利活用データの解析Webアプリ
