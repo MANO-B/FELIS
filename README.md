@@ -4,7 +4,9 @@ Functions Especially for LIquid and Solid tumor clinical sequencing for C-CAT da
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
 
 ### Trial Website
-[こちら](https://1onvji-mano0b.shinyapps.io/felis-cs/)のWebsiteで動作確認が可能です。計算資源の限界のため生存期間解析やOdds比・ハザード比の計算はエラーが生じます。  
+[Shinyapps.io](https://1onvji-mano0b.shinyapps.io/felis-cs/)で機能制限版(v1.5.5)での動作確認が可能です。  
+1GBメモリの環境のため200症例程度までは動作可能ですが、1000例になるとメモリ不足でクラッシュします。  
+計算資源の限界のためCGP検査後の生存期間解析およびOdds比・ハザード比の多変量解析はLocalでのみ実行可能です。  
 
 ### C-CAT利活用データの解析Webアプリ
 国立がん研究センターに設置されている[がんゲノム情報管理センター(C-CAT)](https://www.ncc.go.jp/jp/c_cat/use/index.html)には保険診療で行われたがん遺伝子パネル検査(Comprehensive Genomic Profiling, CGP検査)の結果と臨床情報が集約されています。この情報を学術研究や医薬品等の開発を目的とした二次利活用する仕組みがあります。現状では所属施設の倫理審査とC-CATでの倫理審査を経た研究でのみ使用可能であり、また病院やアカデミア以外の組織では年間780万円の利用料金が必要と敷居が高いですが、類似した海外のデータベースである[AACR project GENIE](https://www.aacr.org/professionals/research/aacr-project-genie/)と比較して薬剤の情報や臨床情報が詳しい点で優れており、希少がん・希少フラクションの研究においてこれまでになかった切り口での解析が可能になると考えられています。  
@@ -386,9 +388,10 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 
 ### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
 C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
-C-CAT database version 20240820 & 20240621: FELIS version 1.5.4  
+C-CAT database version 20240820 & 20240621: FELIS version 1.5.5  
   
 ### Version history
+1.5.5: 設定の項目選択に【全選択】と【選択解除】のボタンを追加 - 20240904  
 1.5.4: Shiny-serverでの動作を調整 - 20240902  
 1.5.2: ダミーデータで解析のトライアルを可能に - 20240902  
 1.5.1: Apple silicon用のDocker fileを作成, gtsummary packageのbugに対応 - 20240901  
