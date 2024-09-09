@@ -36,12 +36,20 @@ Dockerの使用法は[Windows向け](https://qiita.com/hoshimado/items/51c99ccae
 Docker desktop使用時は、CPUは4コア以上、メモリは[可及的に大きく設定](https://dojo.docker.jp/t/topic/52)ください。  
 FELISのDocker fileは[Docker-hub](https://hub.docker.com/r/ikegamitky/)に登録しています。  
 ```
+# Windowsはコマンドプロンプト、Macはターミナルで以下を実行
 # 適宜sudoで実施ください
 docker pull ikegamitky/felis:latest
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
 ```
-docker run -d --rm -p 3838:3838 ikegamitky/felis:latest R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)' 
+docker run -d --rm -p 3838:3838 ikegamitky/felis:latest R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)'
+
+##上記で動かない場合は以下を
+# Docker containerを起動
+docker run -it --rm -p 3838:3838 ikegamitky/felis:latest R
+# Rで以下の2行を実行
+library(shiny)
+runApp("/srv/shiny-server/felis-cs", launch.browser=F)
 ```
 サーバーでFELISを起動する場合、ターミナルから以下のコマンドを入力後はssh接続は不要です。  
 接続先のIPアドレスが172.25.100.1であれば、ブラウザで **[http://172.25.100.1:3838](http://172.25.100.1:3838)** にアクセスするとFELISが起動します。  
