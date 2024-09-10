@@ -36,9 +36,10 @@ Dockerの使用法は[Windows向け](https://qiita.com/hoshimado/items/51c99ccae
 Docker desktop使用時は、CPUは4コア以上、メモリは[可及的に大きく設定](https://dojo.docker.jp/t/topic/52)ください。  
 FELISのDocker fileは[Docker-hub](https://hub.docker.com/r/ikegamitky/)に登録しています。  
 ```
-# 先にDocker desktopを起動しておきます。
+# 先にDocker desktopを起動しておきます
 # Windowsはコマンドプロンプト、Macはターミナルで以下を実行
 # 適宜sudoで実施ください
+# バージョンアップを行う場合もこのコマンドを実行します
 docker pull ikegamitky/felis:latest
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
