@@ -333,7 +333,8 @@ log-log transformationを用いて95%信頼区間を算出します。
 - **推奨治療がある患者が**推奨治療を受けるかどうかを予測するノモグラムを**Factors leading to Treatment, post-CGP, Nomogram**タブに表示します。  
 - 推奨治療を受けるかどうかの因子を**Factors leading to Treatment, pre-CGP, Odds ratio**タブに表示します。  
 - **推奨治療がある患者が**推奨治療を受けるかどうかの因子を**Factors leading to Treatment, post-CGP, Odds ratio**タブに表示します。  
-- 推奨治療を受けるかどうかのノモグラムの性能を[Decision curve analysis](https://mskcc-epi-bio.github.io/decisioncurveanalysis/index.html)で評価し**Factors leading to Treatment, decision curve**タブに表示します。  
+- 推奨治療を受けるかどうかのノモグラムの性能を[Decision curve analysis](https://mskcc-epi-bio.github.io/decisioncurveanalysis/index.html)で評価し**Factors leading to Treatment, decision curve**タブに表示します。
+  結果の考え方については[こちら](https://github.com/MANO-B/FELIS/blob/main/decision_curve_analysis.md)を参照ください。  
 - Decision curve analysisの詳細を**Factors leading to Treatment, table**タブに表示します。  
     
 
