@@ -399,10 +399,11 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 
 ### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
 C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
-C-CAT database version 20240820 & 20240621: FELIS version 1.5.7  
+C-CAT database version 20240820 & 20240621: FELIS version 1.6.2
   
 ### Version history
-1.6.1: Lolliplotのデータを保存しインターネットアクセスができる限り不要になるよう調整 -20240912  
+1.6.2: Biomarker (MSI, MMR, HER2)の解析を追加、肺がんでのbugを修正 - 20240913  
+1.6.1: Lolliplotのデータを保存しインターネットアクセスができる限り不要になるよう調整 - 20240912  
 1.6.0: UIをShiny dashboardに変更 - 20240909  
 1.5.7: 多変量解析の変数選択のエラーを修正 - 20240908  
 1.5.6: Fusion genesをまとめて解析するオプションを追加 - 20240905  
