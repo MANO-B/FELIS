@@ -4,7 +4,7 @@ Functions Especially for LIquid and Solid tumor clinical sequencing for C-CAT da
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
 
 ### Trial Website
-[Shinyapps.io](https://1onvji-mano0b.shinyapps.io/felis-cs/)で機能制限版(v1.5.5)での動作確認が可能です。  
+[Shinyapps.io](https://1onvji-mano0b.shinyapps.io/felis-cs/)で機能制限版(v1.6.3)での動作確認が可能です。  
 1GBメモリの環境のため頻繁にメモリ不足でクラッシュします。基本的には以下に記載の手順のとおりLocal環境で実行ください。  
 計算資源の限界のためCGP検査後の生存期間解析およびOdds比・ハザード比の多変量解析はLocalでのみ実行可能です。  
 
@@ -399,9 +399,10 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
 
 ### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
 C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
-C-CAT database version 20240820 & 20240621: FELIS version 1.6.2
+C-CAT database version 20240820 & 20240621: FELIS version 1.6.3
   
 ### Version history
+1.6.3: 薬剤名の記載修正、オッズ比・ハザード比の表示桁数修正 - 20240914  
 1.6.2: Biomarker (MSI, MMR, HER2)の解析を追加、肺がんでのbugを修正 - 20240913  
 1.6.1: Lolliplotのデータを保存しインターネットアクセスができる限り不要になるよう調整 - 20240912  
 1.6.0: UIをShiny dashboardに変更 - 20240909  
