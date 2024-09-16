@@ -41,6 +41,11 @@ FELISのDocker fileは[Docker-hub](https://hub.docker.com/r/ikegamitky/)に登�
 # 適宜sudoで実施ください
 # バージョンアップを行う場合もこのコマンドを実行します
 docker pull ikegamitky/felis:latest
+
+# バージョンアップが不調の時は、以下の例の様にlatestを変更して直接バージョンを指定するとよいかもしれません。
+# この場合は以下のコマンドにおけるlatestも対応するバージョンに変更して実行します。
+Intel: docker pull ikegamitky/felis:1.6.4
+Apple silicon Mac: docker pull ikegamitky/felis:1.6.4.mac
 ```
 使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
 ```
