@@ -1,4 +1,4 @@
-## FELIS for C-CAT database <img src="source/FELIS.png" width=50>
+  ## FELIS for C-CAT database <img src="source/FELIS.png" width=50>
 Functions Especially for LIquid and Solid tumor clinical sequencing for C-CAT database.  
 [English version of this README file](https://github.com/MANO-B/FELIS/blob/main/README_ENG.md).  
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
@@ -277,6 +277,10 @@ Analysisタブを開きます。
 選択した症例のまとめを**Case summary**タブに表示します。  
 - 変異パターンで分類して**Summarized by mutation pattern**タブに表示します。  
 - 組織型で分類して**Summarized by histology**タブに表示します。  
+
+#### パネル間の変異数の比較
+- パネルごとの変異のVAFの分布を**Comparison figure**タブに表示します。  
+- 組織型とパネルごとにTMBや変異数をまとめた表を**Comparison figure**タブに表示します。  
   
 #### Oncoprintを表示  
 - 選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
@@ -394,7 +398,8 @@ Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や
     Clopper–Pearson法を用いて95%信頼区間を算出します。  
 - 変異パターンごとの奏効性の表を**Mutation pattern and RECIST**タブに表示します。  
 - 組織型ごとの奏効性の表を**Histology and RECIST**タブに表示します。  
-- 遺伝子変異ごとの奏効性の表を**Mutated genes and RECIST**タブに表示します。  
+- 遺伝子変異ごとの奏効性の表を**Mutated genes and RECIST**タブに表示します。
+- CGP後に使用した薬剤ごとにCGP検査後の生存曲線を**Survival and drug**タブに描画します。  
   
 #### 説明
 ソフトの使用法などを**Instruction**タブに表示します。  
