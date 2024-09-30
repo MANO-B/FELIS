@@ -119,7 +119,7 @@ install.packages("shiny")
 初めて実行する場合は相当に時間がかかります(最短で2時間程度、慣れていないとインストールの完遂は困難です)。  
 依存するライブラリ群を必要に応じてapt/brewなどでinstallすることになり大変ですので、Dockerの使用が望まれます。  
 ```
-install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'ggrepel', 'httr', 'plyr', 'rms', 'dcurves', 'Matching', 'blorr', 'broom', 'survRM2', 'rsample', 'shinydashboard', 'pROC', 'withr', 'rpart', 'ranger', 'bonsai', 'tidymodels', 'discrim', 'klaR', 'probably', 'lightgbm', 'partykit', 'betacal', 'BiocManager'), dependencies = TRUE)
+install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'survival', 'gridExtra', 'survminer', 'tranSurv', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'ggrepel', 'httr', 'plyr', 'rms', 'dcurves', 'Matching', 'blorr', 'broom', 'survRM2', 'rsample', 'shinydashboard', 'pROC', 'withr', 'rpart', 'ranger', 'bonsai', 'tidymodels', 'discrim', 'klaR', 'probably', 'lightgbm', 'partykit', 'betacal', 'ggbeeswarm', 'BiocManager'), dependencies = TRUE)
 BiocManager::install("maftools", update=FALSE)
 BiocManager::install("ComplexHeatmap", update=FALSE)
 BiocManager::install("drawProteins", update=FALSE)
