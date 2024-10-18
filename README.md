@@ -14,6 +14,7 @@ Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://o
 C-CATのデータを用いるに当たってはビッグデータかつリアルワールドデータの解析には特有の問題があり、また一定程度のデータ処理を行うプログラミングの知識が必要になります。GUIを用いたソフトウェアにより解析の敷居を下げることで、臨床医の日常診療におけるクリニカルクエスチョンに基づいた探索的研究を容易とし、C-CAT利活用データの活用を促進するために本ソフトウェアを作成しました。Felisはネコの学名であり、C-CAT関連の命名にはネコの名前縛りがあるようです。
 
 C-CATからデータを入手可能な方のみが本ソフトウェアを使用可能となる現状はご理解ください。  
+使用方法がよく分からない場合はmaikegamあっとncc.go.jpまでご相談ください。  
 
 ### 解析手法は以下の論文に基づきます
 > 1) Tamura T et al., Selection bias due to delayed comprehensive genomic profiling in Japan, Cancer Sci, 114(3):1015-1025, 2023.  
