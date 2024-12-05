@@ -3,7 +3,7 @@ Functions Especially for LIquid and Solid tumor clinical sequencing for C-CAT da
 [English version of this README file](https://github.com/MANO-B/FELIS/blob/main/README_ENG.md).  
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
 
-## 実際の使用法の解説やTips
+### 実際の使用法の解説やTips
 [こちらを参考に使用いただくとわかりやすいと思います。](Tips.md)  
 
 ### Trial Website
