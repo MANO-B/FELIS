@@ -4,7 +4,7 @@ Functions Especially for LIquid and Solid tumor clinical sequencing for C-CAT da
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
 
 ## 実際の使用法の解説やTips
-[こちらを参考に使用いただくとわかりやすいと思います。](Tips.md).  
+[こちらを参考に使用いただくとわかりやすいと思います。](Tips.md)  
 
 ### Trial Website
 [Shinyapps.io](https://1onvji-mano0b.shinyapps.io/felis-cs/)で機能制限版(v1.6.6)での動作確認が可能です。  
