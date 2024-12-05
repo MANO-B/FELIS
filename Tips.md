@@ -24,6 +24,19 @@
 4. Results -> Drug response -> Tables -> Drug use, by line of treatmentから使用状況を確認する<br>  
 5. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで治療を選択する<br>
 6. Analysis -> Drug response analysis -> Analyze with the setting selected aboveボタンで解析を行う<br>
+7. Results -> Drug response -> Time on treatment -> Time on treatment and pre-treatment for the specified treatment, KM-curveで、遺伝子変異の有無で群分けした指定治療のTime on treatmentをKaplan-Meier法で評価する<br>
+<br>
+全ての薬剤での治療期間と指定薬剤での治療期間に差がある場合、その遺伝子変異が指定薬剤のbiomarkerである可能性が示唆されます。
+</details>
+
+<details>
+<summary>ある薬剤の効果における遺伝子変異の有無の意義をみたい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢、治療コースなどの絞り込みを行う<br>  
+3. Analysis -> Drug response analysis -> List of drugs used in Palliative CTxボタンを押す<br>  
+4. Results -> Drug response -> Tables -> Drug use, by line of treatmentから使用状況を確認する<br>  
+5. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで治療を選択する<br>
+6. Analysis -> Drug response analysis -> Analyze with the setting selected aboveボタンで解析を行う<br>
 7. Results -> Drug response -> Time on treatment -> Time on treatment by tissue type, KM-curveで、全ての治療あるいは指定治療のTime on treatmentをKaplan-Meier法で評価する<br>
 <br>
 全ての薬剤での治療期間と指定薬剤での治療期間に差がある場合、その組織型に指定薬剤が有効ないし無効である可能性が示唆されます。
