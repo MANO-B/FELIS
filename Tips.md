@@ -111,7 +111,39 @@ Pts received recommended CTxは推奨治療を実際に受けた症例の割合�
 Median time from CTx to CGPは緩和的化学療法開始日からCGP検査日までの期間の中央値を意味します。<br>
 Median time from CGP to deathはCGP検査日から死亡までの期間のKaplan-Meier法での中央値を意味します。<br> 
 </details>
+
+<details>
+<summary>オンコプリント（遺伝子変異の一覧表）が欲しい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢の絞り込みを行う<br>  
+3. AnalysisからOncoprintボタンを押す<br>  
+4. Results -> Oncoprint -> Figures -> Oncoprintから結果を確認する<br>  
+5. AnalysisからMutation rate of each gene for each histologyボタンを押す<br>  
+6. Results -> Variation by histologyから組織型ごとにどの遺伝子変異の頻度が高いのかを確認する<br>  
+<br>
+描画した元データはDownloadable tableからExcelファイルでダウンロード可能です。<br> 
+</details>
+
+<details>
+<summary>ロリプロット（遺伝子のどのアミノ酸残基に変異が多いかの図）が欲しい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢の絞り込みを行う。3列目のGene for lolliplotから遺伝子を指定する。<br>  
+3. AnalysisからOncoprintボタンを押す<br>  
+4. Results -> Oncoprint -> Figures -> Lolliplot for the selected geneから結果を確認する<br>  
+<br>
+描画した元データはDownloadable tableからExcelファイルでダウンロード可能です。<br> 
+</details>
   
+<details>
+<summary>遺伝子間の相互排他性・共変異の情報が欲しい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢の絞り込みを行う<br>  
+3. AnalysisからMutually exclusive or co-occurring mutationボタンを押す<br>  
+4. Results -> Mutually exclusivityから結果を確認する<br>  
+<br>
+X軸の遺伝子とY軸の遺伝子の交わるセルの色が青いと両者は相互排他的、赤いと共変異の関係です。<br> 
+</details>
+
 
   
 ### データのキュレーション
