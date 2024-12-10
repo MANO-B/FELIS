@@ -1,6 +1,7 @@
 ## FELIS 解析例 <img src="source/FELIS.png" width=50>
-必要性の高いであろう解析について方法をまとめてみました。
-
+必要性の高いであろう解析について方法をまとめてみました。  
+  
+  
 ### 薬剤奏効性解析
 <details>
 <summary>ある治療と、一つ前のコースの治療との効果比較をしたい</summary>
@@ -15,7 +16,7 @@
 <br>
 
 </details>
-
+  
 <details>
 <summary>組織型ごとの治療効果をみたい</summary>
 1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
@@ -28,11 +29,11 @@
 <br>
 全ての薬剤での治療期間と指定薬剤での治療期間に差がある場合、その遺伝子変異が指定薬剤のbiomarkerである可能性が示唆されます。
 </details>
-
+  
 <details>
 <summary>ある薬剤の効果における遺伝子変異の有無の意義をみたい</summary>
 1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
-2. Settingから組織型や年齢、治療コースなどの絞り込みを行う<br>  
+2. Settingから組織型や年齢、治療コースなどの絞り込み、探索したい遺伝子の指定を行う<br>  
 3. Analysis -> Drug response analysis -> List of drugs used in Palliative CTxボタンを押す<br>  
 4. Results -> Drug response -> Tables -> Drug use, by line of treatmentから使用状況を確認する<br>  
 5. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで治療を選択する<br>
@@ -41,7 +42,37 @@
 <br>
 全ての薬剤での治療期間と指定薬剤での治療期間に差がある場合、その組織型に指定薬剤が有効ないし無効である可能性が示唆されます。
 </details>
+  
+<details>
+<summary>薬剤の効果と遺伝子変異の関係をvolcano plotで網羅的に確認したい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢、治療コースなどの絞り込みを行う<br>  
+3. Analysis -> Drug response analysis -> List of drugs used in Palliative CTxボタンを押す<br>  
+4. Results -> Drug response -> Tables -> Drug use, by line of treatmentから使用状況を確認する<br>  
+5. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで治療を選択する<br>
+6. Analysis -> Drug response analysis -> Analyze with the setting selected aboveボタンで解析を行う<br>
+7. Results -> Drug response -> Response rate -> Volcano plot for objective response rateで奏効性に関連する遺伝子変異を探索する<br>
+<br>
+右上の赤い遺伝子では変異があると奏効率が高く、左上の青い遺伝子では変異があると奏効率が低くなります。
+</details>
+  
 
+  
+### 生存期間解析
+<details>
+<summary>CGP検査後の予後と遺伝子変異の関係をみたい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢、治療コースなどの絞り込みを行う。とくにGenes of interestで注目する遺伝子セットを指定する。<br>  
+3. Analysis -> Survival analysis after CGP test ボタンを押す<br>  
+4. Results -> Survival after CGP -> Survival analysis -> Survival after CGP and performance statusから指定遺伝子セットないのいずれかに変異があるか否かで群分けした生存曲線を確認する。<br>
+5. Results -> Survival after CGP -> Survival analysis -> Survival after CGP and mutations, forest plotで、変異頻度の高い遺伝子について、変異の有無での2群間での生存期間の比較を行う<br>
+6. Results -> Survival after CGP -> Survival analysis -> Survival after CGP and mutations, KM-curveで、変異頻度の高い遺伝子について、変異の有無での2群間での生存曲線の比較を行う<br>
+<br>
+SettingのTiming for RMST measuring in survival analysis (years) で、forest plotで描画する生存期間(restricted mean survival time)の差を計算する時期を指定します。
+</details>
+  
+
+  
 ### 患者背景
 <details>
 <summary>患者背景のTableが欲しい</summary>
@@ -53,7 +84,7 @@
 <br>
 SettingのFilters on mutation types で選択した遺伝子変異の有無で群分けして表示されます。
 </details>
-
+  
 <details>
 <summary>患者背景のFigureが欲しい</summary>
 1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
@@ -68,7 +99,9 @@ Pts received recommended CTxは推奨治療を実際に受けた症例の割合�
 Median time from CTx to CGPは緩和的化学療法開始日からCGP検査日までの期間の中央値を意味します。<br>
 Median time from CGP to deathはCGP検査日から死亡までの期間のKaplan-Meier法での中央値を意味します。<br> 
 </details>
+  
 
+  
 ### データのキュレーション
 <details>
 <summary>組織型のキュレーションをしたい</summary>
@@ -85,5 +118,5 @@ Median time from CGP to deathはCGP検査日から死亡までの期間のKaplan
 <br>
 「がん種.OncoTree.」の記載と「がん種.OncoTree.LEVEL1.」の記載が同じ症例だけキュレーションすると労力が少ないと思います。<br>
 </details>
-
+  
 
