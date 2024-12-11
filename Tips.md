@@ -85,6 +85,34 @@ SettingのTiming for RMST measuring in survival analysis (years) で、forest pl
 
   
 <details>
+<summary>ある薬剤を生存中に使用したか否かでの生存期間の差をみたい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢、治療コースなどの絞り込みを行う<br>  
+3. Analysis -> Drug response analysis -> List of drugs used in Palliative CTxボタンを押す<br>  
+4. Results -> Drug response -> Tables -> Drug use, by line of treatmentから使用状況を確認する<br>  
+5. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで治療を選択する<br>
+6. Analysis -> Drug response analysis -> Analyze with the setting selected aboveボタンで解析を行う<br>
+7. Results -> Drug response -> Survival after CGP -> Survival and drugで、緩和的化学療法導入後に指定したレジメンを使用したか否かでの2群で分けた生存曲線を確認する<br>
+<br>
+左側切断バイアスを補正した場合としない場合で生存曲線が描かれます。<br>
+</details>
+
+  
+<details>
+<summary>ある薬剤をCGP検査後に使用したか否かでの生存期間の差をみたい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢、治療コースなどの絞り込みを行う<br>  
+3. Analysis -> Drug response analysis -> List of drugs used in Palliative CTxボタンを押す<br>  
+4. Results -> Drug response -> Tables -> Drug use, by line of treatmentから使用状況を確認する<br>  
+5. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで治療を選択する<br>
+6. Analysis -> Drug response analysis -> Analyze with the setting selected aboveボタンで解析を行う<br>
+7. Results -> Drug response -> Survival after CGP -> Survival and drugで、CGP検査後に指定したレジメンを使用したか否か、そして治療を受けなかった群で2〜3群に分けた生存曲線を確認する<br>
+<br>
+通常のカプラン・マイアー生存曲線が描かれます。<br>
+</details>
+
+  
+<details>
 <summary>CGP検査後の死亡ハザードに関係する因子を抽出したい</summary>
 1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
 2. Settingから組織型や年齢、治療コースなどの絞り込みを行う。<br>  
