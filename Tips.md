@@ -14,6 +14,8 @@
 7. Results -> Drug response -> Time on treatment -> Time on treatment and pre-treatment for the specified treatment, scatter plotで、同一患者群での前治療と指定治療のtime on treatmentの比較を行う<br>
 8. Results -> Drug response -> Time on treatment -> Time on treatment and pre-treatment for the specified treatment, KM-curveで、同一患者群での前治療と指定治療のtime on treatmentの比較を行う<br>
 <br>
+指定の治療を2コース目以降に受けた患者を抽出し、その前の治療とtime on treatmentの期間をカプラン・マイアー法で比較しました。<br>
+<br>
 <br>
 </details>
   
