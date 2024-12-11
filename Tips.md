@@ -202,6 +202,16 @@ X軸の遺伝子とY軸の遺伝子の交わるセルの色が青いと両者は
 Decision curve analysisについては<a href="https://mskcc-epi-bio.github.io/decisioncurveanalysis/index.html">こちら</a>や<a href="https://github.com/MANO-B/FELIS/blob/main/decision_curve_analysis.md">こちら</a>を参照下さい。<br> 
 </details>
 
+<details>
+<summary>CGP検査後の生存期間と治療到達率の関係性を知りたい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢、治療コースなどの絞り込みを行う。とくにGenes of interestで注目する遺伝子セットを指定する。<br>  
+3. Analysis -> Survival analysis after CGP test ボタンを押す<br>  
+4. Results -> Survival after CGP -> Survival analysis -> Survival period and treatment reach rate から、CGP検査後の生存期間と治療到達率について移動平均を取ったグラフを確認する。<br>
+<br>
+CGP検査後に短期で死亡する患者は治療到達率が低いため、いかに予後が悪そうな患者さんに早めに検査を行うか、そしてPSが保たれ一定程度の生存期間がある患者さんに検査を行うかが重要と思われます。<br>
+</details>
+
   
 ### データのキュレーション
 <details>
