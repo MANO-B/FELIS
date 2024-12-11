@@ -18,6 +18,22 @@
 </details>
   
 <details>
+<summary>二つの治療の治療効果比較をしたい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢、治療コースなどの絞り込みを行う<br>  
+3. Analysis -> Drug response analysis -> List of drugs used in Palliative CTxボタンを押す<br>  
+4. Results -> Drug response -> Tables -> Drug use, by line of treatmentから使用状況を確認する<br>  
+5. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで二つ以上の治療を選択する。比較したい2レジメンを、それぞれDrug set 1とDrug set 2に入力する<br>
+6. Analysis -> Drug response analysis -> Analyze with the setting selected aboveボタンで解析を行う<br>
+7. Results -> Drug response -> Survival after CGP -> Survival and drugで、緩和的化学療法導入後に指定したレジメンで2群で分けた生存曲線を確認する<br>
+<br>
+とくに、1st lineの治療に限定すると、例えば膵がんの1st line治療としてFOLFIRINOXとGEM + nab-PTXのどちらが生存期間が優れるかの比較ができたりします。<br>
+発売が新しい薬剤では左側切断バイアスが強く出るため、治療開始日でマッチングさせた解析も加えました。<br>
+<br>
+<br>
+</details>
+  
+<details>
 <summary>組織型ごとの治療効果をみたい</summary>
 1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
 2. Settingから組織型や年齢、治療コースなどの絞り込みを行う<br>  
