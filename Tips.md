@@ -62,7 +62,7 @@
 <br>
 </details>
   
-
+  
   
 ### 生存期間解析
 <details>
@@ -139,7 +139,7 @@ SettingのTiming for RMST measuring in survival analysis (years) で、forest pl
 <br>
 </details>
   
-
+  
   
 ### 患者背景
 <details>
@@ -210,8 +210,8 @@ X軸の遺伝子とY軸の遺伝子の交わるセルの色が青いと両者は
 <br>
 <br>
 </details>
-
-
+  
+  
   
 ### 治療到達性解析
 <details>
@@ -241,7 +241,8 @@ CGP検査後に短期で死亡する患者は治療到達率が低いため、�
 <br>
 <br>
 </details>
-
+  
+  
   
 ### データのキュレーション
 <details>
@@ -261,7 +262,8 @@ CGP検査後に短期で死亡する患者は治療到達率が低いため、�
 <br>
 <br>
 </details>
-
+  
+  
   
 ### 左側切断バイアスのシミュレーション
 <details>
@@ -279,8 +281,9 @@ C-CATのデータのように、生存期間の測定開始日と検査日（観
 <br>
 <br>
 </details>
-  
 
+  
+  
 ### その他
 <details>
 <summary>図を保存したい</summary>
