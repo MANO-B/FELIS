@@ -14,7 +14,7 @@
 7. Results -> Drug response -> Time on treatment -> Time on treatment and pre-treatment for the specified treatment, scatter plotで、同一患者群での前治療と指定治療のtime on treatmentの比較を行う<br>
 8. Results -> Drug response -> Time on treatment -> Time on treatment and pre-treatment for the specified treatment, KM-curveで、同一患者群での前治療と指定治療のtime on treatmentの比較を行う<br>
 <br>
-
+<br>
 </details>
   
 <details>
@@ -28,6 +28,8 @@
 7. Results -> Drug response -> Time on treatment -> Time on treatment and pre-treatment for the specified treatment, KM-curveで、遺伝子変異の有無で群分けした指定治療のTime on treatmentをKaplan-Meier法で評価する<br>
 <br>
 全ての薬剤での治療期間と指定薬剤での治療期間に差がある場合、その遺伝子変異が指定薬剤のbiomarkerである可能性が示唆されます。<br> 
+<br>
+<br>
 </details>
   
 <details>
@@ -41,6 +43,8 @@
 7. Results -> Drug response -> Time on treatment -> Time on treatment by tissue type, KM-curveで、全ての治療あるいは指定治療のTime on treatmentをKaplan-Meier法で評価する<br>
 <br>
 全ての薬剤での治療期間と指定薬剤での治療期間に差がある場合、その組織型に指定薬剤が有効ないし無効である可能性が示唆されます。<br> 
+<br>
+<br>
 </details>
   
 <details>
@@ -54,6 +58,8 @@
 7. Results -> Drug response -> Response rate -> Volcano plot for objective response rateで奏効性に関連する遺伝子変異を探索する<br>
 <br>
 右上の赤い遺伝子では変異があると奏効率が高く、左上の青い遺伝子では変異があると奏効率が低くなります。<br> 
+<br>
+<br>
 </details>
   
 
@@ -69,6 +75,8 @@
 6. Results -> Survival after CGP -> Survival analysis -> Survival after CGP and mutations, KM-curveで、変異頻度の高い遺伝子について、変異の有無での2群間での生存曲線の比較を行う<br>
 <br>
 SettingのTiming for RMST measuring in survival analysis (years) で、forest plotで描画する生存期間(restricted mean survival time)の差を計算する時期を指定します。<br> 
+<br>
+<br>
 </details>
 
   
@@ -81,6 +89,8 @@ SettingのTiming for RMST measuring in survival analysis (years) で、forest pl
 5. Results -> Survival after CTx -> Genetic variants and survival, KM-curveで、変異頻度の高い遺伝子について、変異の有無での2群間での生存曲線の比較を行う<br>
 <br>
 左側切断バイアスを補正した場合としない場合で生存曲線が描かれます。<br>
+<br>
+<br>
 </details>
 
   
@@ -95,6 +105,8 @@ SettingのTiming for RMST measuring in survival analysis (years) で、forest pl
 7. Results -> Drug response -> Survival after CGP -> Survival and drugで、緩和的化学療法導入後に指定したレジメンを使用したか否かでの2群で分けた生存曲線を確認する<br>
 <br>
 左側切断バイアスを補正した場合としない場合で生存曲線が描かれます。<br>
+<br>
+<br>
 </details>
 
   
@@ -109,6 +121,8 @@ SettingのTiming for RMST measuring in survival analysis (years) で、forest pl
 7. Results -> Drug response -> Survival after CGP -> Survival and drugで、CGP検査後に指定したレジメンを使用したか否か、そして治療を受けなかった群で2〜3群に分けた生存曲線を確認する<br>
 <br>
 通常のカプラン・マイアー生存曲線が描かれます。<br>
+<br>
+<br>
 </details>
 
   
@@ -121,6 +135,8 @@ SettingのTiming for RMST measuring in survival analysis (years) で、forest pl
 5. Results -> Survival after CGP -> Survival analysis -> Hazard ratio for survival after CGP -genes から、単変量解析・多変量解析でのハザード比に関係する臨床情報や遺伝子パターン（クラスタリング）を検討する。<br>
 <br>
 赤池情報量規準を用いて自動的に変数選択を行っています。<br> 
+<br>
+<br>
 </details>
   
 
@@ -135,6 +151,8 @@ SettingのTiming for RMST measuring in survival analysis (years) で、forest pl
 5. 必要があれば全体をコピーしてWordに保存する<br>
 <br>
 SettingのFilters on mutation types で選択した遺伝子変異の有無で群分けして表示されます。
+<br>
+<br>
 </details>
   
 <details>
@@ -150,6 +168,8 @@ Pts with recommended CTxはエキスパートパネルで推奨治療があっ�
 Pts received recommended CTxは推奨治療を実際に受けた症例の割合を意味します。<br>
 Median time from CTx to CGPは緩和的化学療法開始日からCGP検査日までの期間の中央値を意味します。<br>
 Median time from CGP to deathはCGP検査日から死亡までの期間のKaplan-Meier法での中央値を意味します。<br> 
+<br>
+<br>
 </details>
 
 <details>
@@ -162,6 +182,8 @@ Median time from CGP to deathはCGP検査日から死亡までの期間のKaplan
 6. Results -> Variation by histologyから組織型ごとにどの遺伝子変異の頻度が高いのかを確認する<br>  
 <br>
 描画した元データはDownloadable tableからExcelファイルでダウンロード可能です。<br> 
+<br>
+<br>
 </details>
 
 <details>
@@ -173,6 +195,8 @@ Median time from CGP to deathはCGP検査日から死亡までの期間のKaplan
 <br>
 描画した元データはDownloadable tableからExcelファイルでダウンロード可能です。<br> 
 現状ではエキソンスキッピングやイントロンの変異には対応していません。<br> 
+<br>
+<br>
 </details>
   
 <details>
@@ -183,6 +207,8 @@ Median time from CGP to deathはCGP検査日から死亡までの期間のKaplan
 4. Results -> Mutually exclusivityから結果を確認する<br>  
 <br>
 X軸の遺伝子とY軸の遺伝子の交わるセルの色が青いと両者は相互排他的、赤いと共変異の関係です。<br> 
+<br>
+<br>
 </details>
 
 
@@ -200,6 +226,8 @@ X軸の遺伝子とY軸の遺伝子の交わるセルの色が青いと両者は
 8. Results -> CGP benefit prediction -> Factors lesding to treatment -> Analyze your data から、特定の患者さんの情報を入力すると治療到達率が予想される。<br>
 <br>
 Decision curve analysisについては<a href="https://mskcc-epi-bio.github.io/decisioncurveanalysis/index.html">こちら</a>や<a href="https://github.com/MANO-B/FELIS/blob/main/decision_curve_analysis.md">こちら</a>を参照下さい。<br> 
+<br>
+<br>
 </details>
 
 <details>
@@ -210,6 +238,8 @@ Decision curve analysisについては<a href="https://mskcc-epi-bio.github.io/d
 4. Results -> Survival after CGP -> Survival analysis -> Survival period and treatment reach rate から、CGP検査後の生存期間と治療到達率について移動平均を取ったグラフを確認する。<br>
 <br>
 CGP検査後に短期で死亡する患者は治療到達率が低いため、いかに予後が悪そうな患者さんに早めに検査を行うか、そしてPSが保たれ一定程度の生存期間がある患者さんに検査を行うかが重要と思われます。<br>
+<br>
+<br>
 </details>
 
   
@@ -228,6 +258,8 @@ CGP検査後に短期で死亡する患者は治療到達率が低いため、�
 8. Input C-CAT files -> Correspondence table between ID and histology (CSV)から作成したCSVファイルを取り込む<br>  
 <br>
 「がん種.OncoTree.」の記載と「がん種.OncoTree.LEVEL1.」の記載が同じ症例だけキュレーションすると労力が少ないと思います。<br>
+<br>
+<br>
 </details>
 
   
@@ -244,6 +276,33 @@ C-CATのデータのように、生存期間の測定開始日と検査日（観
 4. 真の生存曲線、通常のカプラン・マイアー生存曲線、CGP検査前後で分割した生存曲線、ベイズ推定でのバイアス解消手法による生存曲線が描画されます。<br>  
 <br>
 概ね良好なバイアスの補正ができているのではないでしょうか。<br>
+<br>
+<br>
+</details>
+  
+
+### その他
+<details>
+<summary>図を保存したい</summary>
+図を右クリックし、拡張子を.pngとして名前をつけて保存して下さい。<br>
+<br>
+<br>
+</details>
+  
+
+<details>
+<summary>サマリーの表を保存したい</summary>
+保存して下さい。<br>
+<br>
+<br>
+</details>
+  
+
+<details>
+<summary>生データの表を保存したい</summary>
+左上にあるボタンでエクセルファイルあるいはCSVファイルなどで名前をつけて保存して下さい。<br>
+<br>
+<br>
 </details>
   
 
