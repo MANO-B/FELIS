@@ -27,7 +27,7 @@
 6. Analysis -> Drug response analysis -> Analyze with the setting selected aboveボタンで解析を行う<br>
 7. Results -> Drug response -> Time on treatment -> Time on treatment and pre-treatment for the specified treatment, KM-curveで、遺伝子変異の有無で群分けした指定治療のTime on treatmentをKaplan-Meier法で評価する<br>
 <br>
-全ての薬剤での治療期間と指定薬剤での治療期間に差がある場合、その遺伝子変異が指定薬剤のbiomarkerである可能性が示唆されます。
+全ての薬剤での治療期間と指定薬剤での治療期間に差がある場合、その遺伝子変異が指定薬剤のbiomarkerである可能性が示唆されます。<br> 
 </details>
   
 <details>
@@ -40,7 +40,7 @@
 6. Analysis -> Drug response analysis -> Analyze with the setting selected aboveボタンで解析を行う<br>
 7. Results -> Drug response -> Time on treatment -> Time on treatment by tissue type, KM-curveで、全ての治療あるいは指定治療のTime on treatmentをKaplan-Meier法で評価する<br>
 <br>
-全ての薬剤での治療期間と指定薬剤での治療期間に差がある場合、その組織型に指定薬剤が有効ないし無効である可能性が示唆されます。
+全ての薬剤での治療期間と指定薬剤での治療期間に差がある場合、その組織型に指定薬剤が有効ないし無効である可能性が示唆されます。<br> 
 </details>
   
 <details>
@@ -53,7 +53,7 @@
 6. Analysis -> Drug response analysis -> Analyze with the setting selected aboveボタンで解析を行う<br>
 7. Results -> Drug response -> Response rate -> Volcano plot for objective response rateで奏効性に関連する遺伝子変異を探索する<br>
 <br>
-右上の赤い遺伝子では変異があると奏効率が高く、左上の青い遺伝子では変異があると奏効率が低くなります。
+右上の赤い遺伝子では変異があると奏効率が高く、左上の青い遺伝子では変異があると奏効率が低くなります。<br> 
 </details>
   
 
@@ -68,7 +68,7 @@
 5. Results -> Survival after CGP -> Survival analysis -> Survival after CGP and mutations, forest plotで、変異頻度の高い遺伝子について、変異の有無での2群間での生存期間の比較を行う<br>
 6. Results -> Survival after CGP -> Survival analysis -> Survival after CGP and mutations, KM-curveで、変異頻度の高い遺伝子について、変異の有無での2群間での生存曲線の比較を行う<br>
 <br>
-SettingのTiming for RMST measuring in survival analysis (years) で、forest plotで描画する生存期間(restricted mean survival time)の差を計算する時期を指定します。
+SettingのTiming for RMST measuring in survival analysis (years) で、forest plotで描画する生存期間(restricted mean survival time)の差を計算する時期を指定します。<br> 
 </details>
 
   
@@ -120,7 +120,7 @@ SettingのTiming for RMST measuring in survival analysis (years) で、forest pl
 4. Results -> Survival after CGP -> Survival analysis -> Hazard ratio for survival after CGP -genes から、単変量解析・多変量解析でのハザード比に関係する臨床情報や遺伝子変異を検討する。<br>
 5. Results -> Survival after CGP -> Survival analysis -> Hazard ratio for survival after CGP -genes から、単変量解析・多変量解析でのハザード比に関係する臨床情報や遺伝子パターン（クラスタリング）を検討する。<br>
 <br>
-赤池情報量規準を用いて自動的に変数選択を行っています。
+赤池情報量規準を用いて自動的に変数選択を行っています。<br> 
 </details>
   
 
@@ -172,6 +172,7 @@ Median time from CGP to deathはCGP検査日から死亡までの期間のKaplan
 4. Results -> Oncoprint -> Figures -> Lolliplot for the selected geneから結果を確認する<br>  
 <br>
 描画した元データはDownloadable tableからExcelファイルでダウンロード可能です。<br> 
+現状ではエキソンスキッピングやイントロンの変異には対応していません。<br> 
 </details>
   
 <details>
@@ -184,6 +185,22 @@ Median time from CGP to deathはCGP検査日から死亡までの期間のKaplan
 X軸の遺伝子とY軸の遺伝子の交わるセルの色が青いと両者は相互排他的、赤いと共変異の関係です。<br> 
 </details>
 
+
+  
+### 治療到達性解析
+<details>
+<summary>どのような患者にCGP検査を行うと治療到達率が高いのかを知りたい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢、治療コースなどの絞り込みを行う。とくにGenes of interestで注目する遺伝子セットを指定する。<br>  
+3. Analysis -> CGP benefit prediction analysis ボタンを押す<br>  
+4. Results -> CGP benefit prediction -> Factors lesding to treatment -> Factors lesding to treatment, pre-CGP, Nomogram から、検査前に得られる患者の臨床情報に基づいて治療到達率を予測するノモグラムを得る。<br>
+5. Results -> CGP benefit prediction -> Factors lesding to treatment -> Factors lesding to treatment, pre-CGP, Odds ratio から、検査前に得られる患者の臨床情報が治療到達率に与える影響を単変量・多変量で解析する。<br>
+6. Results -> CGP benefit prediction -> Factors lesding to treatment -> ROC curve of nomogram から、ノモグラムによる予測の精度をROC曲線で確認する。<br>
+7. Results -> CGP benefit prediction -> Factors lesding to treatment -> Factors lesding to treatment, decision curve から、ノモグラムによる予測の臨床的有用性をdecision curve analysisで評価した結果を確認する。<br>
+8. Results -> CGP benefit prediction -> Factors lesding to treatment -> Analyze your data から、特定の患者さんの情報を入力すると治療到達率が予想される。<br>
+<br>
+Decision curve analysisについては<a href="https://mskcc-epi-bio.github.io/decisioncurveanalysis/index.html">こちら</a>や<a href="https://github.com/MANO-B/FELIS/blob/main/decision_curve_analysis.md">こちら</a>を参照下さい。<br> 
+</details>
 
   
 ### データのキュレーション
