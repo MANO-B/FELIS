@@ -73,6 +73,18 @@ SettingのTiming for RMST measuring in survival analysis (years) で、forest pl
 
   
 <details>
+<summary>緩和的化学療法導入後の予後と遺伝子変異の関係をみたい</summary>
+1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
+2. Settingから組織型や年齢、治療コースなどの絞り込みを行う。とくにGenes of interestで注目する遺伝子セットを指定する。<br>  
+3. Analysis -> Survival analysis after CTx induction ボタンを押す<br>  
+4. Results -> Survival after CTx -> Genetic variants and survival, forest plotで、変異頻度の高い遺伝子について、変異の有無での2群間での生存期間の比較を行う<br>
+5. Results -> Survival after CTx -> Genetic variants and survival, KM-curveで、変異頻度の高い遺伝子について、変異の有無での2群間での生存曲線の比較を行う<br>
+<br>
+左側切断バイアスを補正した場合としない場合で生存曲線が描かれます。<br>
+</details>
+
+  
+<details>
 <summary>CGP検査後の死亡ハザードに関係する因子を抽出したい</summary>
 1. Input C-CAT filesからcase/report CSVファイルを取り込む<br>  
 2. Settingから組織型や年齢、治療コースなどの絞り込みを行う。<br>  
