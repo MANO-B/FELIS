@@ -1,4 +1,5 @@
 ### Version history
+1.10.3: Bug fixed in Survival analysis after CGP, 三輪先生ありがとうございました。 - 20241217  
 1.10.1: Bug fixed in Survival analysis after CGP, 三輪先生ありがとうございました。 - 20241217  
 1.10.0: data.frameからdata.tableとして高速化、薬剤のコース数抽出を修正 - 20241216  
 1.9.2: volcano plotの設定の調整。Tipsで有用な解析の例を解説 - 20241211  
