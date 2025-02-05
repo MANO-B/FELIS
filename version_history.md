@@ -1,4 +1,5 @@
 ### Version history
+1.12.1: 生存期間解析を日表記から月表記に変更 - 20250205  
 1.10.3: Bug fixed in Survival analysis after CGP, 三輪先生ありがとうございました。 - 20241217  
 1.10.1: Bug fixed in Survival analysis after CGP, 三輪先生ありがとうございました。 - 20241217  
 1.10.0: data.frameからdata.tableとして高速化、薬剤のコース数抽出を修正 - 20241216  
