@@ -10081,7 +10081,10 @@ server <- function(input, output, session) {
       if(length(Data_MAF[Data_MAF$TMB > 30,]$TMB) > 0){
         Data_MAF[Data_MAF$TMB > 30,]$TMB = 30
       }
-      
+      ID_evidence_AB = unique((Data_report() %>%
+                                 dplyr::filter(
+                                   Evidence_level %in% c("A","B")) %>% 
+                                 dplyr::arrange(Tumor_Sample_Barcode))$Tumor_Sample_Barcode)
       Data_report_TMB = Data_MAF %>%
         dplyr::filter(Tumor_Sample_Barcode %in%
                         Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
@@ -10862,10 +10865,6 @@ server <- function(input, output, session) {
       Factor_names = colnames(Data_forest)
       Factor_names = Factor_names[!Factor_names %in% c('ID', 'time_enroll_final', 'censor', 'EP_treat', 'EP_option')]
       
-      ID_evidence_AB = unique((Data_MAF %>%
-        dplyr::filter(
-          Evidence_level %in% c("A","B")) %>% 
-        dplyr::arrange(Tumor_Sample_Barcode))$Tumor_Sample_Barcode)
       Data_forest_tmp__ = Data_forest %>%
         dplyr::mutate(EP_option = case_when(
           ID %in% ID_evidence_AB ~ 1,
@@ -11589,6 +11588,8 @@ server <- function(input, output, session) {
         }
       })
       
+      Data_ML =  Data_forest %>%
+        dplyr::select(-Age, -time_enroll_final, -censor, -EP_treat, -ID, -Histology_dummy)
       Data_forest_tmp_8_rec = Data_forest_tmp_7_rec
       if("Lines" %in% colnames(Data_forest_tmp_8_rec)){
         Data_forest_tmp_8_rec = Data_forest_tmp_8_rec %>% select(-Lines)
@@ -11626,7 +11627,7 @@ server <- function(input, output, session) {
             } else {
               m2_rec <- lrm(formula_treat_rec,
                         data = Data_forest_tmp_treat_rec,x=TRUE,y=TRUE,penalty = Penal, tol=Toler)
-              save(m2_rec, file = "source/m2_rec.qs")
+              saveRDS(m2_rec, file = "source/m2_rec.qs")
             }
             # error in rms package
             val_rec <- try(rms::validate(m2_rec, B=500), silent = FALSE)
@@ -11654,12 +11655,12 @@ server <- function(input, output, session) {
               
               abline(0, 1, lty=3, lwd=2,  col=c("#224444")) 
               text(x=.4, y=.0, adj = c(0,0), paste0("Matched therapy recommendation ratio, pre CGP information (other than mutation)","\n",
-                                                    "Model lokelihood ratio test P-value: ", format(m2$stats["P"][[1]], nsmall=3),'\n',
-                                                    "500-time-bootstrapped-Brier score: ", round(val[9,5], digits=3),'\n',
-                                                    "500-time-bootstrapped-Nagelkerke R2 = ", round(val[2,5], digits=3),'\n',
-                                                    "500-time-bootstrapped-concordance index = ", round(((val[1,5] + 1) / 2), digits=3),"\n",
-                                                    "Intercept = ",round(val[3,5], digits=3),"\n",
-                                                    "Slope = ", round(val[4,5], digits=3)))
+                                                    "Model lokelihood ratio test P-value: ", format(m2_rec$stats["P"][[1]], nsmall=3),'\n',
+                                                    "500-time-bootstrapped-Brier score: ", round(val_rec[9,5], digits=3),'\n',
+                                                    "500-time-bootstrapped-Nagelkerke R2 = ", round(val_rec[2,5], digits=3),'\n',
+                                                    "500-time-bootstrapped-concordance index = ", round(((val_rec[1,5] + 1) / 2), digits=3),"\n",
+                                                    "Intercept = ",round(val_rec[3,5], digits=3),"\n",
+                                                    "Slope = ", round(val_rec[4,5], digits=3)))
               legend(x=.8, y=.2, legend=c("Apparent", "Bias-corrected", "Ideal"), 
                      lty=c(3, 1, 2), bty="n")
               plot(log_nomogram_rec)
@@ -11725,7 +11726,7 @@ server <- function(input, output, session) {
             } else {
               m2_GMT <- lrm(formula_treat_GMT,
                             data = Data_forest_tmp_treat_GMT,x=TRUE,y=TRUE,penalty = Penal, tol=Toler)
-              save(m2_GMT, file = "source/m2_GMT.qs")
+              saveRDS(m2_GMT, file = "source/m2_GMT.qs")
             }
             # error in rms package
             val_GMT <- try(rms::validate(m2_GMT, B=500), silent = FALSE)
@@ -11753,12 +11754,12 @@ server <- function(input, output, session) {
               
               abline(0, 1, lty=3, lwd=2,  col=c("#224444")) 
               text(x=.4, y=.0, adj = c(0,0), paste0("Matched therapy recommendation ratio, pre CGP information (other than mutation)","\n",
-                                                    "Model lokelihood ratio test P-value: ", format(m2$stats["P"][[1]], nsmall=3),'\n',
-                                                    "500-time-bootstrapped-Brier score: ", round(val[9,5], digits=3),'\n',
-                                                    "500-time-bootstrapped-Nagelkerke R2 = ", round(val[2,5], digits=3),'\n',
-                                                    "500-time-bootstrapped-concordance index = ", round(((val[1,5] + 1) / 2), digits=3),"\n",
-                                                    "Intercept = ",round(val[3,5], digits=3),"\n",
-                                                    "Slope = ", round(val[4,5], digits=3)))
+                                                    "Model lokelihood ratio test P-value: ", format(m2_GMT$stats["P"][[1]], nsmall=3),'\n',
+                                                    "500-time-bootstrapped-Brier score: ", round(val_GMT[9,5], digits=3),'\n',
+                                                    "500-time-bootstrapped-Nagelkerke R2 = ", round(val_GMT[2,5], digits=3),'\n',
+                                                    "500-time-bootstrapped-concordance index = ", round(((val_GMT[1,5] + 1) / 2), digits=3),"\n",
+                                                    "Intercept = ",round(val_GMT[3,5], digits=3),"\n",
+                                                    "Slope = ", round(val_GMT[4,5], digits=3)))
               legend(x=.8, y=.2, legend=c("Apparent", "Bias-corrected", "Ideal"), 
                      lty=c(3, 1, 2), bty="n")
               plot(log_nomogram_GMT)
@@ -11861,6 +11862,8 @@ server <- function(input, output, session) {
             }
             
             set.seed(1212)
+            Data_ML =  Data_forest %>%
+              dplyr::select(-Age, -time_enroll_final, -censor, -EP_option, -ID, -Histology_dummy)
             Data_ML$EP_treat = factor(Data_ML$EP_treat)
             cls_met <- metric_set(brier_class)
             Data_cv <- vfold_cv(v=10, Data_ML, strata = EP_treat)
@@ -11943,40 +11946,40 @@ server <- function(input, output, session) {
               saveRDS(rf_parameter, "source/rf_param.qs")
             }  
             set.seed(1212)
+            lgb_model <-
+              parsnip::boost_tree(mode = "classification") %>%
+              set_engine("lightgbm",
+                         lambda_l1 = .9,
+                         min_n = lgb_parameter$min_n,
+                         tree_depth = lgb_parameter$tree_depth,
+                         learn_rate = 0.01,
+                         trees = 10000,
+                         mtry = lgb_parameter$mtry)
+            lgb_wflow <- 
+              workflow() %>% 
+              add_model(lgb_model) %>% 
+              add_recipe(Data_recipe)
             if(input$new_analysis =="No, use the previous dataset" & file.exists("source/lgb_m2.qs")){
               lgb_m2 = readRDS( "source/lgb_m2.qs")
             } else {
-              lgb_model <-
-                parsnip::boost_tree(mode = "classification") %>%
-                set_engine("lightgbm",
-                           lambda_l1 = .9,
-                           min_n = lgb_parameter$min_n,
-                           tree_depth = lgb_parameter$tree_depth,
-                           learn_rate = 0.01,
-                           trees = 10000,
-                           mtry = lgb_parameter$mtry)
-              lgb_wflow <- 
-                workflow() %>% 
-                add_model(lgb_model) %>% 
-                add_recipe(Data_recipe)
               lgb_m2 = lgb_wflow %>% fit(Data_ML) 
               saveRDS(lgb_m2, file = "source/lgb_m2.qs")
             }
+            rf_model <-
+              parsnip::rand_forest() |>
+              parsnip::set_args(trees = 10000, min_n = rf_parameter$min_n, mtry = rf_parameter$mtry) |>
+              parsnip::set_engine(
+                'ranger', keep.inbag = TRUE,
+                num.threads = max(1, parallel::detectCores() - 1, na.rm = TRUE)
+              ) |>
+              parsnip::set_mode('classification')
+            rf_wflow <- 
+              workflow() %>% 
+              add_model(rf_model) %>% 
+              add_recipe(Data_recipe)
             if(input$new_analysis =="No, use the previous dataset" & file.exists("source/rf_m2.qs")){
               rf_m2 = readRDS( "source/rf_m2.qs")
             } else {
-              rf_model <-
-                parsnip::rand_forest() |>
-                parsnip::set_args(trees = 10000, min_n = rf_parameter$min_n, mtry = rf_parameter$mtry) |>
-                parsnip::set_engine(
-                  'ranger', keep.inbag = TRUE,
-                  num.threads = max(1, parallel::detectCores() - 1, na.rm = TRUE)
-                ) |>
-                parsnip::set_mode('classification')
-              rf_wflow <- 
-                workflow() %>% 
-                add_model(rf_model) %>% 
-                add_recipe(Data_recipe)
               rf_m2 = rf_wflow %>% fit(Data_ML) 
               saveRDS(rf_m2, file = "source/rf_m2.qs")
             }
@@ -12251,6 +12254,8 @@ server <- function(input, output, session) {
             }
             
             set.seed(1212)
+            Data_ML =  Data_forest %>%
+              dplyr::select(-Age, -time_enroll_final, -censor, -EP_treat, -ID, -Histology_dummy)
             Data_ML$EP_option = factor(Data_ML$EP_option)
             cls_met <- metric_set(brier_class)
             Data_cv <- vfold_cv(v=10, Data_ML, strata = EP_option)
@@ -12333,40 +12338,40 @@ server <- function(input, output, session) {
               saveRDS(rf_parameter_rec, "source/rf_param_rec.qs")
             }  
             set.seed(1212)
+            lgb_model <-
+              parsnip::boost_tree(mode = "classification") %>%
+              set_engine("lightgbm",
+                         lambda_l1 = .9,
+                         min_n = lgb_parameter$min_n,
+                         tree_depth = lgb_parameter$tree_depth,
+                         learn_rate = 0.01,
+                         trees = 10000,
+                         mtry = lgb_parameter$mtry)
+            lgb_wflow <- 
+              workflow() %>% 
+              add_model(lgb_model) %>% 
+              add_recipe(Data_recipe)
             if(input$new_analysis =="No, use the previous dataset" & file.exists("source/lgb_m2_rec.qs")){
               lgb_m2_rec = readRDS( "source/lgb_m2_rec.qs")
             } else {
-              lgb_model <-
-                parsnip::boost_tree(mode = "classification") %>%
-                set_engine("lightgbm",
-                           lambda_l1 = .9,
-                           min_n = lgb_parameter$min_n,
-                           tree_depth = lgb_parameter$tree_depth,
-                           learn_rate = 0.01,
-                           trees = 10000,
-                           mtry = lgb_parameter$mtry)
-              lgb_wflow <- 
-                workflow() %>% 
-                add_model(lgb_model) %>% 
-                add_recipe(Data_recipe)
               lgb_m2_rec = lgb_wflow %>% fit(Data_ML) 
               saveRDS(lgb_m2_rec, file = "source/lgb_m2_rec.qs")
             }
+            rf_model <-
+              parsnip::rand_forest() |>
+              parsnip::set_args(trees = 10000, min_n = rf_parameter$min_n, mtry = rf_parameter$mtry) |>
+              parsnip::set_engine(
+                'ranger', keep.inbag = TRUE,
+                num.threads = max(1, parallel::detectCores() - 1, na.rm = TRUE)
+              ) |>
+              parsnip::set_mode('classification')
+            rf_wflow <- 
+              workflow() %>% 
+              add_model(rf_model) %>% 
+              add_recipe(Data_recipe)
             if(input$new_analysis =="No, use the previous dataset" & file.exists("source/rf_m2_rec.qs")){
               rf_m2_rec = readRDS( "source/rf_m2_rec.qs")
             } else {
-              rf_model <-
-                parsnip::rand_forest() |>
-                parsnip::set_args(trees = 10000, min_n = rf_parameter$min_n, mtry = rf_parameter$mtry) |>
-                parsnip::set_engine(
-                  'ranger', keep.inbag = TRUE,
-                  num.threads = max(1, parallel::detectCores() - 1, na.rm = TRUE)
-                ) |>
-                parsnip::set_mode('classification')
-              rf_wflow <- 
-                workflow() %>% 
-                add_model(rf_model) %>% 
-                add_recipe(Data_recipe)
               rf_m2_rec = rf_wflow %>% fit(Data_ML) 
               saveRDS(rf_m2_rec, file = "source/rf_m2_rec.qs")
             }
@@ -12379,16 +12384,16 @@ server <- function(input, output, session) {
               bind_rows() %>%
               dplyr::arrange(.row)
             # df_cv_pred_rec$rf  = rf_res_all$.pred_1
-            ROC_rf <- roc(EP_option ~ .pred_1, data = rf_res_all, ci = TRUE)
-            gROC_rf_rec = ggroc(ROC_rf, 
+            ROC_rf_rec <- roc(EP_option ~ .pred_1, data = rf_res_all, ci = TRUE)
+            gROC_rf_rec = ggroc(ROC_rf_rec, 
                             size = 1, #サイズ
                             legacy.axes = TRUE) + 
               geom_abline(color = "dark grey", size = 0.5) +
               theme_classic() +
               labs(
                 title = 
-                  paste0("Random forest, AUC: ", round(ROC_rf$auc[1],3), " (95%CI:",round(ROC_rf$ci[1],3), "-", round(ROC_rf$ci[3],3), ")",
-                         ", mtry/min_n=",rf_parameter$mtry,"/",rf_parameter$min_n)
+                  paste0("Random forest, AUC: ", round(ROC_rf_rec$auc[1],3), " (95%CI:",round(ROC_rf_rec$ci[1],3), "-", round(ROC_rf_rec$ci[3],3), ")",
+                         ", mtry/min_n=",rf_parameter_rec$mtry,"/",rf_parameter_rec$min_n)
               )
             
             set.seed(1212)
@@ -12398,16 +12403,16 @@ server <- function(input, output, session) {
               bind_rows() %>%
               dplyr::arrange(.row)
             # df_cv_pred_rec$lgb  = lgb_res_all$.pred_1
-            ROC_lgb <- roc(EP_option ~ .pred_1, data = lgb_res_all, ci = TRUE)
-            gROC_lgb_rec = ggroc(ROC_lgb, 
+            ROC_lgb_rec <- roc(EP_option ~ .pred_1, data = lgb_res_all, ci = TRUE)
+            gROC_lgb_rec = ggroc(ROC_lgb_rec, 
                              size = 1, #サイズ
                              legacy.axes = TRUE) + 
               geom_abline(color = "dark grey", size = 0.5) +
               theme_classic() +
               labs(
                 title = 
-                  paste0("LightGBM, AUC: ", round(ROC_lgb$auc[1],3), " (95%CI:",round(ROC_lgb$ci[1],3), "-", round(ROC_lgb$ci[3],3), ")",
-                         ", mtry/min_n/tree_depth=",lgb_parameter$mtry,"/",lgb_parameter$min_n,"/",lgb_parameter$tree_depth)
+                  paste0("LightGBM, AUC: ", round(ROC_lgb_rec$auc[1],3), " (95%CI:",round(ROC_lgb_rec$ci[1],3), "-", round(ROC_lgb_rec$ci[3],3), ")",
+                         ", mtry/min_n/tree_depth=",lgb_parameter_rec$mtry,"/",lgb_parameter_rec$min_n,"/",lgb_parameter_rec$tree_depth)
               )
             
             g1_rec = collect_predictions(lgb_res) %>%
@@ -12641,6 +12646,8 @@ server <- function(input, output, session) {
             }
             
             set.seed(1212)
+            Data_ML =  Data_forest %>%
+              dplyr::select(-Age, -time_enroll_final, -censor, -EP_treat, -ID, -Histology_dummy)
             Data_ML$EP_option = factor(Data_ML$EP_option)
             cls_met <- metric_set(brier_class)
             Data_cv <- vfold_cv(v=10, Data_ML, strata = EP_option)
@@ -12723,40 +12730,40 @@ server <- function(input, output, session) {
               saveRDS(rf_parameter_GMT, "source/rf_param_GMT.qs")
             }  
             set.seed(1212)
+            lgb_model <-
+              parsnip::boost_tree(mode = "classification") %>%
+              set_engine("lightgbm",
+                         lambda_l1 = .9,
+                         min_n = lgb_parameter$min_n,
+                         tree_depth = lgb_parameter$tree_depth,
+                         learn_rate = 0.01,
+                         trees = 10000,
+                         mtry = lgb_parameter$mtry)
+            lgb_wflow <- 
+              workflow() %>% 
+              add_model(lgb_model) %>% 
+              add_recipe(Data_recipe)
             if(input$new_analysis =="No, use the previous dataset" & file.exists("source/lgb_m2_GMT.qs")){
               lgb_m2_GMT = readRDS( "source/lgb_m2_GMT.qs")
             } else {
-              lgb_model <-
-                parsnip::boost_tree(mode = "classification") %>%
-                set_engine("lightgbm",
-                           lambda_l1 = .9,
-                           min_n = lgb_parameter$min_n,
-                           tree_depth = lgb_parameter$tree_depth,
-                           learn_rate = 0.01,
-                           trees = 10000,
-                           mtry = lgb_parameter$mtry)
-              lgb_wflow <- 
-                workflow() %>% 
-                add_model(lgb_model) %>% 
-                add_recipe(Data_GMTipe)
               lgb_m2_GMT = lgb_wflow %>% fit(Data_ML) 
               saveRDS(lgb_m2_GMT, file = "source/lgb_m2_GMT.qs")
             }
+            rf_model <-
+              parsnip::rand_forest() |>
+              parsnip::set_args(trees = 10000, min_n = rf_parameter$min_n, mtry = rf_parameter$mtry) |>
+              parsnip::set_engine(
+                'ranger', keep.inbag = TRUE,
+                num.threads = max(1, parallel::detectCores() - 1, na.rm = TRUE)
+              ) |>
+              parsnip::set_mode('classification')
+            rf_wflow <- 
+              workflow() %>% 
+              add_model(rf_model) %>% 
+              add_recipe(Data_recipe)
             if(input$new_analysis =="No, use the previous dataset" & file.exists("source/rf_m2_GMT.qs")){
               rf_m2_GMT = readRDS( "source/rf_m2_GMT.qs")
             } else {
-              rf_model <-
-                parsnip::rand_forest() |>
-                parsnip::set_args(trees = 10000, min_n = rf_parameter$min_n, mtry = rf_parameter$mtry) |>
-                parsnip::set_engine(
-                  'ranger', keep.inbag = TRUE,
-                  num.threads = max(1, parallel::detectCores() - 1, na.rm = TRUE)
-                ) |>
-                parsnip::set_mode('classification')
-              rf_wflow <- 
-                workflow() %>% 
-                add_model(rf_model) %>% 
-                add_recipe(Data_GMTipe)
               rf_m2_GMT = rf_wflow %>% fit(Data_ML) 
               saveRDS(rf_m2_GMT, file = "source/rf_m2_GMT.qs")
             }
@@ -12769,16 +12776,16 @@ server <- function(input, output, session) {
               bind_rows() %>%
               dplyr::arrange(.row)
             # df_cv_pred_GMT$rf  = rf_res_all$.pred_1
-            ROC_rf <- roc(EP_option ~ .pred_1, data = rf_res_all, ci = TRUE)
-            gROC_rf_GMT = ggroc(ROC_rf, 
+            ROC_rf_GMT <- roc(EP_option ~ .pred_1, data = rf_res_all, ci = TRUE)
+            gROC_rf_GMT = ggroc(ROC_rf_GMT, 
                                 size = 1, #サイズ
                                 legacy.axes = TRUE) + 
               geom_abline(color = "dark grey", size = 0.5) +
               theme_classic() +
               labs(
                 title = 
-                  paste0("Random forest, AUC: ", round(ROC_rf$auc[1],3), " (95%CI:",round(ROC_rf$ci[1],3), "-", round(ROC_rf$ci[3],3), ")",
-                         ", mtry/min_n=",rf_parameter$mtry,"/",rf_parameter$min_n)
+                  paste0("Random forest, AUC: ", round(ROC_rf_GMT$auc[1],3), " (95%CI:",round(ROC_rf_GMT$ci[1],3), "-", round(ROC_rf_GMT$ci[3],3), ")",
+                         ", mtry/min_n=",rf_parameter_GMT$mtry,"/",rf_parameter_GMT$min_n)
               )
             
             set.seed(1212)
@@ -12788,16 +12795,16 @@ server <- function(input, output, session) {
               bind_rows() %>%
               dplyr::arrange(.row)
             # df_cv_pred_rec$lgb  = lgb_res_all$.pred_1
-            ROC_lgb <- roc(EP_option ~ .pred_1, data = lgb_res_all, ci = TRUE)
-            gROC_lgb_GMT = ggroc(ROC_lgb, 
+            ROC_lgb_GMT <- roc(EP_option ~ .pred_1, data = lgb_res_all, ci = TRUE)
+            gROC_lgb_GMT = ggroc(ROC_lgb_GMT, 
                                  size = 1, #サイズ
                                  legacy.axes = TRUE) + 
               geom_abline(color = "dark grey", size = 0.5) +
               theme_classic() +
               labs(
                 title = 
-                  paste0("LightGBM, AUC: ", round(ROC_lgb$auc[1],3), " (95%CI:",round(ROC_lgb$ci[1],3), "-", round(ROC_lgb$ci[3],3), ")",
-                         ", mtry/min_n/tree_depth=",lgb_parameter$mtry,"/",lgb_parameter$min_n,"/",lgb_parameter$tree_depth)
+                  paste0("LightGBM, AUC: ", round(ROC_lgb_GMT$auc[1],3), " (95%CI:",round(ROC_lgb_GMT$ci[1],3), "-", round(ROC_lgb_GMT$ci[3],3), ")",
+                         ", mtry/min_n/tree_depth=",lgb_parameter_GMT$mtry,"/",lgb_parameter_GMT$min_n,"/",lgb_parameter_GMT$tree_depth)
               )
             
             g1_GMT = collect_predictions(lgb_res) %>%
