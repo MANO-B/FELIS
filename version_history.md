@@ -1,4 +1,5 @@
 ### Version history
+1.18.0: CGP検査のメリットに関する解析として機械学習のSHAPでの評価、推奨治療提案の予測、Evidence level A/Bが検出されるかどうかの予測を追加 - 20250408  
 1.12.1: 生存期間解析を日表記から月表記に変更 - 20250205  
 1.10.3: Bug fixed in Survival analysis after CGP, 三輪先生ありがとうございました。 - 20241217  
 1.10.1: Bug fixed in Survival analysis after CGP, 三輪先生ありがとうございました。 - 20241217  
