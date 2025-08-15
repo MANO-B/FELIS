@@ -12,7 +12,7 @@ Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://o
 動作を試したあとは、実際のデータ解析は基本的に以下に記載の手順のとおりLocal環境で実行ください。  
   
 You can check the web-appli of v3.0.1 on [this server](http://213.199.63.181/felis-ccat/).
-Due to the 12 GB memory with low-spec CPU environment, it frequently crashes due to memory shortages.
+Due to the 12 GB memory with low-spec CPU environment (x0.1 speed of M4Max Mac), it takes times.
 Basically, please execute it in a local environment according to the procedure described below (in Japanese only now).  
 
 ### C-CAT利活用データの解析Webアプリ
