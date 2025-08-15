@@ -7,9 +7,13 @@ Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://o
 [こちらを参考に使用いただくとわかりやすいと思います。](Tips.md)  
 
 ### Trial Website
-[こちらのサーバー](http://213.199.63.181)でv3.0.1での動作確認が可能です。  
-12GBメモリの環境のため頻繁にメモリ不足でクラッシュします。基本的には以下に記載の手順のとおりLocal環境で実行ください。  
-計算資源の限界のためCGP検査後の生存期間解析およびOdds比・ハザード比の多変量解析はLocalでのみ実行可能です。  
+[こちらのサーバー](http://213.199.63.181/felis-ccat/)で、ダミーデータを用いたv3.0.1での動作確認が可能です。  
+低スペックのCPU、12GBメモリの環境のため数分単位で処理に時間がかかったり、頻繁にメモリ不足でクラッシュします。  
+動作を試したあとは、実際のデータ解析は基本的に以下に記載の手順のとおりLocal環境で実行ください。  
+  
+You can check the web-appli of v3.0.1 on [this server](http://213.199.63.181/felis-ccat/).
+Due to the 12 GB memory with low-spec CPU environment, it frequently crashes due to memory shortages.
+Basically, please execute it in a local environment according to the procedure described below (in Japanese only now).  
 
 ### C-CAT利活用データの解析Webアプリ
 国立がん研究センターに設置されている[がんゲノム情報管理センター(C-CAT)](https://www.ncc.go.jp/jp/c_cat/use/index.html)には保険診療で行われたがん遺伝子パネル検査(Comprehensive Genomic Profiling, CGP検査)の結果と臨床情報が集約されています。この情報を学術研究や医薬品等の開発を目的とした二次利活用する仕組みがあります。現状では所属施設の倫理審査とC-CATでの倫理審査を経た研究でのみ使用可能であり、また病院やアカデミア以外の組織では年間780万円の利用料金が必要と敷居が高いですが、類似した海外のデータベースである[AACR project GENIE](https://www.aacr.org/professionals/research/aacr-project-genie/)と比較して薬剤の情報や臨床情報が詳しい点で優れており、希少がん・希少フラクションの研究においてこれまでになかった切り口での解析が可能になると考えられています。  
