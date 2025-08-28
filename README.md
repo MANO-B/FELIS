@@ -127,7 +127,7 @@ install.packages("shiny")
 初めて実行する場合は相当に時間がかかります(最短で2時間程度、慣れていないとインストールの完遂は困難です)。  
 依存するライブラリ群を必要に応じてapt/brewなどでinstallすることになり大変ですので、Dockerの使用が望まれます。  
 ```
-install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'survival', 'gridExtra', 'survminer', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'ggrepel', 'httr', 'plyr', 'rms', 'dcurves', 'Matching', 'blorr', 'broom', 'survRM2', 'rsample', 'shinydashboard', 'pROC', 'withr', 'rpart', 'ranger', 'bonsai', 'tidymodels', 'discrim', 'klaR', 'probably', 'lightgbm', 'partykit', 'flexsurv', 'betacal', 'ggbeeswarm', 'BiocManager'), dependencies = TRUE)
+install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'survival', 'gridExtra', 'survminer', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'ggrepel', 'httr', 'plyr', 'rms', 'dcurves', 'Matching', 'blorr', 'broom', 'survRM2', 'rsample', 'shinydashboard', 'pROC', 'withr', 'rpart', 'ranger', 'bonsai', 'tidymodels', 'discrim', 'klaR', 'probably', 'lightgbm', 'partykit', 'flexsurv', 'betacal', 'ggbeeswarm', 'BiocManager', 'RcppParallel', 'remotes'), dependencies = TRUE)
 BiocManager::install("maftools", update=FALSE)
 BiocManager::install("ComplexHeatmap", update=FALSE)
 BiocManager::install("drawProteins", update=FALSE)
@@ -135,9 +135,15 @@ install.packages("Rediscover")
 install.packages("tidybayes")
 devtools::install_github("stc04003/tranSurv")
 
+# Windows user
+install.packages("qs2")
+# On x64 Mac or Linux, you can enable multi-threading by compiling from source. It is enabled by default on Windows.
+remotes::install_cran("qs2", type = "source", configure.args = "--with-TBB --with-simd=AVX2")
+On non-x64 systems (e.g. Mac ARM) remove the AVX2 flag.
+remotes::install_cran("qs2", type = "source", configure.args = "--with-TBB")
+
 # drawProteinsのインストールが上手くいかない場合
 # githubのサインイン、PATの発行を行った上で以下を実行
-install.packages("remotes")
 remotes::install_github('brennanpincardiff/drawProteins', auth_token = "入手したPAT")
 
 # Rのバージョンによりrmsのインストールが上手くいかない場合
