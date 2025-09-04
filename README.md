@@ -7,12 +7,10 @@ Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://o
 [こちらを参考に使用いただくとわかりやすいと思います。](Tips.md)  
 
 ### Trial Website
-[こちらのサーバー](http://213.199.63.181/felis-ccat/)で、ダミーデータを用いたv3.0.1での動作確認が可能です。  
-低スペックのCPU、12GBメモリの環境のため数分単位で処理に時間がかかります（[Geekbench 6 single-core score 842](https://browser.geekbench.com/v6/cpu/13344345)）。  
+[こちらのサーバー](https://www.felis-portal.com/felis-ccat/)で、ダミーデータを用いたv3.0.1での動作確認が可能です。  
 動作を試したあとは、実際のデータ解析は基本的に以下に記載の手順のとおりLocal環境で実行ください。  
   
-You can check the web-appli of v3.0.1 on [this server](http://213.199.63.181/felis-ccat/).
-Due to the 12 GB memory with low-spec CPU environment (x0.1 speed of M4Max Mac), it takes times.
+You can check the web-appli of v3.0.1 on [this server](https://www.felis-portal.com/felis-ccat/).
 Basically, please execute it in a local environment according to the procedure described below (in Japanese only now).  
 
 ### C-CAT利活用データの解析Webアプリ
