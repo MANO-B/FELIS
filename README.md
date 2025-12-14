@@ -7,7 +7,8 @@ Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://o
 [こちらを参考に使用いただくとわかりやすいと思います。](Tips.md)  
 
 ### Trial Website
-[こちらのサーバー](https://www.felis-portal.com/felis-ccat/)で、ダミーデータを用いたv3.0.1での動作確認が可能です。  
+[こちらのサーバー](https://www.felis-portal.com/felis-ccat/)で、ダミーデータを用いたv4.2.3での動作確認が可能です。  
+[こちらのサーバー](https://www.felis-portal.com/felis-cs/)では、実際のC-CATデータを使ったv4.2.3での動作確認が可能です。  
 動作を試したあとは、実際のデータ解析は基本的に以下に記載の手順のとおりLocal環境で実行ください。  
   
 You can check the web-appli of v3.0.1 on [this server](https://www.felis-portal.com/felis-ccat/).
