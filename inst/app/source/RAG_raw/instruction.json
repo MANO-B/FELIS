@@ -1,0 +1,203 @@
+[
+  {
+    "instruction": "食道癌のアドリアマイシンとイホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで食道癌のアドリアマイシンとイホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を食道癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでアドリアマイシンとイホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "卵巣がんにおいてBRCA1変異の有無で生存期間を比較したい",
+    "input": "",
+    "output": "FELISで卵巣がんにおけるBRCA1変異の有無で生存期間を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を卵巣がんに設定し、Genes of interestでBRCA1を指定\n3. Analysis -> Survival analysis after CGP testボタンを押す\n4. Results -> Survival after CGP -> Survival analysis -> Survival after CGP and mutations, KM-curveで生存曲線を確認する"
+  },
+  {
+    "instruction": "子宮頚癌のパゾパニブとシクロホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで子宮頚癌のパゾパニブとシクロホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を子宮頚癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでパゾパニブとシクロホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "食道癌のアドリアマイシンとイホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで食道癌のアドリアマイシンとイホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を食道癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでアドリアマイシンとイホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "卵巣がんにおいてBRCA1変異の有無で生存期間を比較したい",
+    "input": "",
+    "output": "FELISで卵巣がんにおけるBRCA1変異の有無で生存期間を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を卵巣がんに設定し、Genes of interestでBRCA1を指定\n3. Analysis -> Survival analysis after CGP testボタンを押す\n4. Results -> Survival after CGP -> Survival analysis -> Survival after CGP and mutations, KM-curveで生存曲線を確認する"
+  },
+  {
+    "instruction": "子宮頚癌のパゾパニブとシクロホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで子宮頚癌のパゾパニブとシクロホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を子宮頚癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでパゾパニブとシクロホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "前立腺癌においてTP53変異の有無で薬剤奏効性を比較したい",
+    "input": "",
+    "output": "FELISで前立腺癌におけるTP53変異の有無で薬剤奏効性を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を前立腺癌に設定し、Genes of interestでTP53を指定\n3. Analysis -> Drug response analysis -> List of drugs used in Palliative CTxボタンを押す\n4. Results -> Drug response -> Response rate -> Volcano plot for objective response rateでTP53変異の奏効性を確認する"
+  },
+  {
+    "instruction": "脳腫瘍のアドリアマイシンとパゾパニブの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで脳腫瘍のアドリアマイシンとパゾパニブの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を脳腫瘍に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでアドリアマイシンとパゾパニブを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "組織型のキュレーションをしたい",
+    "input": "",
+    "output": "FELISで組織型のキュレーションを行うには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingから組織型や年齢の絞り込みを行う\n3. AnalysisからOncoprintボタンを押す\n4. Downloadable tableのExcelボタンから結果をダウンロードする\n5. P列、Q列、R列を参考にS列を修正する\n6. CSVテンプレートをダウンロードし、修正したデータを貼り付ける\n7. Input C-CAT files -> Correspondence tableからCSVを取り込む"
+  },
+  {
+    "instruction": "左側切断バイアスについて確認したい",
+    "input": "",
+    "output": "FELISで左側切断バイアスを確認するには、以下の手順を実行します：\n1. Results -> Bias correction simulation -> An example of bias adjustmentを開く\n2. パラメタを調整する\n3. Left-truncation bias adjustment simulationボタンを押す\n4. 各生存曲線を確認する"
+  },
+  {
+    "instruction": "オンコプリント（遺伝子変異の一覧表）が欲しい",
+    "input": "",
+    "output": "FELISでオンコプリントを作成するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingから組織型や年齢の絞り込みを行う\n3. AnalysisからOncoprintボタンを押す\n4. Results -> Oncoprint -> Figures -> Oncoprintから結果を確認する\n5. AnalysisからMutation rate of each gene for each histologyボタンを押す\n6. Results -> Variation by histologyから組織型ごとにどの遺伝子変異の頻度が高いのかを確認する\n7. Downloadable tableからExcelファイルで元データをダウンロードする"
+  },
+  {
+    "instruction": "ロリプロット（遺伝子のどのアミノ酸残基に変異が多いかの図）が欲しい",
+    "input": "",
+    "output": "FELISでロリプロットを作成するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingから組織型や年齢の絞り込みを行い、Gene for lolliplotで遺伝子を指定する\n3. AnalysisからOncoprintボタンを押す\n4. Results -> Oncoprint -> Figures -> Lolliplot for the selected geneから結果を確認する\n5. Downloadable tableからExcelファイルで元データをダウンロードする"
+  },
+  {
+    "instruction": "遺伝子間の相互排他性・共変異の情報が欲しい",
+    "input": "",
+    "output": "FELISで遺伝子間の相互排他性・共変異を確認するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingから組織型や年齢の絞り込みを行う\n3. AnalysisからMutually exclusive or co-occurring mutationボタンを押す\n4. Results -> Mutually exclusivityから結果を確認する\n\n交わるセルの色が青い場合は相互排他的、赤い場合は共変異の関係を示します"
+  },
+  {
+    "instruction": "どのような患者にCGP検査を行うと治療到達率が高いのかを知りたい",
+    "input": "",
+    "output": "FELISで治療到達率の高い患者を予測するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingから組織型や年齢、治療コースなどの絞り込みを行う。Genes of interestで注目する遺伝子セットを指定する\n3. Analysis -> CGP benefit prediction analysis ボタンを押す\n4. Results -> CGP benefit prediction -> Factors leading to treatment -> Factors leading to treatment, pre-CGP, Nomogramからノモグラムを得る\n5. Odds ratio, ROC curve, decision curve analysisを確認する\n6. Analyze your dataから患者情報を入力し、治療到達率を予測する"
+  },
+  {
+    "instruction": "CGP検査後の生存期間と治療到達率の関係性を知りたい",
+    "input": "",
+    "output": "FELISでCGP検査後の生存期間と治療到達率を確認するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingから組織型や年齢、治療コースなどの絞り込みを行う。Genes of interestで注目する遺伝子セットを指定する\n3. Analysis -> Survival analysis after CGP test ボタンを押す\n4. Results -> Survival after CGP -> Survival analysis -> Survival period and treatment reach rateからグラフを確認する"
+  },
+    {
+    "instruction": "肺がんのEGFR変異の有無で治療効果を比較したい",
+    "input": "",
+    "output": "FELISで肺がんのEGFR変異の有無で治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を肺がんに設定し、Genes of interestでEGFRを指定\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで比較したい薬剤を選択\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "大腸がんのKRAS変異の有無で治療効果を比較したい",
+    "input": "",
+    "output": "FELISで大腸がんのKRAS変異の有無で治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を大腸がんに設定し、Genes of interestでKRASを指定\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで比較したい薬剤を選択\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "乳がんのHER2変異の有無で治療効果を比較したい",
+    "input": "",
+    "output": "FELISで乳がんのHER2変異の有無で治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を乳がんに設定し、Genes of interestでHER2を指定\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで比較したい薬剤を選択\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "胃がんのPD-L1発現レベルで治療効果を比較したい",
+    "input": "",
+    "output": "FELISで胃がんのPD-L1発現レベルで治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を胃がんに設定し、BiomarkersでPD-L1を指定\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで比較したい薬剤を選択\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+[
+  {
+    "instruction": "前立腺癌のアドリアマイシンとイホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで前立腺癌のアドリアマイシンとイホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を前立腺癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでアドリアマイシンとイホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "脳腫瘍のパゾパニブとトラベクテジンの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで脳腫瘍のパゾパニブとトラベクテジンの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を脳腫瘍に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでパゾパニブとトラベクテジンを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "胃癌のシクロホスファミドとイホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで胃癌のシクロホスファミドとイホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を胃癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでシクロホスファミドとイホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "食道癌のアドリアマイシンとパゾパニブの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで食道癌のアドリアマイシンとパゾパニブの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を食道癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでアドリアマイシンとパゾパニブを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "卵巣がんのトラベクテジンとシクロホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで卵巣がんのトラベクテジンとシクロホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を卵巣がんに設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでトラベクテジンとシクロホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "子宮頚癌のイホスファミドとアドリアマイシンの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで子宮頚癌のイホスファミドとアドリアマイシンの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を子宮頚癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでイホスファミドとアドリアマイシンを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "子宮体癌のパゾパニブとトラベクテジンの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで子宮体癌のパゾパニブとトラベクテジンの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を子宮体癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでパゾパニブとトラベクテジンを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "大腸癌のシクロホスファミドとイホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで大腸癌のシクロホスファミドとイホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を大腸癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでシクロホスファミドとイホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "頭頚部癌のアドリアマイシンとパゾパニブの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで頭頚部癌のアドリアマイシンとパゾパニブの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を頭頚部癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでアドリアマイシンとパゾパニブを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "舌癌のトラベクテジンとシクロホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで舌癌のトラベクテジンとシクロホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を舌癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでトラベクテジンとシクロホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "メラノーマのイホスファミドとアドリアマイシンの治療効果を比較したい",
+    "input": "",
+    "output": "FELISでメラノーマのイホスファミドとアドリアマイシンの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型をメラノーマに設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでイホスファミドとアドリアマイシンを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "皮膚がんのパゾパニブとトラベクテジンの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで皮膚がんのパゾパニブとトラベクテジンの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を皮膚がんに設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでパゾパニブとトラベクテジンを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "肝臓がんのシクロホスファミドとイホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで肝臓がんのシクロホスファミドとイホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を肝臓がんに設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでシクロホスファミドとイホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "膵臓がんのアドリアマイシンとパゾパニブの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで膵臓がんのアドリアマイシンとパゾパニブの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を膵臓がんに設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでアドリアマイシンとパゾパニブを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "胆嚢癌のトラベクテジンとシクロホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで胆嚢癌のトラベクテジンとシクロホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を胆嚢癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでトラベクテジンとシクロホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "胆道がんのイホスファミドとアドリアマイシンの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで胆道がんのイホスファミドとアドリアマイシンの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を胆道がんに設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでイホスファミドとアドリアマイシンを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "肝臓がんのパゾパニブとトラベクテジンの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで肝臓がんのパゾパニブとトラベクテジンの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を肝臓がんに設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでパゾパニブとトラベクテジンを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "前立腺癌のシクロホスファミドとイホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで前立腺癌のシクロホスファミドとイホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を前立腺癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでシクロホスファミドとイホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "脳腫瘍のアドリアマイシンとパゾパニブの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで脳腫瘍のアドリアマイシンとパゾパニブの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を脳腫瘍に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでアドリアマイシンとパゾパニブを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "胃癌のトラベクテジンとシクロホスファミドの治療効果を比較したい",
+    "input": "",
+    "output": "FELISで胃癌のトラベクテジンとシクロホスファミドの治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を胃癌に設定する\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisでトラベクテジンとシクロホスファミドを選択し、それぞれDrug set 1とDrug set 2に入力\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  },
+  {
+    "instruction": "膵臓がんのSMAD4変異の有無で治療効果を比較したい",
+    "input": "",
+    "output": "FELISで膵臓がんのSMAD4変異の有無で治療効果を比較するには、以下の手順を実行します：\n1. Input C-CAT filesからcase/report CSVファイルを取り込む\n2. Settingで組織型を膵臓がんに設定し、Genes of interestでSMAD4を指定\n3. Analysis -> Drug response analysis -> Choose drugs for treatment effect analysisで比較したい薬剤を選択\n4. Analyze with the setting selected aboveボタンで解析を実行\n5. Results -> Drug response -> Survival after CGP -> Survival and drugで生存曲線を確認する"
+  }
+]

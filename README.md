@@ -85,7 +85,7 @@ Dockerを使用する場合は**解析ファイルの読み込み**セクショ�
 以下、[コマンドラインからRを起動して作業を行います。](http://kouritsu.biz/installing-r-on-mac/)  
 ##### Rstan
 こちらの[RStan Getting Started (Japanese)](https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started-(Japanese))を参照ください。  
-- MacOSでのインストールには[Xcode CLT](https://qiita.com/payreikit/items/4bb0f863afc7b56d0809)が必要で、さらに[macrtools](https://mac.thecoatlessprofessor.com/macrtools/)を[github](https://github.com)からインストールする関係でgithubへのアカウント登録が必要です。[こちらのウェブサイト](https://qiita.com/tsutsumin_pro/items/52a483d67c9b9e490d76)を参照ください。生存期間解析が不要であれば、Rstanをインストールしないという選択も可能です。  
+- MacOSでのインストールには[Xcode CLT](https://qiita.com/payreikit/items/4bb0f863afc7b56d0809)が必要で、さらに[macrtools](https://mac.thecoatlessprofessor.com/macrtools/)を[github](https://github.com)からインストールする関係でgithubへのアカウント登録が必要です。[こちらのウェブサイト](https://qiita.com/tsutsumin_pro/items/52a483d67c9b9e490d76)を参照ください。  
 - WindowsでのインストールはRのバージョンに合わせて[Rtools](https://github.com/stan-dev/rstan/wiki/Configuring-C---Toolchain-for-Windows)をインストールください。  
 - Linuxでのインストールは[適宜](https://github.com/stan-dev/rstan/wiki/Configuring-C-Toolchain-for-Linux)実施ください。  
 ```
@@ -96,7 +96,14 @@ Dockerを使用する場合は**解析ファイルの読み込み**セクショ�
 ### 3. Generate a Personal access token (classic) without any checkboxes.
 ### 4. Copy the generated token.
 ## ターミナルで以下のコマンドを実行しCommand Line Tools for Xcodeのインストールを行う　
-### xcode-select --install
+xcode-select --install
+## ターミナルで以下のコマンドを実行しHomebrewのインストールを行う　
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+## ターミナルで以下のコマンドを実行しlibompのインストールを行う　
+brew install libomp
+# OpenMPライブラリのパスをRに伝えるコマンド
+export PKG_LIBS="-fopenmp"
+export PKG_CPPFLAGS="-I/usr/local/opt/libomp/include -Xpreprocessor -fopenmp"
 ## Rコンソールで以下のコマンドを実行する
 install.packages("remotes")
 remotes::install_github("coatless-mac/macrtools", auth_token = "入手したPAT")
@@ -111,8 +118,25 @@ cat(paste("\nCXX17FLAGS += -O3 -mtune=native -arch", arch, "-ftemplate-depth-256
     file = M, sep = "\n", append = FALSE)
 install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 
+
 ## Windowsの場合
 ## Rtoolsをインストールする
+https://k-metrics.github.io/cabinet/env_install_tls.html
+https://cran.r-project.org/bin/windows/Rtools/
+## Visual Studio のインストール
+## インストール時に、必ず**「C++によるデスクトップ開発」**というワークロードを選択してください。
+https://visualstudio.microsoft.com/ja/vs/community/
+## Rコンソールで以下のコマンドを実行する
+install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+
+
+## Linuxの場合
+## Ubuntu/Debian系の場合: ターミナルで以下を実行します。
+Bash
+sudo apt-get install -y build-essential cmake git
+## CentOS/RHEL系の場合: ターミナルで以下を実行します。
+Bash
+sudo yum install -y gcc-c++ cmake git
 ## Rコンソールで以下のコマンドを実行する
 install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 ```
@@ -123,23 +147,58 @@ install.packages("shiny")
 ```
 ##### Package dependencies
 依存しているパッケージ群を`R`ターミナルからインストールください。  
-初めて実行する場合は相当に時間がかかります(最短で2時間程度、慣れていないとインストールの完遂は困難です)。  
 依存するライブラリ群を必要に応じてapt/brewなどでinstallすることになり大変ですので、Dockerの使用が望まれます。  
 ```
-install.packages(c('ggplot2', 'umap', 'tidyr', 'dbscan', 'shinyWidgets', 'readr', 'dplyr', 'stringr', 'RColorBrewer', 'gt', 'gtsummary', 'flextable', 'survival', 'gridExtra', 'survminer', 'DT', 'ggsci', 'scales', 'patchwork', 'sjPlot', 'sjlabelled', 'forcats', 'markdown','PropCIs','shinythemes', 'data.table', 'ggrepel', 'httr', 'plyr', 'rms', 'dcurves', 'Matching', 'blorr', 'broom', 'survRM2', 'rsample', 'shinydashboard', 'pROC', 'withr', 'rpart', 'ranger', 'bonsai', 'tidymodels', 'discrim', 'klaR', 'probably', 'lightgbm', 'partykit', 'flexsurv', 'betacal', 'ggbeeswarm', 'BiocManager', 'RcppParallel', 'remotes'), dependencies = TRUE)
-BiocManager::install("maftools", update=FALSE)
-BiocManager::install("ComplexHeatmap", update=FALSE)
-BiocManager::install("drawProteins", update=FALSE)
+install.packages(c(
+  # Shiny / UI
+  "shinyBS","shinyjqui","shinyWidgets","shinydashboard","DT","shinythemes","markdown",
+
+  # Data handling / plotting
+  "dplyr","tidyr","readr","stringr","forcats","data.table",
+  "ggplot2","scales","RColorBrewer","ggsci","ggrepel","patchwork","gridExtra","ggiraph"
+
+  # Tables / reporting
+  "gt","gtsummary","flextable",
+
+  # Survival / stats
+  "survival","survminer","survRM2","flexsurv","rms","PropCIs","pROC",
+  "Matching","dcurves","MatchIt","cobalt"
+
+  # ML core (tidymodels meta)
+  "tidymodels",
+
+  # ML extras / models (tidymodels周辺)
+  "mltools","bonsai","discrim","klaR","probably","ranger","lightgbm","partykit","rpart","bigstep","twang"
+
+  # Dimension reduction / clustering
+  "umap","dbscan",
+
+  # misc
+  "httr","plyr","withr","blorr","betacal",
+  "sjPlot","sjlabelled","aws.s3"
+
+  # install helpers
+  "BiocManager","RcppParallel","remotes"
+), dependencies = TRUE)
+
+BiocManager::install(c("maftools","ComplexHeatmap","drawProteins"), update = FALSE)
+
 install.packages("Rediscover")
 install.packages("tidybayes")
-devtools::install_github("stc04003/tranSurv")
+install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+cmdstanr::install_cmdstan()
+install.packages("tranSurv")
+
 
 # Windows user
 install.packages("qs2")
+
 # On x64 Mac or Linux, you can enable multi-threading by compiling from source. It is enabled by default on Windows.
 remotes::install_cran("qs2", type = "source", configure.args = "--with-TBB --with-simd=AVX2")
-On non-x64 systems (e.g. Mac ARM) remove the AVX2 flag.
+
+# On non-x64 systems (e.g. Mac ARM) remove the AVX2 flag.
 remotes::install_cran("qs2", type = "source", configure.args = "--with-TBB")
+
 
 # drawProteinsのインストールが上手くいかない場合
 # githubのサインイン、PATの発行を行った上で以下を実行

@@ -1,0 +1,24 @@
+# RStudio
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+
+# Mac
+.DS_Store
+
+# Zips (build artifacts / releases)
+*.zip
+
+# Office / slides (large binaries)
+*.pptx
+*.ppt
+*.docx
+*.xlsx
+
+# Old / archive
+old_version/
+
+# Local scratch / temp
+tmp/
+cache/

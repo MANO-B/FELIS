@@ -1,0 +1,1411 @@
+get_cpu_architecture <- function() {
+  arch <- R.version$arch
+  if (arch == "aarch64") {
+    return("arm64")
+  } else if (arch == "x86_64") {
+    return("amd64")
+  } else {
+    return("unknown")
+  }
+}
+
+QS_READ <- function(nthreads, file, ...) {
+  cpu_arch <- get_cpu_architecture()
+  if (cpu_arch == "arm64") {
+    # Arm64の場合、nthreadsをデフォルト設定
+    qs2::qs_read(file=file, nthreads=nthreads, ...)
+  } else if(!file.exists("/.dockerenv")){
+    # その他のアーキテクチャの場合、nthreadsを1に設定
+    # readRDS(file=file, ...)
+    qs2::qs_read(file=file, nthreads = 1, ...)
+  } else {
+    qs2::qs_read(file=file, nthreads = 1, ...)
+    # print(1)
+  }
+}
+QS_SAVE <- function(nthreads, object, file, ...) {
+  cpu_arch <- get_cpu_architecture()
+  if (cpu_arch == "arm64") {
+    # Arm64の場合、nthreadsをデフォルト設定
+    qs2::qs_save(nthreads=nthreads, object=object, file=file, ...)
+  } else if(!file.exists("/.dockerenv")){
+    # その他のアーキテクチャの場合、nthreadsを1に設定
+    # saveRDS(object=object, file=file, ...)
+    qs2::qs_save(nthreads = 1, object=object, file=file, ...)
+  } else {
+    qs2::qs_save(nthreads = 1, object=object, file=file, ...)
+    # print(1)
+  }
+}
+Abs = function(x){
+  x = as.numeric(x)
+  x[is.na(x)]=1
+  return(x)
+}
+get_type_optimized = function(x) {
+  if (is.na(x) || x == "") return(character(0))
+  unlist(strsplit(x, ";", fixed = TRUE))
+}
+
+format_p <- function(x, digits = 1, scientific = TRUE) {
+  # ゼロの場合
+  zero_case <- sprintf(paste0("0.%0", digits, "d"), 0)
+  
+  # 通常表示の場合
+  normal_case <- sprintf(paste0("%.", digits, "f"), x)
+  
+  # 指数表示の場合
+  e <- floor(log10(abs(x)))
+  m <- x / (10^e)
+  sci_case <- paste0(sprintf(paste0("%.", digits, "f"), m), "×10^", e)
+  
+  # 条件に基づいて選択
+  result <- ifelse(x == 0, zero_case,
+                   ifelse(abs(x) >= 10^(-digits) & abs(x) < 1000, normal_case, sci_case))
+  
+  return(result)
+}
+
+apply_custom_format <- function(tbl, columns = c("estimate", "conf.low", "conf.high", "p.value", "q.value")) {
+  tbl |>
+    modify_table_styling(
+      columns = columns,
+      fmt_fun = function(x) {
+        sapply(x, function(val) {
+          if (is.na(val)) return(NA_character_)
+          format_p(val, digits = 2, scientific = TRUE)
+        })
+      }
+    )
+}
+
+fun_zero <- function(a, b){
+  if(length(a) != length(b)){
+    if(length(a) / length(b) == as.integer(length(a) / length(b))){
+      b = rep(b,length(a) / length(b))
+    }
+  }
+  return(ifelse(b == 0, 0, a / b))
+}
+convert_date <- function(x) {
+  case_when(
+    x < "1924-02-19" & x > "1901-01-01" ~ paste0("20", str_sub(x, 3, 10)),
+    TRUE ~ x
+  )
+}
+
+gg_empty = function(){
+  g = ggplot()
+  g = g + geom_blank()
+  g = g + ggtitle("")
+  g = g + theme_void()
+  return(g)
+}
+
+ggsurvplot_empty = function(){
+  g = ggsurvplot(survfit(Surv(time, status) ~ 1, data = lung),
+                 title = "",
+                 palette = "white",
+                 ggtheme=theme_void())
+  g$plot <- g$plot + theme(axis.text.x = element_blank(),
+                           axis.text.y = element_blank(),
+                           plot.title = element_blank(),
+                           plot.subtitle = element_blank(),
+                           legend.title=element_blank(),
+                           legend.text=element_blank(),
+                           axis.ticks=element_blank(),
+                           axis.ticks.x = element_blank())
+  return(g)
+}
+
+gg_drug_plot = function(data, x_name, y_name, x_lab, y_lab, Total_pts, x_max_patients){
+  Cor = format_p(cor.test(data[,colnames(data) == x_name], data[,colnames(data) == y_name])$estimate,digits = 3)
+  P = format_p(cor.test(data[,colnames(data) == x_name], data[,colnames(data) == y_name])$p.value,digits = 3)
+  cor = data.frame(Cor, P)
+  Max_x = max(data[,colnames(data) == x_name],na.rm = T) * 1.05
+  Max_y = max(data[,colnames(data) == y_name],na.rm = T)
+  g <- ggplot(data, aes_(x = as.name(x_name), y = as.name(y_name), color = as.name("Cancers")))
+  g <- g + geom_point(size = Total_pts/x_max_patients*10, alpha = .5)
+  g <- g + scale_fill_nejm()
+  g <- g + coord_cartesian(xlim = c(0, Max_x), ylim = c(0, Max_y*1.05))
+  g <- g + theme_bw()
+  g <- g + labs(x = x_lab,y = y_lab, color = "Cancer type")
+  g <- g + geom_smooth(method = lm, se = FALSE, na.rm = T, colour = "red")
+  g <- g + geom_text(data=cor, colour = "red", mapping = aes(x = 0.3*Max_x, y = Max_y*1.03, label = paste("r =",Cor, ", p =",P)))
+}
+
+shannon.entropy = function(x, x_length){ 
+  x = x[(!is.na(x))]
+  x = x[(x != 0)]
+  if(sum(x) <= 0) {
+    return(log(x_length, base=2)) 
+  } else {
+    p = x/sum(x)
+    score = -sum(p * log(p, base=2))
+    return(score)
+  }
+} 
+
+odds.ratio <- function(a, b, c, d, correct=FALSE){
+  cl <- function(x){
+    or*exp(c(1,-1)*qnorm(x)*sqrt(1/a+1/b+1/c+1/d))
+  }
+  if (correct || a*b*c*d==0) {
+    a <- a+0.5
+    b <- b+0.5
+    c <- c+0.5
+    d <- d+0.5
+  }
+  or <- a*d/(b*c)
+  conf <- rbind(cl90=cl(0.05), cl95=cl(0.025), cl99=cl(0.005), cl999=cl(0.0005))
+  conf <- data.frame(conf)
+  colnames(conf) <- paste(c("lower","upper"), " limit" , sep="")
+  rownames(conf) <- paste(c(90, 95, 99, 99.9), "%CI" , sep="")
+  list(or=or, conf=conf)
+}
+
+surv_curv_entry <- function(fit, data, title, legend_, diff_0, diff_1, diff_2=NULL){
+  g = ggsurvplot(
+    fit = fit,
+    combine = TRUE,
+    data = data,
+    xlab = "Time from enrollment (months)",
+    ylab = "Survival Probability",
+    censor = TRUE,
+    conf.int = FALSE,
+    surv.scale = "percent",
+    font.title = 8,
+    font.subtitle = 8,
+    font.main = 8,
+    font.submain = 8,
+    font.caption = 8,
+    font.legend = 8,
+    pval = FALSE,
+    surv.median.line = "v",
+    palette = "Dark2",
+    risk.table = TRUE,
+    risk.table.y.text = FALSE,
+    cumevents = FALSE,
+    cumcensor = FALSE,
+    tables.theme = clean_theme(), 
+    legend = c(0.8,0.8),
+    xlim = c(0, min(365.25*10, max(data$time_enroll_final, na.rm = T)) * 1.05),
+    xscale = "d_m",
+    # break.x.by = 6 * 365.25 / 12,
+    break.x.by = max(6 * 365.25 / 12, ceiling(max(data$time_enroll_final) / 365.25 / 6) * 365.25 / 2),
+    legend.labs = legend_
+  )
+  if(is.null(diff_0)){
+    tmp = summary(fit)$table
+    legends = paste0(
+      format_p(digits = 1, tmp[[7]] / 365.25 * 12),
+      " (",
+      format_p(digits = 1, tmp[[8]] / 365.25 * 12),
+      "-",
+      format_p(digits = 1, tmp[[9]] / 365.25 * 12),
+      ")"
+    )
+    g$plot <- g$plot +
+      labs(title = title,
+           subtitle = paste0("Median OS, ", legends, " months"))
+  } else{
+    tmp = data.frame(summary(fit)$table)
+    legends = paste0(
+      format_p(digits = 1, tmp$median[1] / 365.25 * 12),
+      " (",
+      format_p(digits = 1, tmp$X0.95LCL[1] / 365.25 * 12),
+      "-",
+      format_p(digits = 1, tmp$X0.95UCL[1] / 365.25 * 12),
+      ")"
+    )
+    for(i in 2:nrow(tmp)){
+      legends = paste(
+        legends,
+        paste0(
+          format_p(digits = 1, tmp$median[i] / 365.25 * 12),
+          " (",
+          format_p(digits = 1, tmp$X0.95LCL[i] / 365.25 * 12),
+          "-",
+          format_p(digits = 1, tmp$X0.95UCL[i] / 365.25 * 12),
+          ")"
+        ),
+        sep = ", "
+      )
+    }
+    title_HR = NULL
+    if(!is.null(diff_2)){
+      data_tmp = tidy(diff_2, exponentiate=TRUE, conf.int=TRUE)
+      if(nrow(data_tmp) > 0){
+        for(i in 1:nrow(data_tmp)){
+          title_HR = c(title_HR,
+                       paste0(format_p(data_tmp$estimate[i],digits=2), " (",
+                              format_p(data_tmp$conf.low[i],digits=2), "-",
+                              format_p(data_tmp$conf.high[i],digits=2), ") ",
+                              "p=", format_p(data_tmp$p.value[i],digits=2)))
+        }
+      }
+    }
+    g$plot <- g$plot +
+      labs(title = paste0(title, ": \nhazard ratio (vs 1st group)=", paste(title_HR, collapse = "/")),
+           subtitle = paste0("Median OS, ", legends, " months"))
+    g$plot <- g$plot +
+      labs(title = paste0(title, ": log-rank, p=", format_p(
+        1 - pchisq(diff_0$chisq, length(diff_0$n)-1, lower.tail = TRUE),digits=3),
+        "/Wilcoxon, p=", format_p(
+          1 - pchisq(diff_1$chisq, length(diff_1$n)-1, lower.tail = TRUE),digits=3), 
+        "\nhazard ratio (vs 1st group)=", paste(title_HR, collapse = "/")),
+        subtitle = paste0("Median OS, ", legends, " months"))
+  }
+  g$table <- g$table + theme(plot.title = element_blank(),
+                             plot.subtitle = element_blank())
+  return(g)
+}
+
+surv_curv_CTx <- function(fit, data, title, legend_, diff_0, Xlab = "Time from CTx start, risk-set adjusted (months)"){
+  g = ggsurvplot(
+    fit = fit,
+    combine = TRUE,
+    data = data,
+    xlab = Xlab,
+    ylab = "Survival Probability",
+    censor = TRUE,
+    conf.int = FALSE,
+    surv.scale = "percent",
+    font.title = 8,
+    font.subtitle = 8,
+    font.main = 8,
+    font.submain = 8,
+    font.caption = 8,
+    font.legend = 8,
+    pval = FALSE,
+    surv.median.line = "v",
+    palette = "Dark2",
+    risk.table = TRUE,
+    risk.table.y.text = FALSE,
+    cumevents = FALSE,
+    cumcensor = FALSE,
+    tables.theme = clean_theme(), 
+    legend = c(0.8,0.8),
+    xlim = c(0, min(365.25*10, max(data$time_all, na.rm = T)) * 1.05),
+    xscale = "d_m",
+    # break.x.by = 12 * 365.25 / 12,
+    break.x.by = max(6 * 365.25 / 12, ceiling(max(data$time_all) / 365.25 / 6) * 365.25 / 2),
+    legend.labs = legend_
+  )
+  if(is.null(diff_0)){
+    tmp = summary(fit)$table
+    legends = paste0(
+      format_p(digits = 1, tmp[[7]] / 365.25 * 12),
+      " (",
+      format_p(digits = 1, tmp[[8]] / 365.25 * 12),
+      "-",
+      format_p(digits = 1, tmp[[9]] / 365.25 * 12),
+      ")"
+    )
+    g$plot <- g$plot +
+      labs(title = title,
+           subtitle = paste0("Median OS, ", legends, " months"))
+  } else{
+    tmp = data.frame(summary(fit)$table)
+    legends = paste0(
+      format_p(digits = 1, tmp$median[1] / 365.25 * 12),
+      " (",
+      format_p(digits = 1, tmp$X0.95LCL[1] / 365.25 * 12),
+      "-",
+      format_p(digits = 1, tmp$X0.95UCL[1] / 365.25 * 12),
+      ")"
+    )
+    for(i in 2:nrow(tmp)){
+      legends = paste(
+        legends,
+        paste0(
+          format_p(digits = 1, tmp$median[i] / 365.25 * 12),
+          " (",
+          format_p(digits = 1, tmp$X0.95LCL[i] / 365.25 * 12),
+          "-",
+          format_p(digits = 1, tmp$X0.95UCL[i] / 365.25 * 12),
+          ")"
+        ),
+        sep = ", "
+      )
+    }
+    data_tmp = tidy(diff_0, exponentiate=TRUE, conf.int=TRUE)
+    title_HR = NULL
+    if(nrow(data_tmp) > 0){
+      for(i in 1:nrow(data_tmp)){
+        title_HR = c(title_HR,
+                     paste0(format_p(data_tmp$estimate[i],digits=2), " (",
+                            format_p(data_tmp$conf.low[i],digits=2), "-",
+                            format_p(data_tmp$conf.high[i],digits=2), ") ",
+                            "p=", format_p(data_tmp$p.value[i],digits=2)))
+      }
+    }
+    g$plot <- g$plot +
+      labs(title = paste0(title, ": \nhazard ratio (vs 1st group)=", paste(title_HR, collapse = "/")),
+           subtitle = paste0("Median OS, ", legends, " months"))
+  }
+  g$table <- g$table + theme(plot.title = element_blank(),
+                             plot.subtitle = element_blank())
+  return(g)
+}
+
+surv_curv_drug <- function(fit, data, title, diff_0, diff_1, diff_2=NULL){
+  g = ggsurvplot(
+    fit = fit,
+    combine = TRUE,
+    data = data,
+    xlab = "Time from drug initiation (months)",
+    ylab = "Survival Probability",
+    censor = TRUE,
+    surv.scale = "percent",
+    conf.int = FALSE,
+    font.title = 8,
+    font.subtitle = 8,
+    font.main = 8,
+    font.submain = 8,
+    font.caption = 8,
+    font.legend = 8,
+    pval = FALSE,
+    surv.median.line = "v",
+    palette = "Dark2",
+    risk.table = TRUE,
+    risk.table.y.text = FALSE,
+    cumevents = FALSE,
+    cumcensor = FALSE,
+    tables.theme = clean_theme(), 
+    legend = c(0.8,0.8),
+    xscale = "d_m",
+    xlim = c(0, 3*365.35),
+    break.x.by = 3 * 365.25 / 12,
+    # break.x.by = ceiling(max(data$time_enroll_final) / 365.25 / 6,
+  )
+  if(is.null(diff_0)){
+    if(is.null(diff_2)){
+      tmp = summary(fit)$table
+      legends = paste0(
+        format_p(digits = 1, tmp[[7]] / 365.25 * 12),
+        " (",
+        format_p(digits = 1, tmp[[8]] / 365.25 * 12),
+        "-",
+        format_p(digits = 1, tmp[[9]] / 365.25 * 12),
+        ")"
+      )
+      g$plot <- g$plot +
+        labs(title = title,
+             subtitle = paste0("Median OS, ", legends, " months"))
+      g$table <- g$table + theme(plot.title = element_blank(),
+                                 plot.subtitle = element_blank())
+    } else {
+      tmp = summary(fit)$table
+      legends = paste0(
+        format_p(digits = 1, tmp[[7]] / 365.25 * 12),
+        " (",
+        format_p(digits = 1, tmp[[8]] / 365.25 * 12),
+        "-",
+        format_p(digits = 1, tmp[[9]] / 365.25 * 12),
+        ")"
+      )
+      data_tmp = tidy(diff_2, exponentiate=TRUE, conf.int=TRUE)
+      title_HR = NULL
+      if(nrow(data_tmp) > 0){
+        for(i in 1:nrow(data_tmp)){
+          title_HR = c(title_HR,
+                       paste0(format_p(data_tmp$estimate[i],digits=2), " (",
+                              format_p(data_tmp$conf.low[i],digits=2), "-",
+                              format_p(data_tmp$conf.high[i],digits=2), ") ",
+                              "p=", format_p(data_tmp$p.value[i],digits=3)))
+        }
+      }
+      g$plot <- g$plot +
+        labs(title = paste0(title, ": hazard ratio=", paste(title_HR, collapse = "/")),
+             subtitle = paste0("Median OS, ", legends, " months"))
+      g$table <- g$table + theme(plot.title = element_blank(),
+                                 plot.subtitle = element_blank())
+    }
+  } else{
+    tmp = data.frame(summary(fit)$table)
+    legends = paste0(
+      format_p(digits = 1, tmp$median[1] / 365.25 * 12),
+      " (",
+      format_p(digits = 1, tmp$X0.95LCL[1] / 365.25 * 12),
+      "-",
+      format_p(digits = 1, tmp$X0.95UCL[1] / 365.25 * 12),
+      ")"
+    )
+    for(i in 2:nrow(tmp)){
+      legends = paste(
+        legends,
+        paste0(
+          format_p(digits = 1, tmp$median[i] / 365.25 * 12),
+          " (",
+          format_p(digits = 1, tmp$X0.95LCL[i] / 365.25 * 12),
+          "-",
+          format_p(digits = 1, tmp$X0.95UCL[i] / 365.25 * 12),
+          ")"
+        ),
+        sep = ", "
+      )
+    }
+    data_tmp = tidy(diff_2, exponentiate=TRUE, conf.int=TRUE)
+    title_HR = NULL
+    if(nrow(data_tmp) > 0){
+      for(i in 1:nrow(data_tmp)){
+        title_HR = c(title_HR,
+                     paste0(format_p(data_tmp$estimate[i],digits=2), " (",
+                            format_p(data_tmp$conf.low[i],digits=2), "-",
+                            format_p(data_tmp$conf.high[i],digits=2), ") ",
+                            "p=", format_p(data_tmp$p.value[i],digits=3)))
+      }
+    }
+    # g$plot <- g$plot +
+    #   labs(title = paste0(title, ": hazard ratio=", paste(title_HR, collapse = "/")),
+    #        subtitle = paste0("Median OS, ", legends, " months"))
+    g$plot <- g$plot +
+      labs(title = paste0(title, ": log-rank, p=", format_p(
+        1 - pchisq(diff_0$chisq, length(diff_0$n)-1, lower.tail = TRUE),digits=3),
+        "/Wilcoxon, p=", format_p(
+          1 - pchisq(diff_1$chisq, length(diff_1$n)-1, lower.tail = TRUE),digits=3)),
+        subtitle = paste0("Median OS, ", legends," months, hazard ratio (vs 1st group)=", paste(title_HR, collapse = "/")))
+    g$table <- g$table + theme(plot.title = element_blank(),
+                               plot.subtitle = element_blank())
+  }
+  return(g)
+}
+
+surv_curv_drug_IPTW <- function(fit, data, title, diff_2=NULL){
+  g = ggsurvplot(
+    fit = fit,
+    combine = TRUE,
+    data = data,
+    xlab = "Time from drug initiation (months)",
+    ylab = "Survival Probability, IPTW corrected",
+    censor = TRUE,
+    surv.scale = "percent",
+    conf.int = FALSE,
+    font.title = 8,
+    font.subtitle = 8,
+    font.main = 8,
+    font.submain = 8,
+    font.caption = 8,
+    font.legend = 8,
+    pval = FALSE,
+    surv.median.line = "v",
+    palette = "Dark2",
+    risk.table = TRUE,
+    risk.table.y.text = FALSE,
+    cumevents = FALSE,
+    cumcensor = FALSE,
+    tables.theme = clean_theme(), 
+    legend = c(0.8,0.8),
+    xscale = "d_m",
+    xlim = c(0, 3*365.35),
+    break.x.by = 3 * 365.25 / 12,
+    # break.x.by = ceiling(max(data$time_enroll_final) / 365.25 / 6,
+  )
+  tmp = summary(fit)$table
+  legends = paste0(
+    format_p(digits = 1, tmp[[7]] / 365.25 * 12),
+    " (",
+    format_p(digits = 1, tmp[[8]] / 365.25 * 12),
+    "-",
+    format_p(digits = 1, tmp[[9]] / 365.25 * 12),
+    ")"
+  )
+  tmp = data.frame(summary(fit)$table)
+  legends = paste0(
+    format_p(digits = 1, tmp$median[1] / 365.25 * 12),
+    " (",
+    format_p(digits = 1, tmp$X0.95LCL[1] / 365.25 * 12),
+    "-",
+    format_p(digits = 1, tmp$X0.95UCL[1] / 365.25 * 12),
+    ")"
+  )
+  for(i in 2:nrow(tmp)){
+    legends = paste(
+      legends,
+      paste0(
+        format_p(digits = 1, tmp$median[i] / 365.25 * 12),
+        " (",
+        format_p(digits = 1, tmp$X0.95LCL[i] / 365.25 * 12),
+        "-",
+        format_p(digits = 1, tmp$X0.95UCL[i] / 365.25 * 12),
+        ")"
+      ),
+      sep = ", "
+    )
+  }
+  data_tmp = tidy(diff_2, exponentiate=TRUE, conf.int=TRUE)
+  title_HR = NULL
+  if(nrow(data_tmp) > 0){
+    for(i in 1:nrow(data_tmp)){
+      title_HR = c(title_HR,
+                   paste0(format_p(data_tmp$estimate[i],digits=2), " (",
+                          format_p(data_tmp$conf.low[i],digits=2), "-",
+                          format_p(data_tmp$conf.high[i],digits=2), ") ",
+                          "p=", format_p(data_tmp$p.value[i],digits=3)))
+    }
+  }
+  g$plot <- g$plot +
+    labs(title = paste0(title, ": hazard ratio=", paste(title_HR, collapse = "/")),
+         subtitle = paste0("Median OS, ", legends, " months. Risk table is not valid due to IPTW correction."))
+  g$table <- g$table + theme(plot.title = element_blank(),
+                             plot.subtitle = element_blank())
+  return(g)
+}
+
+survival_compare_and_plot <- function(data,
+                                      time_var = "time_enroll_final",
+                                      status_var = "censor",
+                                      group_var = "treatment",
+                                      plot_title = "Survival curve",
+                                      input_rmst_cgp = 2,
+                                      group_labels = NULL) {
+  surv_formula <- as.formula(paste0("Surv(", time_var, ", ", status_var, ") ~ ", group_var))
+  surv_fit <- eval(substitute(
+    survfit(formula = FORMULA, data = data, conf.type = "log-log"),
+    list(FORMULA = surv_formula)
+  ))
+  if(group_var == "1"){
+    surv_curv_entry(surv_fit, data, plot_title, NULL, NULL, NULL)
+  } else{
+    group_vals <- unique(na.omit(data[[group_var]]))
+    n_group <- length(group_vals)
+    if (n_group == 1) {
+      surv_curv_entry(surv_fit, data, plot_title, NULL, NULL, NULL)
+    } else if (n_group == 2) {
+      surv_obj <- with(data, Surv(get(time_var), get(status_var)))
+      # tau: min of max times in each group or input
+      data <- data %>%
+        mutate(treatment_numeric = ifelse(.data[[group_var]] == group_vals[1], 0,
+                                          ifelse(.data[[group_var]] == group_vals[2], 1, NA)))
+      
+      tau0 <- max(data[data[[group_var]] == group_vals[1], ] %>% pull(!!sym(time_var)), na.rm = TRUE) / 365.25
+      tau1 <- max(data[data[[group_var]] == group_vals[2], ] %>% pull(!!sym(time_var)), na.rm = TRUE) / 365.25
+      tau <- floor(min(tau0, tau1, input_rmst_cgp) * 10) / 10
+      
+      # rmst
+      rmst_result <- rmst2(
+        time = data[[time_var]],
+        status = data[[status_var]],
+        arm = data$treatment_numeric,
+        tau = tau * 365.25
+      )
+      
+      # 差と信頼区間
+      rmst_diff <- format_p(rmst_result$unadjusted.result[1], digits = 1)
+      rmst_ll <- format_p(rmst_result$unadjusted.result[4], digits = 1)
+      rmst_ul <- format_p(rmst_result$unadjusted.result[7], digits = 1)
+      
+      # log-rank
+      diff_0 <- survdiff(surv_obj ~ data[[group_var]], rho = 0)
+      diff_1 <- survdiff(surv_obj ~ data[[group_var]], rho = 1)
+      diff_2 <- coxph(surv_obj ~ data[[group_var]])
+      # title更新
+      plot_title_full <- paste0(plot_title, ", ", tau, "-year RMST diff.: ", rmst_diff, 
+                                " (", rmst_ll, "-", rmst_ul, ") days")
+      
+      surv_curv_entry(surv_fit, data, plot_title_full, group_labels, diff_0, diff_1, diff_2)
+      
+    } else if (n_group > 2) {
+      surv_obj <- with(data, Surv(get(time_var), get(status_var)))
+      # 通常の log-rankのみ
+      diff_0 <- survdiff(surv_obj ~ data[[group_var]], rho = 0)
+      diff_1 <- survdiff(surv_obj ~ data[[group_var]], rho = 1)
+      diff_2 <- coxph(surv_obj ~ data[[group_var]])
+      
+      surv_curv_entry(surv_fit, data, plot_title, group_labels, diff_0, diff_1, diff_2)
+    }
+  }
+}
+
+survival_compare_and_plot_match <- function(data,
+                                            time_var = "time_enroll_final",
+                                            status_var = "censor",
+                                            group_var = "treatment",
+                                            plot_title = "Survival curve",
+                                            input_rmst_cgp = 2,
+                                            group_labels = NULL,
+                                            pair_var = NULL,     # ペアID列名（例 "pair_id" or "subclass"）
+                                            n_boot = 1000,
+                                            seed = 1) {
+  
+  surv_formula <- as.formula(paste0("Surv(", time_var, ", ", status_var, ") ~ ", group_var))
+  surv_fit <- eval(substitute(
+    survfit(formula = FORMULA, data = data, conf.type = "log-log"),
+    list(FORMULA = surv_formula)
+  ))
+  
+  if (group_var == "1") {
+    return(surv_curv_entry(surv_fit, data, plot_title, NULL, NULL, NULL))
+  }
+  
+  group_vals <- unique(na.omit(data[[group_var]]))
+  n_group <- length(group_vals)
+  
+  if (n_group == 1) {
+    return(surv_curv_entry(surv_fit, data, plot_title, NULL, NULL, NULL))
+  }
+  
+  # surv_obj は共通で使う
+  surv_obj <- with(data, Surv(get(time_var), get(status_var)))
+  
+  if (n_group == 2) {
+    
+    data <- data %>%
+      mutate(treatment_numeric = ifelse(.data[[group_var]] == group_vals[1], 0,
+                                        ifelse(.data[[group_var]] == group_vals[2], 1, NA)))
+    
+    tau0 <- max(data[data[[group_var]] == group_vals[1], ] %>% pull(!!sym(time_var)), na.rm = TRUE) / 365.25
+    tau1 <- max(data[data[[group_var]] == group_vals[2], ] %>% pull(!!sym(time_var)), na.rm = TRUE) / 365.25
+    tau  <- floor(min(tau0, tau1, input_rmst_cgp) * 10) / 10
+    
+    # RMST point estimate
+    rmst_result <- rmst2(
+      time   = data[[time_var]],
+      status = data[[status_var]],
+      arm    = data$treatment_numeric,
+      tau    = tau * 365.25
+    )
+    rmst_diff_point <- rmst_result$unadjusted.result[1]
+    
+    # CI: pair bootstrap if pair_var is available
+    if (!is.null(pair_var) && pair_var %in% names(data)) {
+      
+      set.seed(seed)
+      pairs <- unique(data[[pair_var]])
+      
+      boot_rmst_diff <- function(d){
+        if (length(unique(d$treatment_numeric)) < 2) return(NA_real_)
+        out <- rmst2(
+          time   = d[[time_var]],
+          status = d[[status_var]],
+          arm    = d$treatment_numeric,
+          tau    = tau * 365.25
+        )
+        out$unadjusted.result[1]
+      }
+      
+      boot_vals <- replicate(n_boot, {
+        sampled_pairs <- sample(pairs, size = length(pairs), replace = TRUE)
+        d_boot <- data[data[[pair_var]] %in% sampled_pairs, , drop = FALSE]
+        boot_rmst_diff(d_boot)
+      })
+      
+      boot_vals <- boot_vals[is.finite(boot_vals)]
+      rmst_ll <- unname(quantile(boot_vals, 0.025, na.rm=TRUE))
+      rmst_ul <- unname(quantile(boot_vals, 0.975, na.rm=TRUE))
+      
+    } else {
+      rmst_ll <- rmst_result$unadjusted.result[4]
+      rmst_ul <- rmst_result$unadjusted.result[7]
+    }
+    
+    rmst_diff <- format_p(rmst_diff_point, digits = 1)
+    rmst_ll_f <- format_p(rmst_ll, digits = 1)
+    rmst_ul_f <- format_p(rmst_ul, digits = 1)
+    
+    # log-rank / Wilcoxon
+    diff_0 <- survdiff(surv_obj ~ data[[group_var]], rho = 0)
+    diff_1 <- survdiff(surv_obj ~ data[[group_var]], rho = 1)
+    
+    # ★ Cox: strata(pair_var) を条件付きで入れる
+    if (!is.null(pair_var) && pair_var %in% names(data)) {
+      cox_formula <- as.formula(
+        paste0("Surv(", time_var, ", ", status_var, ") ~ ",
+               group_var, " + strata(", pair_var, ")")
+      )
+      diff_2 <- coxph(cox_formula, data = data)
+    } else {
+      cox_formula <- as.formula(
+        paste0("Surv(", time_var, ", ", status_var, ") ~ ", group_var)
+      )
+      diff_2 <- coxph(cox_formula, data = data)
+    }
+    
+    plot_title_full <- paste0(
+      plot_title, ", ", tau, "-year RMST diff.: ",
+      rmst_diff, " (", rmst_ll_f, "-", rmst_ul_f, ") days"
+    )
+    
+    return(surv_curv_entry(surv_fit, data, plot_title_full,
+                           group_labels, diff_0, diff_1, diff_2))
+    
+  } else {  # n_group > 2
+    
+    diff_0 <- survdiff(surv_obj ~ data[[group_var]], rho = 0)
+    diff_1 <- survdiff(surv_obj ~ data[[group_var]], rho = 1)
+    
+    # ★ Cox: strata(pair_var) 条件付き
+    if (!is.null(pair_var) && pair_var %in% names(data)) {
+      cox_formula <- as.formula(
+        paste0("Surv(", time_var, ", ", status_var, ") ~ ",
+               group_var, " + strata(", pair_var, ")")
+      )
+      diff_2 <- coxph(cox_formula, data = data)
+    } else {
+      cox_formula <- as.formula(
+        paste0("Surv(", time_var, ", ", status_var, ") ~ ", group_var)
+      )
+      diff_2 <- coxph(cox_formula, data = data)
+    }
+    
+    return(surv_curv_entry(surv_fit, data, plot_title,
+                           group_labels, diff_0, diff_1, diff_2))
+  }
+}
+
+survival_compare_and_plot_CTx <- function(data,
+                                          time_var1 = "time_pre",
+                                          time_var2 = "time_all",
+                                          status_var = "censor",
+                                          group_var = "treatment",
+                                          plot_title = "Survival curve",
+                                          adjustment = TRUE,
+                                          color_var_surv_CTx_1 = "CTx",
+                                          group_labels = NULL) {
+  if(adjustment){
+    surv_formula <- as.formula(paste0("Surv(", time_var1, ", ", time_var2, ", ", status_var, ") ~ ", group_var))
+    Xlab = paste0("Time from ", color_var_surv_CTx_1, ", risk-set adjusted (months)")
+  } else {
+    surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
+    Xlab = paste0("Time from ", color_var_surv_CTx_1, ", bias not adj (months)")
+  }
+  data$time_pre = data[[time_var1]]
+  data$time_all = data[[time_var2]]
+  surv_fit <- eval(substitute(
+    survfit(formula = FORMULA, data = data, conf.type = "log-log"),
+    list(FORMULA = surv_formula)
+  ))
+  if(group_var == "1"){
+    surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
+  } else{
+    group_vals <- unique(na.omit(data[[group_var]]))
+    n_group <- length(group_vals)
+    if (n_group == 1) {
+      surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
+    } else {
+      diff_0 = coxph(Surv(time = data[[time_var1]],
+                          time2 = data[[time_var2]],
+                          censor) ~ data[[group_var]], data=data)
+      
+      surv_curv_CTx(surv_fit, data, plot_title, group_labels, diff_0, Xlab)
+    }
+  }
+}
+
+rename_factors_survival_CGP <- function(names_vec) {
+  name_map <- c(
+    "Lymph_met" = "Lymphatic metastasis",
+    "Liver_met" = "Liver metastasis",
+    "Lung_met" = "Lung metastasis",
+    "Bone_met" = "Bone metastasis",
+    "Brain_met" = "Brain metastasis",
+    "EP_option" = "Treatment recommended",
+    "PS" = "Performance status",
+    "Lines" = "CTx lines before CGP",
+    "Best_effect" = "Best CTx effect before CGP"
+  )
+  return(ifelse(names_vec %in% names(name_map), name_map[names_vec], names_vec))
+}
+create_gt_table <- function(Data_forest_tmp, Factor_names, Factor_names_univariant) {
+  withProgress(message = sample(nietzsche)[1], {
+    Data_forest_tmp_table <- Data_forest_tmp %>%
+      dplyr::mutate(EP_option = case_when(
+        EP_option == 1 ~ "Yes",
+        TRUE ~ "No"
+      ))
+    colnames(Data_forest_tmp_table) <- rename_factors_survival_CGP(colnames(Data_forest_tmp_table))
+    Factor_names <- rename_factors_survival_CGP(Factor_names)
+    Factor_names_univariant <- rename_factors_survival_CGP(Factor_names_univariant)
+    Factor_names <- Factor_names[Factor_names != "CTx lines before CGP"]
+    formula_str <- paste0("Surv(time_enroll_final, censor) ~ ", paste(paste0("`", Factor_names, "`"), collapse = " + "))
+    linelistsurv_cox <- coxph(
+      formula = as.formula(formula_str),
+      data = Data_forest_tmp_table,
+      control = coxph.control(iter.max = 50)
+    )
+    incProgress(1/4)
+    univ_tab <- Data_forest_tmp_table %>%
+      tbl_uvregression(
+        method = coxph,
+        y = Surv(time = time_enroll_final, event = censor),
+        include = Factor_names_univariant,
+        exponentiate = TRUE
+      ) |>
+      add_global_p() |>
+      add_n(location = "level") |>
+      add_nevent(location = "level") |>
+      add_q() |>
+      bold_p() |>
+      apply_custom_format(columns = c("estimate", "conf.low", "conf.high", "p.value", "q.value")) |>
+      bold_labels()
+    incProgress(1/4)
+    final_mv_reg <- linelistsurv_cox %>%
+      stats::step(direction = "backward", trace = FALSE)
+    incProgress(1/4)
+  })
+  if (!is.null(final_mv_reg$xlevels)) {
+    mv_tab <- final_mv_reg |>
+      tbl_regression(exponentiate = TRUE) |>
+      add_global_p() |>
+      add_q() |>
+      bold_p() |>
+      apply_custom_format(columns = c("estimate", "conf.low", "conf.high", "p.value", "q.value")) |>
+      bold_labels()
+    tbl_merge(
+      tbls = list(univ_tab, mv_tab),
+      tab_spanner = c("**Univariate**", "**Multivariable**")
+    ) |>
+      modify_caption("Hazard ratio for death after CGP (Only factors with >2 events observed)") |> as_gt()
+  } else {
+    univ_tab |>
+      modify_caption("Hazard ratio for death after CGP, no significant factor in multivariable analysis (Only factors with >2 events observed)") |> as_gt()
+  }
+}
+
+manual_one_hot <- function(data, target_cols) {
+  result_data <- data
+  for(col in target_cols) {
+    if(col %in% names(data)) {
+      unique_vals <- unique(data[[col]])
+      unique_vals <- unique_vals[!is.na(unique_vals)]
+      for(val in unique_vals) {
+        new_col_name <- paste0(col, "_", val)
+        result_data[[new_col_name]] <- as.numeric(data[[col]] == val)
+      }
+      result_data[[col]] <- NULL
+    }
+  }
+  return(result_data)
+}
+
+
+format_numeric_columns <- function(df, digits = 3) {
+  is_integer_column <- function(x) {
+    is.integer(x) || (is.numeric(x) && all(x %% 1 == 0, na.rm = TRUE))
+  }
+  
+  df[] <- lapply(df, function(col) {
+    if (is.numeric(col) && !is_integer_column(col)) {
+      formatted <- ifelse(
+        is.na(col), NA_character_,
+        ifelse(col < 0.001, "<0.001",
+               ifelse(col > 1000, ">1000",
+                      format(round(col, 3), nsmall = 3,  scientific = FALSE)))
+      )
+      return(formatted)
+    } else {
+      return(col)  # integer や文字列はそのまま
+    }
+  })
+  return(df)
+}
+
+
+# create_datatable_with_confirm <- function(data,
+#                                           page_length = 100,
+#                                           scroll_y = "1000px",
+#                                           buttons = c("csv", "excel"),
+#                                           messages = list(
+#                                             csv = "I will use the downloaded csv file in accordance with the terms and conditions.",
+#                                             excel = "I will use the downloaded excel file in accordance with the terms and conditions."
+#                                           )) {
+# 
+#   # ボタン設定を動的に作成
+#   button_configs <- list()
+# 
+#   if ("csv" %in% buttons) {
+#     button_configs <- append(button_configs, list(list(
+#       extend = 'csv',
+#       text = 'CSV',
+#       action = DT::JS(paste0("
+#         function(e, dt, node, config) {
+#           if (confirm('", messages$csv, "')) {
+#             $.fn.dataTable.ext.buttons.csvHtml5.action.call(this, e, dt, node, config);
+#           }
+#         }
+#       "))
+#     )))
+#   }
+# 
+#   if ("excel" %in% buttons) {
+#     button_configs <- append(button_configs, list(list(
+#       extend = 'excel',
+#       text = 'Excel',
+#       action = DT::JS(paste0("
+#         function(e, dt, node, config) {
+#           if (confirm('", messages$excel, "')) {
+#             $.fn.dataTable.ext.buttons.excelHtml5.action.call(this, e, dt, node, config);
+#           }
+#         }
+#       "))
+#     )))
+#   }
+# 
+#   if ("copy" %in% buttons) {
+#     button_configs <- append(button_configs, list(list(
+#       extend = 'copy',
+#       text = 'Copy',
+#       action = DT::JS(paste0("
+#         function(e, dt, node, config) {
+#           if (confirm('", messages$copy, "')) {
+#             $.fn.dataTable.ext.buttons.copyHtml5.action.call(this, e, dt, node, config);
+#           }
+#         }
+#       "))
+#     )))
+#   }
+# 
+#   DT::datatable(data,
+#                 filter = 'top',
+#                 extensions = c('Buttons'),
+#                 options = list(
+#                   pageLength = page_length,
+#                   lengthMenu = c(100, 500, 1000, nrow(data)),
+#                   scrollX = TRUE,
+#                   scrollY = scroll_y,
+#                   scrollCollapse = TRUE,
+#                   dom = "Blfrtip",
+#                   buttons = button_configs
+#                 ))
+# }
+
+create_datatable_with_confirm <- function(data,
+                                          description = NULL,
+                                          page_length = 100,
+                                          scroll_y = "1000px",
+                                          buttons = c("csv", "excel", "copy"),
+                                          messages = list(
+                                            csv = "Please manage according to the personal information handling rules\\n=================================\\nPlease comply with the contents of the Agreement on Utilization of C-CAT Data and the service specification conformity disclosure of/for C-CAT Research-Use Portal site, and handle it properly.\\n=================================\\nBe careful not to leave the downloaded file on your computer",
+                                            excel = "Please manage according to the personal information handling rules\\n=================================\\nPlease comply with the contents of the Agreement on Utilization of C-CAT Data and the service specification conformity disclosure of/for C-CAT Research-Use Portal site, and handle it properly.\\n=================================\\nBe careful not to leave the downloaded file on your computer",
+                                            copy = "Please manage according to the personal information handling rules\\n=================================\\nPlease comply with the contents of the Agreement on Utilization of C-CAT Data and the service specification conformity disclosure of/for C-CAT Research-Use Portal site, and handle it properly.\\n=================================\\nBe careful not to leave the downloaded file on your computer"
+                                          )) {
+  
+  # description をJSに安全に渡す（JSONとしてエスケープされた文字列）
+  # 例: "FELIS CSV download about case summary"
+  desc_json <- jsonlite::toJSON(
+    if (is.null(description) || !nzchar(description)) NA_character_ else description,
+    auto_unbox = TRUE
+  )
+  # --- 共通で使う fetch の JavaScript ロジックを定義 ---
+  # btnText 変数（'csv', 'excel', 'copy' のいずれか）を使って通知する
+  fetch_logic <- paste0("
+    fetch(window.location.origin + '/@@/api/writwlog', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: btnText,
+        time: new Date().toISOString(),
+        description: ", desc_json, "
+      })
+    }).catch(err => console.error('Download log fetch error:', err));
+  ")
+  
+  # ボタン設定を動的に作成
+  button_configs <- list()
+  
+  if ("csv" %in% buttons) {
+    button_configs <- append(button_configs, list(list(
+      extend = 'csv',
+      text = 'CSV',
+      action = DT::JS(paste0("
+        function(e, dt, node, config) {
+          // 1. 確認ダイアログを表示
+          if (confirm('", messages$csv, "')) {
+            // 2. [追加] 確認OKなら、通知を送信
+            var btnText = 'csv';
+            ", fetch_logic, "
+            
+            // 3. 本来のダウンロードアクションを実行
+            $.fn.dataTable.ext.buttons.csvHtml5.action.call(this, e, dt, node, config);
+          }
+        }
+      "))
+    )))
+  }
+  
+  if ("excel" %in% buttons) {
+    button_configs <- append(button_configs, list(list(
+      extend = 'excel',
+      text = 'Excel',
+      action = DT::JS(paste0("
+        function(e, dt, node, config) {
+          // 1. 確認ダイアログを表示
+          if (confirm('", messages$excel, "')) {
+            // 2. [追加] 確認OKなら、通知を送信
+            var btnText = 'excel';
+            ", fetch_logic, "
+            
+            // 3. 本来のダウンロードアクションを実行
+            $.fn.dataTable.ext.buttons.excelHtml5.action.call(this, e, dt, node, config);
+          }
+        }
+      "))
+    )))
+  }
+  
+  if ("copy" %in% buttons) {
+    button_configs <- append(button_configs, list(list(
+      extend = 'copy',
+      text = 'Copy',
+      action = DT::JS(paste0("
+        function(e, dt, node, config) {
+          // 1. 確認ダイアログを表示
+          if (confirm('", messages$copy, "')) {
+            // 2. [追加] 確認OKなら、通知を送信
+            var btnText = 'copy';
+            ", fetch_logic, "
+            
+            // 3. 本来のコピーアクションを実行
+            $.fn.dataTable.ext.buttons.copyHtml5.action.call(this, e, dt, node, config);
+          }
+        }
+      "))
+    )))
+  }
+  
+  DT::datatable(data,
+                filter = 'top',
+                extensions = c('Buttons'),
+                options = list(
+                  pageLength = page_length,
+                  lengthMenu = c(100, 500, 1000, nrow(data)),
+                  scrollX = TRUE,
+                  scrollY = scroll_y,
+                  scrollCollapse = TRUE,
+                  dom = "Blfrtip",
+                  buttons = button_configs
+                  # initComplete は使いません
+                ))
+}
+
+
+clear_reactive_data <- function(reactive_obj, verbose = FALSE) {
+  
+  tryCatch({
+    isolate({
+      # 全要素を取得
+      all_names <- names(reactive_obj)
+      
+      if(verbose) cat("Found", length(all_names), "elements to clear\n")
+      
+      if(length(all_names) > 0) {
+        # 各要素をNULLに設定
+        for(nm in all_names) {
+          tryCatch({
+            reactive_obj[[nm]] <- NULL
+            if(verbose) cat("Cleared:", nm, "\n")
+          }, error = function(e) {
+            if(verbose) cat("Failed to clear:", nm, "-", e$message, "\n")
+          })
+        }
+        
+        # 内部環境の安全なチェックと削除
+        tryCatch({
+          # reactiveValuesの内部構造を安全に確認
+          if(is.environment(reactive_obj) && ".values" %in% names(reactive_obj)) {
+            internal_env <- reactive_obj$.values
+            
+            if(is.environment(internal_env)) {
+              internal_names <- ls(envir = internal_env)
+              
+              if(length(internal_names) > 0) {
+                if(verbose) cat("Found", length(internal_names), "internal objects\n")
+                
+                # 内部オブジェクトを削除
+                rm(list = internal_names, envir = internal_env)
+                if(verbose) cat("Removed", length(internal_names), "internal objects\n")
+              }
+            }
+          }
+        }, error = function(e) {
+          if(verbose) cat("Could not access internal environment:", e$message, "\n")
+          # 内部環境にアクセスできなくても、API層のクリアは成功しているので続行
+        })
+      } else {
+        if(verbose) cat("No elements to clear\n")
+      }
+    })
+    
+    # 強制ガベージコレクション
+    gc(verbose = FALSE)
+    
+    if(verbose) cat("Clear operation completed successfully\n")
+    return(TRUE)
+    
+  }, error = function(e) {
+    if(verbose) cat("Error in clear_reactive_data:", e$message, "\n")
+    gc(verbose = FALSE)
+    return(FALSE)
+  })
+}
+
+htmlOutputWithPopover <- function(outputId, 
+                                  popoverTitle, 
+                                  popoverContent,
+                                  helpId = NULL,
+                                  placement = "top",
+                                  trigger = "hover") {
+  
+  if (is.null(helpId)) {
+    helpId <- paste0("help_", outputId)
+  }
+  
+  # HTMLコンテンツをJavaScript用にエスケープ
+  escaped_content <- gsub('"', '\\"', gsub("'", "\\'", as.character(popoverContent)))
+  escaped_title <- gsub('"', '\\"', gsub("'", "\\'", popoverTitle))
+  
+  list(
+    div(style = "display: flex; align-items: flex-start; width: 100%; min-height: 25px;",
+        div(style = "flex: 1; min-width: 0; padding-right: 5px;",
+            htmlOutput(outputId)
+        ),
+        div(style = "flex-shrink: 0; width: 20px; height: 20px; margin-top: 2px;",
+            actionButton(helpId, "", 
+                         icon = icon("question-circle"),
+                         style = "border: none; background: transparent; color: #3c8dbc; width: 18px; height: 18px; padding: 0; font-size: 13px;")
+        )
+    ),
+    
+    # JavaScriptでHTMLポップオーバーを初期化
+    tags$script(HTML(paste0("
+      $(document).ready(function(){
+        $('#", helpId, "').popover({
+          title: '", escaped_title, "',
+          content: '", escaped_content, "',
+          html: true,
+          placement: '", placement, "',
+          trigger: '", trigger, "',
+          container: 'body',
+          template: '<div class=\"popover\" role=\"tooltip\"><div class=\"arrow\"></div><h3 class=\"popover-title\"></h3><div class=\"popover-content\"></div></div>'
+        });
+      });
+    ")))
+  )
+}
+
+BootNoSet = function(Data){
+  return(as.integer(min(500, max(25, as.integer(50000 / nrow(Data))*50))/BootNoVar))
+}
+
+run_crossval <- function(cross_validation_samples, formula_treat, Penal, Toler) {
+  try(silent = FALSE,
+      cross_validation_samples %>%
+        dplyr::mutate(
+          glm_analysis = lapply(splits, function(split) {
+            lrm(formula = formula_treat, 
+                data = rsample::analysis(split),
+                x = TRUE, y = TRUE, 
+                penalty = Penal, tol = Toler)
+          })
+        )
+  )
+}
+
+optimize_data_datatable <- function(Data_forest_tmp_, input) {
+  # EP_treat == 1の行を事前に計算
+  ep_treat_mask <- Data_forest_tmp_$EP_treat == 1
+  
+  # 削除する列を収集するベクトル
+  cols_to_remove <- character()
+  
+  # 各列の処理を関数化
+  check_and_process <- function(col_name, value_check, alt_value = NULL) {
+    if (!(col_name %in% names(Data_forest_tmp_))) return(NULL)
+    
+    col_data <- Data_forest_tmp_[[col_name]]
+    if (is.null(alt_value)) {
+      # 単純な削除チェック
+      count_match <- sum(col_data == value_check & ep_treat_mask, na.rm = TRUE)
+      count_not_match <- sum(col_data != value_check & ep_treat_mask, na.rm = TRUE)
+      
+      if (count_match < 3 || count_not_match < 3) {
+        return(col_name)
+      }
+    }
+    return(NULL)
+  }
+  
+  # PS列の処理
+  if ("PS" %in% names(Data_forest_tmp_)) {
+    ps_data <- Data_forest_tmp_$PS
+    count_0 <- sum(ps_data == "0" & ep_treat_mask)
+    count_not_0 <- sum(ps_data != "0" & ep_treat_mask)
+    count_2_4 <- sum(ps_data == "2_4" & ep_treat_mask)
+    
+    if (count_0 < 3 || count_not_0 < 3) {
+      cols_to_remove <- c(cols_to_remove, "PS")
+    } else if (count_2_4 < 3) {
+      Data_forest_tmp_$PS[ps_data %in% c("1", "2_4")] <- "1_4"
+    }
+  }
+  
+  # 単純な二値変数の処理
+  binary_cols <- list(
+    c("Smoking_history", "Yes"),
+    c("Alcoholic_history", "Yes"),
+    c("time_diagnosis_enroll", ">1-year"),
+    c("Lymph_met", "Yes"),
+    c("Lung_met", "Yes"),
+    c("Brain_met", "Yes"),
+    c("Bone_met", "Yes"),
+    c("Liver_met", "Yes")
+  )
+  
+  for (col_info in binary_cols) {
+    col_to_remove <- check_and_process(col_info[1], col_info[2])
+    if (!is.null(col_to_remove)) {
+      cols_to_remove <- c(cols_to_remove, col_to_remove)
+    }
+  }
+  
+  # Panel列の処理
+  if ("Panel" %in% names(Data_forest_tmp_)) {
+    panel_data <- Data_forest_tmp_$Panel
+    solid_panels <- c("NCC OncoPanel", "FoundationOne CDx", "GenMineTOP")
+    
+    if (any(sapply(solid_panels, function(p) sum(panel_data == p & ep_treat_mask) < 3))) {
+      Data_forest_tmp_$Panel[panel_data %in% solid_panels] <- "Solid"
+      
+      if (length(unique(Data_forest_tmp_$Panel)) > 1) {
+        panel_table <- table(Data_forest_tmp_$Panel)
+        ref_level <- names(sort(panel_table, decreasing = TRUE))[1]
+        Data_forest_tmp_$Panel <- relevel(factor(Data_forest_tmp_$Panel), ref = ref_level)
+      }
+      
+      count_solid <- sum(Data_forest_tmp_$Panel == "Solid" & ep_treat_mask)
+      count_not_solid <- sum(Data_forest_tmp_$Panel != "Solid" & ep_treat_mask)
+      
+      if (count_solid < 3 || count_not_solid < 3) {
+        cols_to_remove <- c(cols_to_remove, "Panel")
+      }
+    }
+  }
+  
+  # Enroll_date列の処理
+  if ("Enroll_date" %in% names(Data_forest_tmp_)) {
+    enroll_data <- Data_forest_tmp_$Enroll_date
+    count_2019 <- sum(enroll_data == "2019" & ep_treat_mask, na.rm = TRUE)
+    
+    if (count_2019 < 3) {
+      Data_forest_tmp_$Enroll_date[enroll_data %in% c("2019", "2020")] <- "2019/20"
+      
+      count_2019_20 <- sum(Data_forest_tmp_$Enroll_date == "2019/20" & ep_treat_mask, na.rm = TRUE)
+      
+      if (count_2019_20 < 3) {
+        Data_forest_tmp_$Enroll_date[Data_forest_tmp_$Enroll_date %in% c("2019/20", "2021")] <- "2019-21"
+        
+        count_2019_21 <- sum(Data_forest_tmp_$Enroll_date == "2019-21" & ep_treat_mask, na.rm = TRUE)
+        count_not_2019_21 <- sum(Data_forest_tmp_$Enroll_date != "2019-21" & ep_treat_mask, na.rm = TRUE)
+        
+        if (count_2019_21 < 3 || count_not_2019_21 < 3) {
+          cols_to_remove <- c(cols_to_remove, "Enroll_date")
+        }
+      } else {
+        count_not_2019_20 <- sum(Data_forest_tmp_$Enroll_date != "2019/20" & ep_treat_mask, na.rm = TRUE)
+        if (count_not_2019_20 < 3) {
+          cols_to_remove <- c(cols_to_remove, "Enroll_date")
+        }
+      }
+    } else {
+      count_not_2019 <- sum(enroll_data != "2019" & ep_treat_mask, na.rm = TRUE)
+      if (count_not_2019 < 3) {
+        cols_to_remove <- c(cols_to_remove, "Enroll_date")
+      }
+    }
+  }
+  
+  # Age列の処理
+  if ("Age" %in% names(Data_forest_tmp_)) {
+    age_data <- Data_forest_tmp_$Age
+    count_younger <- sum(age_data == "Younger" & ep_treat_mask)
+    count_older <- sum(age_data == "Older" & ep_treat_mask)
+    
+    if (count_younger < 3 || count_older < 3) {
+      cols_to_remove <- c(cols_to_remove, "Age")
+    }
+  }
+  
+  # Best_effect列の処理（注：元のコードにバグがある可能性）
+  if ("Best_effect" %in% names(Data_forest_tmp_)) {
+    best_data <- Data_forest_tmp_$Best_effect
+    count_sd <- sum(best_data == "SD" & ep_treat_mask, na.rm = TRUE)
+    count_not_sd <- sum(best_data != "SD" & ep_treat_mask, na.rm = TRUE)
+    
+    if (count_sd < 3) {
+      cols_to_remove <- c(cols_to_remove, "Best_effect")
+    } else if (count_not_sd < 3) {
+      # 元のコードはselect(Best_effect)となっているが、これは他の列を削除する意味？
+      # バグの可能性があるため、コメントとして残す
+      # Data_forest_tmp_ <- Data_forest_tmp_[, "Best_effect", drop = FALSE]
+      cols_to_remove <- c(cols_to_remove, setdiff(names(Data_forest_tmp_), c("Best_effect", "EP_treat")))
+    }
+  }
+  
+  # Sex列の処理
+  if ("Sex" %in% names(Data_forest_tmp_)) {
+    sex_data <- Data_forest_tmp_$Sex
+    count_male <- sum(sex_data == "Male" & ep_treat_mask, na.rm = TRUE)
+    count_not_male <- sum(sex_data != "Male" & ep_treat_mask, na.rm = TRUE)
+    
+    if (count_male < 3 || count_not_male < 3) {
+      cols_to_remove <- c(cols_to_remove, "Sex")
+    }
+  }
+  
+  # Lines列の処理
+  if ("Lines" %in% names(Data_forest_tmp_)) {
+    lines_data <- Data_forest_tmp_$Lines
+    count_1 <- sum(lines_data == "1" & ep_treat_mask)
+    count_not_1 <- sum(lines_data != "1" & ep_treat_mask)
+    count_0 <- sum(lines_data == "0" & ep_treat_mask)
+    count_2_plus <- sum(lines_data == "2~" & ep_treat_mask)
+    
+    if (count_1 < 3 || count_not_1 < 3) {
+      cols_to_remove <- c(cols_to_remove, "Lines")
+    } else if (count_0 < 3) {
+      Data_forest_tmp_$Lines[lines_data %in% c("0", "1")] <- "0~1"
+    } else if (count_2_plus < 3) {
+      Data_forest_tmp_$Lines[lines_data %in% c("2~", "1")] <- "1~"
+    }
+  }
+  
+  # 条件付き列の処理
+  if (!is.null(input$HER2) && input$HER2 != "No" && "HER2_IHC" %in% names(Data_forest_tmp_)) {
+    her2_data <- Data_forest_tmp_$HER2_IHC
+    count_pos <- sum(her2_data == "Positive" & ep_treat_mask)
+    count_not_pos <- sum(her2_data != "Positive" & ep_treat_mask)
+    
+    if (count_pos < 3 || count_not_pos < 3) {
+      cols_to_remove <- c(cols_to_remove, "HER2_IHC")
+    }
+  }
+  
+  if (!is.null(input$MSI) && input$MSI != "No" && "MSI_PCR" %in% names(Data_forest_tmp_)) {
+    msi_data <- Data_forest_tmp_$MSI_PCR
+    count_pos <- sum(msi_data == "Positive" & ep_treat_mask)
+    count_not_pos <- sum(msi_data != "Positive" & ep_treat_mask)
+    
+    if (count_pos < 3 || count_not_pos < 3) {
+      cols_to_remove <- c(cols_to_remove, "MSI_PCR")
+    }
+  }
+  
+  if (!is.null(input$MMR) && input$MMR != "No" && "MMR_IHC" %in% names(Data_forest_tmp_)) {
+    mmr_data <- Data_forest_tmp_$MMR_IHC
+    count_dmmr <- sum(mmr_data == "dMMR" & ep_treat_mask)
+    count_not_dmmr <- sum(mmr_data != "dMMR" & ep_treat_mask)
+    
+    if (count_dmmr < 3 || count_not_dmmr < 3) {
+      cols_to_remove <- c(cols_to_remove, "MMR_IHC")
+    }
+  }
+  
+  # 一度にすべての列を削除
+  if (length(cols_to_remove) > 0) {
+    cols_to_keep <- setdiff(names(Data_forest_tmp_), cols_to_remove)
+    Data_forest_tmp_ <- Data_forest_tmp_[,  ..cols_to_keep, drop = FALSE]
+  }
+  
+  return(Data_forest_tmp_)
+}

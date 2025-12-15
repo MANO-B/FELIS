@@ -1,0 +1,588 @@
+﻿P1,P2
+(2回目以降)CBDCA+nab-PTX+Atezolizumab【03 24】,"Atezolizumab,Carboplatin,nab-Paclitaxel"
+(2回目以降)CBDCA+PEM+BV(ﾌﾟﾛｲﾒﾝﾄﾞ)【03 24】,"Carboplatin,Pemetrexed,Bevacizumab"
+(2回目以降)CBDCA+PEM+BV【03 24】,"Carboplatin,Pemetrexed,Bevacizumab"
+(2回目以降)CDDP+PEM+BV【03 24】(ｼｮｰﾄﾊｲﾄﾞﾚｰｼｮﾝ),"Cisplatin,Pemetrexed,Bevacizumab"
+(2回目以降)DTX+Ramucirumab【03 24】,"Docetaxel,Ramucirumab"
+(2回目以降)PEM+BV【03 24】,"Pemetrexed,Bevacizumab"
+(day1のみ)Halaven【22】,Eribulin
+[IFO−ADM,"Doxorubicin,Ifosfamide"
+《前》AI(ADM+IFM)【2nd line】(肉腫),"Doxorubicin,Ifosfamide"
+《前》AI(ADM+IFM)【術後】(肉腫),"Doxorubicin,Ifosfamide"
+☆肺VNR,Vinorelbine
+301_010 CBDCA+PEM,"Carboplatin,Pemetrexed"
+301_011 PEM単剤,Pemetrexed
+301_050 shortCDDP+PEM+BEV（90）,"Cisplatin,Pemetrexed,Bevacizumab"
+310_379　VAC-V-V（3歳≦）,"ActinomaycinD,Cyclophosphamide,Vincristine"
+328_068　トラベクテジン,Trabectedin
+328_096　ERI,Eribulin
+328_105　DXR(75),Doxorubicin
+ABCP,"Atezolizumab,Bevacizumab,Carboplatin,Paclitaxel"
+ABCP療法,"Atezolizumab,Bevacizumab,Carboplatin,Paclitaxel"
+ABP療法,"Atezolizumab,Bevacizumab,Paclitaxel"
+Adj Imatinib,Imatinib
+Adj UFT,"Tegafur,Uracil"
+ADM,Doxorubicin
+ADM　単剤,Doxorubicin
+ADM（静注）+IFM（静注）,"Doxorubicin,Ifosfamide"
+ADM+IFM,"Doxorubicin,Ifosfamide"
+ADM+IFO,"Doxorubicin,Ifosfamide"
+ADM単剤【35】,Doxorubicin
+ADM単独療法,Doxorubicin
+ADR,Doxorubicin
+ADR 【43】,Doxorubicin
+ADR（75）1day,Doxorubicin
+ADR【35】,Doxorubicin
+Afatinib,Afatinib
+AFATINIB MALEATE ,Afatinib
+AI,"Doxorubicin,Ifosfamide"
+ＡＩ,"Doxorubicin,Ifosfamide"
+AI療法,"Doxorubicin,Ifosfamide"
+Alectinib,Alectinib
+ALECTINIB HYDROCHLORIDE ,Alectinib
+ａｔｅｚｏ,Atezolizumab
+Atezo+CBDCA+PEM,"Atezolizumab,Carboplatin,Pemetrexed"
+Atezolizumab,Atezolizumab
+atezolizumab,Atezolizumab
+ATZ,Atezolizumab
+BDCA+PEM,"Carboplatin,Pemetrexed"
+BEV,Bevacizumab
+Bevacizumab療法,Bevacizumab
+BEV療法,Bevacizumab
+biweekly PTX,Paclitaxel
+Brigatinib,Brigatinib
+Brigtinib,Brigatinib
+BU/MEL,"Busulfan,Melphalan"
+BU+MEL,"Busulfan,Melphalan"
+BV維持療法,Bevacizumab
+Cabozantinib,Cabozantinib
+Car/Pem/Pembro,"Carboplatin,Pemetrexed,Pembrolizumab"
+Car/TS1,"Carboplatin,Tegafur・Gimeracil・Oteracil"
+Car+Pem,"Carboplatin,Pemetrexed"
+Carboplatin+nab-paclitaxel,"Carboplatin,nab-Paclitaxel"
+Carboplatin+nab-paclitaxel療法,"Carboplatin,nab-Paclitaxel"
+carboplatin+pemetrexed,"Carboplatin,Pemetrexed"
+CBDCA + PTX,"Carboplatin,Paclitaxel"
+CBDCA(AUC２)+PTX+RT（weekly 6週分）,"Carboplatin,Paclitaxel"
+CBDCA(AUC5)+PEM 【03 24】,"Carboplatin,Pemetrexed"
+CBDCA(AUC6)+PEM【03 24】,"Carboplatin,Pemetrexed"
+CBDCA(AUC6)+PTX（200mg/ｍ2）+Pemb（200mg/body),"Carboplatin,Paclitaxel,Pembrolizumab"
+CBDCA/GEM,"Carboplatin,Gemcitabine"
+CBDCA/nab-PTX,"Carboplatin,nab-Paclitaxel"
+CBDCA/naｂ−PTX,"Carboplatin,nab-Paclitaxel"
+CBDCA/nabPac,"Carboplatin,nab-Paclitaxel"
+CBDCA/PTX,"Carboplatin,Paclitaxel"
+CBDCA+nab-Paclitaxel,"Carboplatin,nab-Paclitaxel"
+CBDCA＋nab-PTX,"Carboplatin,nab-Paclitaxel"
+CBDCA+nab-PTX,"Carboplatin,nab-Paclitaxel"
+CBDCA+nab-PTX+Bmab,"Carboplatin,nab-Paclitaxel,Bevacizumab"
+CBDCA+nab-PTX+Pembro,"Carboplatin,nab-Paclitaxel,Pembrolizumab"
+CBDCA+nab-PTX+Prmbro,"Carboplatin,nab-Paclitaxel,Pembrolizumab"
+CBDCA＋nab-PTX＋キイトルーダ,"Carboplatin,nab-Paclitaxel,Pembrolizumab"
+"CBDCA+nab-PTX併用療法：3時間（day8,15：2時間）","Carboplatin,nab-Paclitaxel"
+CBDCA+nab+PTX,"Carboplatin,nab-Paclitaxel"
+CBDCA＋nabPTX,"Carboplatin,nab-Paclitaxel"
+CBDCA+nabPTX,"Carboplatin,nab-Paclitaxel"
+CBDCA＋nabPTX＋Atezo療法,
+CBDCA+NVB,
+CBDCA+PEM,"Carboplatin,Pemetrexed"
+CBDCA＋PEM,"Carboplatin,Pemetrexed"
+CBDCA+PEM(中皮腫) 【03 24 05】,"Carboplatin,Pemetrexed"
+CBDCA＋PEM+Atezolizumab,
+CBDCA+PEM+Atezolizumab,
+CBDCA+PEM+BEV,"Carboplatin,nab-Paclitaxel,Bevacizumab"
+CBDCA+PEM+Bev,"Carboplatin,nab-Paclitaxel,Bevacizumab"
+CBDCA＋PEM＋Bev,"Carboplatin,nab-Paclitaxel,Bevacizumab"
+CBDCA+Pem+Bev,"Carboplatin,nab-Paclitaxel,Bevacizumab"
+CBDCA+PEM＋Bev,"Carboplatin,nab-Paclitaxel,Bevacizumab"
+CBDCA＋PEM+BEV,"Carboplatin,nab-Paclitaxel,Bevacizumab"
+CBDCA+PEM+Bev+Erlotinib,
+CBDCA+PEM+Bmab,"Carboplatin,nab-Paclitaxel,Bevacizumab"
+CBDCA+PEM+BV,"Carboplatin,nab-Paclitaxel,Bevacizumab"
+CBDCA+PEM＋BV 【03 24】,"Carboplatin,nab-Paclitaxel,Bevacizumab"
+CBDCA＋PEM＋Ipi＋Nivo,
+CBDCA＋PEM+Ipilimumab+Nivolumab,
+CBDCA+PEM+Nivolumab+Ipilimumab,
+CBDCA+PEM+Pembro,"Carboplatin,Pemetrexed,Pembrolizumab"
+CBDCA+PEM+Pembrolizumab,"Carboplatin,Pemetrexed,Pembrolizumab"
+CBDCA＋PEM＋Pembrolizumab,"Carboplatin,Pemetrexed,Pembrolizumab"
+CBDCA+PEM+Pembrolizumab【03 24】,"Carboplatin,Pemetrexed,Pembrolizumab"
+CBDCA＋PEM+Pembrolizumad,"Carboplatin,Pemetrexed,Pembrolizumab"
+CBDCA+PEM+Pembrolizumb,"Carboplatin,Pemetrexed,Pembrolizumab"
+CBDCA+pemetrexed,"Carboplatin,Pemetrexed"
+CBDCA+Pemetrexed+Pembrolizumab→Pemetrexed+Pembrolizumab,
+CBDCA+PTX,
+CBDCA+PTX（+RT）,
+CBDCA+PTX(ﾌﾟﾛｲﾒﾝﾄﾞ)【03 24】,
+CBDCA+PTX+Bev,
+CBDCA+PTX+BEV+Atezo,
+CBDCA+PTX+Bmab,
+CBDCA+PTX+BV+Atezo,
+CBDCA＋PTX＋BV＋テセントリク,
+CBDCA＋PTX＋キイトルーダ,
+CBDCA+S-1,
+CBDCA＋TS-1,
+CBDCA+アムリタ+キイトルーダ,
+CBDCA+ペメトレキセド+ベバシズマブ,
+CDDP + ETP,"Cisplatin,Etoposide"
+CDDP + PEM,
+CDDP + TS-1→TS-1隔日投与,
+CDDP + VNR,
+CDDP?DTX療法,
+CDDP/DOC/TRT,
+CDDP/PEM,
+CDDP/S-1 陽子線,
+CDDP＋ADR,"Cisplatin,Doxorubicin"
+CDDP+DOC,
+CDDP+DTX,
+CDDP+ETP,
+CDDP+PEM,
+CDDP+PEM 【03 24】,
+CDDP+PEM 【03 24】（ショートハイドレーション）,
+CDDP+PEM+Bev,
+CDDP+PEM+BEV,
+CDDP＋PEM＋Bev,
+CDDP+PEM+Bmab,
+ＣDDＰ＋PEM＋BV,
+CDDP+PEM+Pembrolizumab,
+CDDP+PEN,
+CDDP+REM+Pembrolizumab,
+CDDP+RT療法,Cisplatin
+CDDP＋S-1,
+CDDP+TS-1,
+"CDDP＋vinerybine
+",
+CDDP+VNR,
+CDDP＋VNR,
+CDDP+VNR+RT,
+CheckMate 9LA,
+Cis/Pem,
+Cis/Vin,
+Cis+Doc 同時照射 (Short Hydration),
+CPT-11（進行・再発）,
+Crizotinib,
+Crizotnib,
+CRT（weekly CBDCA+weeklyPTX),
+Custom Regimen,
+Custom Regimen（Brigatinib）,
+CVD療法,"Cyclophosphamide,Doxorubicin,Vincristine"
+DIN+FIC+TEC,"Dinutuximab,Teceleukin"
+DIN+FIL+TEC,"Dinutuximab,Teceleukin"
+ＤＯＣ,Docetaxel
+Doc,
+DOC,
+DOC 【03 24】,
+DOC(60)療法,
+DOC【03 24】,
+Doc/Ram,
+DOC+CDDP,
+DOC+RAM,
+Doc+Ram,
+DOC＋RAM,
+Docetaxel,
+Docetaxel (d1),
+Docetaxel+Ramcirumab,
+Docetaxel+Ramucirumab療法,
+Doxorubicin,Doxorubicin
+DTX,Docetaxel
+DTX　RAM,
+DTX（tri-weekly）,
+DTX（tri-weekly）：４時間,
+DTX(乳)【22】,
+DTX+CDDP+Durvalumab,
+DTX+Nivo,
+DTX+RAM,
+DTX＋RAM,
+DTX+Ram,
+DTx+Ram,
+DTX＋Ram,
+DTX+ラムシルマブ,
+Dulvalumab,
+Durb(10mg/kg）維持療法,
+Durbalmab,
+Durva,
+durvalmab,
+Durvalmab維持療法(小細胞肺癌)【03 24】,
+Durvalumab,Durvalumab
+Durvalumab地固め療法,Durvalumab
+Durvalumab療法,
+DXR,Doxorubicin
+DXR療法,Doxorubicin
+DXR療法（肉腫）,Doxorubicin
+DXT,
+Entrecrinib,Entrectinib
+Entrectinib,Entrectinib
+Entrectinib,
+Eribrin療法,Eribulin
+Eribulin,Eribulin
+"Eribulin(d1,8)",Eribulin
+"Eribulin(d1,8)",Eribulin
+Eribulin療法,Eribulin
+Erlotinib,
+Erlotinib+Bevacizumab,
+Flu/Mel,"Fludarabine,Melphalan"
+Gd２抗体療法,Dinutuximab
+GD療法（GEM+DOC）【35 45】,"Docetaxel,Gemcitabine"
+GEF,Gefitinib
+Gefitinib,Gefitinib
+gefitinib,
+gefitinib療法,
+GEM,Gemcitabine
+Gem,
+GEM 【03 24】,
+GEM-TXT,"Docetaxel,Gemcitabine"
+GEM(900mg/㎡)+DOC(70mg/㎡),"Docetaxel,Gemcitabine"
+GEM(900mg/㎡)+DOC(70mg/㎡),"Docetaxel,Gemcitabine"
+GEM(900mg/㎡)+DOC(70mg/㎡) 【患者限定4465756】,"Docetaxel,Gemcitabine"
+GEM/VNR,
+GEM＋CBDCA,
+GEM+DOC,"Docetaxel,Gemcitabine"
+GEM+DOC【35 45】,"Docetaxel,Gemcitabine"
+GEM+DTX,"Docetaxel,Gemcitabine"
+GEM+DTX,"Docetaxel,Gemcitabine"
+GEM＋DTX,"Docetaxel,Gemcitabine"
+GEM+DTX療法,"Docetaxel,Gemcitabine"
+GEM+nab-PTX,
+GEM単剤,Gemcitabine
+Halaven(肉腫)【35 腫 05 43 46】,Eribulin
+Halaven【35 腫 05 43 46】,Eribulin
+ICpE療法,"Carboplatin,Etoposide,Ifosfamide"
+IE,"Etoposide,Ifosfamide"
+IFM + DXR (AI療法）,"Doxorubicin,Ifosfamide"
+IFO-ADM,"Doxorubicin,Ifosfamide"
+IFO＋VP,"Etoposide,Ifosfamide"
+IFO＋VP16。,"Etoposide,Ifosfamide"
+Ifosfamide,Ifosfamide
+IFO単剤,Ifosfamide
+IFO大量療法,Ifosfamide
+imatinib,Imatinib
+Imatinib,Imatinib
+Imatinib Mesilate,Imatinib
+investigational Agent,
+Investigational Agent,
+Ipilimumab+Nivolumab+CBDCA+PEM,
+ＩＴ療法,"Irinotecan,Temozolomide"
+Larotorectinib,Larotrectinib
+Larotrectinib療法,Larotrectinib
+MTX+VNB,"Methotrexate,Vinblastine"
+nab-PTX,
+NIVO,Nivolumab
+Nivo,
+"NIVO
+",Nivolumab
+NIVO+IPI 併用療法【45 05】,
+NIVO+IPI 併用療法【45】,
+NIVO+IPI+CBDCA+PEM【03 24】,
+NIVO+IPI+CBDCA+PTX【03 24】,
+Nivolmab,
+Nivolumab,Nivolumab
+nivolumab,Nivolumab
+NPT/CPT,
+Osimertinbi+Bevacizumad,
+Osimertinib,Osimertinib
+osimertinib,
+OSIMERTINIB MESILATE,
+Osinertinib,
+Pazopanib,Pazopanib
+PDC,
+PEM,
+Pem,
+ｐｅｍ,
+PEM 【03 24】,
+PEM+BEV,
+PEM+BEV維持療法,
+PEM+Bmab,
+PEM+CBDCA,
+PEM＋CBDCA＋PEMB,
+PEM＋PEMB,
+PEM+Peｍbro,
+PEM+Pembrolizumab,
+Pembro,Pembrolizumab
+Pembro+Car+Pem,
+Pembro+Pem,
+Pembrolizimab,
+Pembrolizmab,
+Pembrolizumab,Pembrolizumab
+pembrolizumab,Pembrolizumab
+pembrolizumab CBDCA PEM,
+PEM療法,
+Pimitespib,Pimitespib
+pimitespib,Pimitespib
+PTX,
+ｑ3ｗ DCT(進行・再発）,
+Ram/DTX,
+RAM+DOC,
+RAM+DOC療法,
+RAM+DTX,
+regorafenib,Regorafenib
+RET,
+Rolratinib,Lorlatinib
+RT CBDCA+PTX(導入療法)【03 24】,
+S-1,
+S-1単剤,
+S-1単剤療法,
+S-1療法,
+S1,
+S1単剤療法,
+Ｓ1療法,
+Selpercatinib,
+Sotoracib,
+Sotorasib,
+sotorasib,
+Sunitinib,Sunitinib
+sunitinib,Sunitinib
+TBI/Flu/MEL,"Fludarabine,Melphalan"
+TBT,Trabectedin
+TC+Durvalumab,
+Tepotinib,Tepotinib
+Tepotinib単剤療法,
+Topo/CY/Mel,"Cyclophosphamide,Melphalan,Nogitecan"
+TPF療法,"Cisplatin,Docetaxel,Fluorouracil"
+Trabectedin【35 腫 05 43 39】,Trabectedin
+Trabectedin療法,Trabectedin
+Trasutuzumab Emtansine,
+Tri-weekly CBDCA(AUC:6)+PTX：６時間,
+TS-1,
+TS-1療法,
+TS1,
+UFT,
+UFT療法,
+VAC療法,"ActinomaycinD,Cyclophosphamide,Vincristine"
+VDC-IC療法,"Cyclophosphamide,Doxorubicin,Etoposide,Ifosfamide,Vincristine"
+VDC-IE,"Cyclophosphamide,Doxorubicin,Etoposide,Ifosfamide,Vincristine"
+VDC/IE交替療法,"Cyclophosphamide,Doxorubicin,Etoposide,Ifosfamide,Vincristine"
+VDC療法,"Cyclophosphamide,Doxorubicin,Vincristine"
+VNR,
+"VNR (d1,8)",
+VNR単剤,
+VNR療法,
+ｗCBDCA+wPTX+RT,
+"weekly GEM (day1,8,15)",Gemcitabine
+weekly nab-PTX(1ｸｰﾙ3週間)【03】,
+weekly nab-PTX(1ｸｰﾙ4週間)【03】,
+weekly nab-PTX(胃)【05】,
+Weekly NAB-P療法（q4wks）,
+weekly PTX(進行・再発）,Paclitaxel
+weekly PTX療法,Paclitaxel
+weekly-CBDCA+PAC,
+weeklyCBDCA(AUC2)+PTX(40mg/m2)+RT,
+wPTX（血管肉腫 減量）80㎎/㎡,Paclitaxel
+wPTX（血管肉腫）100㎎/㎡,Paclitaxel
+XAGE1ワクチン,
+アテゾリズマブ,
+アテゾリズマブ単剤,
+アテゾリズマブ単剤療法,
+アテゾリズマブ療法,
+アドリアシン+イフォマイド療法,"Doxorubicin,Ifosfamide"
+アドリアシン単剤（キャンサーボード：肉腫）,Doxorubicin
+アドリアマイシン,Doxorubicin
+アドリアマイシン、イフォマイド療法,"Doxorubicin,Ifosfamide"
+アドリアマイシンーイフォスファミド療法,"Doxorubicin,Ifosfamide"
+アドリアマイシン単剤療法,"Doxorubicin,Ifosfamide"
+アファチニブ,Afatinib
+アファチニブ単剤,
+アファチニブ単剤療法,
+アムルビシン,Amrubicin
+アルニブリグ,Brigatinib
+アルンブリグ,Brigatinib
+アルンブルグ,
+アレクチニブ,Alectinib
+アレクチニブ,Alectinib
+ｱﾚｸﾁﾆﾌﾞ,
+アレクチニブ療法,Alectinib
+アレセンサ,
+イマチニブ,Imatinib
+イマチニブ\nグリベック内服,Imatinib
+イマチニブメシル酸塩,Imatinib
+イミフィンジ(デュルバルマブ）：2時間,
+イレッサ,Gefitinib
+ヴァイトラックビ,Larotrectinib
+ヴォトリエント錠,Pazopanib
+"エスワン
+TS-1",
+エヌトレクチニブ単剤療法,Entrectinib
+エブリン,Eribulin
+エリブリン,Eribulin
+エリブリン療法,Eribulin
+エルロチニブ,
+エルロチニブ＋ベバシズマブ併用療法,
+エンコラフェニブ＋ビニメチニブ,"Binimetinib,Encorafenib"
+オシメルチニブ,Osimertinib
+オシメルチニブメシル,Osimertinib
+オシメルチニブメシル単剤,Osimertinib
+オシメルチニブ単剤,Osimertinib
+オシメルチニブ単剤療法,Osimertinib
+オプジーボ,Nivolumab
+カブマチニブ,Capmatinib
+カプマチニブ,Capmatinib
+カプマチニブ,Capmatinib
+カプマチニブ療法,Capmatinib
+カルセド療法,
+カルボアブラキサン,"Carboplatin,nab-Paclitaxel"
+カルボプラチン・パクリタキセル・キイトルーダ,
+"カルボプラチン,ペメトレキセド,ニボルマブ,イピリムマブ",
+カルボプラチン＋nab-パクリタキセル,
+カルボプラチン＋S1,
+カルボプラチン+アブラキサン,"Carboplatin,nab-Paclitaxel"
+カルボプラチン+アリムタ,
+カルボプラチン＋アリムタ＋アバスチン,
+カルボプラチン＋ナブパクリタキセル,
+カルボプラチン＋ナブパクリタキセル併用療法,
+カルボプラチン＋パクリタキセル＋ベバシズマブ＋アテゾリズマブ,
+カルボプラチン＋パクリタキセル＋ベバシズマブ併用療法,
+カルボプラチン＋パクリタキセル＋ベバシズマブ療法,
+カルボプラチン＋パクリタキセル＋ベバシツマブ＋アテゾリズマブ,
+カルボプラチン＋パクリタキセル併用療法,
+カルボプラチン＋ペメトレキシド＋デュルパルマブ＋トレメリムマブ,
+カルボプラチン＋ペメトレキセド,
+カルボプラチン+ペメトレキセド+アテゾリズマブ,
+カルボプラチン＋ペメトレキセド＋ニボルマブ＋イピリムマブ,
+カルボプラチン＋ペメトレキセド＋ベバシズマブ,
+カルボプラチン+ペメトレキセド+ベバシズマブ,
+カルボプラチン＋ペメトレキセド+ベバシズマブ,
+カルボプラチン＋ペメトレキセド＋ベバシズマブ併用療法,
+カルボプラチン+ペメトレキセド+ペムブロリズマブ,
+カルボプラチン＋ペメトレキセド＋ペムブロリズマブ,
+カルボプラチン+ペメトレキセド＋ペムブロリズマブ,
+カルボプラチン＋ペメトレキセド療法,
+キイトルーダ,Pembrolizumab
+キイトルーダ：2時間,Pembrolizumab
+キイトルーダ(呼吸器)【03 24】,Pembrolizumab
+キイトルーダー療法,Pembrolizumab
+グリグチニブ,Brigatinib
+クリゾチニブ,
+グリベック,Imatinib
+グリペック,Imatinib
+グリベック療法,Imatinib
+ゲフィチニブ,Gefitinib
+ゲフィチニブ単剤治療,Gefitinib
+ゲフィチニブ単剤療法,Gefitinib
+ゲフィチニブ療法,Gefitinib
+ゲフチニブ単剤,Gefitinib
+ゲムシタビン,Gemcitabine
+ザーコリ,Crizotinib
+ジェセリ,Dinutuximab
+ジェセリ療法,Pimitespib
+ジオトリフ,
+ジカディア,Ceritinib
+シスプラチン、ビノレルビン,
+シスプラチン、ペメトレキセド,
+シスプラチン＋イリノテカン併用療法,
+シスプラチン＋ドセタキセル＋胸部放射線照射,
+シスプラチン＋ビノレルビン,
+シスプラチン+ペメトレキセド,
+シスプラチン＋ペメトレキセド,
+シスプラチン＋ペメトレキセド＋ベバシズマブ,
+シスプラチン＋ペメトレキセド＋ペムブロリズマブ,
+シスプラチン＋ペメトレキセド＋ペムブロリズマブ療法,
+ジヌツキシマブ,Dinutuximab
+ジュセリ,Dinutuximab
+スーテント,Sunitinib
+スチバーガ,Regorafenib
+スニチニブ,Sunitinib
+スニチニブ治療,Sunitinib
+セリチニブ,
+セリニチブ,
+セルペルカチニブ,
+セルペルカチニブ内服,Selpercatinib
+ソトラシブ,Sorafenib
+ソトラシブ,Sotorasib
+ソトラシブ単剤,
+ソラフェニブ,Sorafenib
+ソラフェニブ＋PLADO療法,"Cisplatin,Doxorubicin,Sorafenib"
+タグリッソ,Osimertinib
+ダコミチニブ,
+ダブラフェニブ・トラメチニブ療法,
+タブレクタ,Capmatinib
+タルセバ,
+タルセバ＋アバスチン,
+ティーエスワン,
+テセントリク,
+テプミトコ,Tepotinib
+テポチニブ,
+デュルバルマブ,
+デュルバルマブ単剤(化学放射線療法後維持)【03 24】,
+ドキソルビシン,Doxorubicin
+ドキソルビシン　イフォスファミド,"Doxorubicin,Ifosfamide"
+ドキソルビシン単剤,Doxorubicin
+ドキソルビシン単剤療法(75mg/㎡)【35 43 05】,Doxorubicin
+ドキソルビシン療法,Doxorubicin
+ドセタキセル,
+ドセタキセル　ラムシルマブ,
+ドセタキセル・ラムシルマブ,
+ドセタキセル＋サイラムザ,
+ドセタキセル＋ラムシルマブ,
+ドセタキセル+ラムシルマブ,
+ドセタキセル＋ラムシルマブ併用療法,
+ドセタキセル単剤,
+ドセタキセル単剤（頭頸部皮膚癌）後発品,Docetaxel
+ドセタキセル療法,
+トラベクテジン,Trabectedin
+トラベクテジン（TBT）療法,Trabectedin
+トラベクテジン療法,Trabectedin
+ナブパクリタキセル単剤,
+ニボルマブ,
+ニボルマブ　イピリマブ,
+ニボルマブ+イピリムマブ,
+ニボルマブ+イピリムマブ+CBDCA+PEM,
+ニボルマブ+イピリムマブ併用療法,"Ipilimumab,Nivolumab"
+ニボルマブ単剤,Nivolumab
+ニボルマブ単剤療法,Nivolumab
+ニボルマブ療法,Nivolumab
+ネダプラチン、ドセタキセル,
+ネダプラチン＋ゲムシタビン＋ビノレルビン,
+ネダプラチン＋ドセタキセル,
+パクリタキセル,Paclitaxel
+ﾊﾟｸﾘﾀｷｾﾙ,Paclitaxel
+ﾊﾟｸﾘﾀｷｾﾙ・Weekly,Paclitaxel
+パゾパニブ,Pazopanib
+ﾊﾟｿﾞﾊﾟﾆﾌﾞ,Pazopanib
+パゾパニブ単剤療法,Pazopanib
+ハラヴェン,Eribulin
+ハラヴェン：１時間,Eribulin
+パラプラチン+タキソテール療法,
+ビジンプロ,
+ビジンプロ（dacomitinib）,
+ビミテスビブ,Pimitespib
+ブリガチニブ,Brigatinib
+ブリグチニブ,Brigatinib
+ブリグチニブ単剤療法,
+ブリグニチブ,Brigatinib
+ペムブロリズマブ,Pembrolizumab
+ペムブロリズマブ単剤,
+ペメトレキセド,
+ペメトレキセド＋ベバシズマブ維持療法,
+ペメトレキセド療法,
+ペンブロリズマブ,Pembrolizumab
+メキニスト単剤療法,Trametinib
+ユニツキシン　Custom Regimen,Dinutuximab
+ユニツキシン療法,Dinutuximab
+ユニツキシン療法,Dinutuximab
+ヨンデリス単剤療法,Trabectedin
+ラムシルマブ＋DTX,
+ラムシルマブ＋ドセタキセル,
+ラムシルマブ+ドセタキセル,
+ラロトレクチニブ,Larotrectinib
+ラロトレクチニブ療法,Larotrectinib
+ランマーク単独療法,Denosumab
+ルマケラス,Sotorasib
+レットヴィモ,
+レットヴィモ単剤,Selpercatinib
+レットヴィモ療法,
+ローブレナ,
+低用量カルボプラチン＋放射線療法,
+入-小-2_小児悪性固形腫瘍/ICE,"Carboplatin,Etoposide,Ifosfamide"
+入-小-367_神経芽腫 NGT+CPA/12kg未満,"Cyclophosphamide,Nogitecan"
+"入-小-562_神経芽腫ｼﾞﾇﾂｷｼﾏﾌﾞCSF（1,3,5ｺｰｽ）2歳以上",Dinutuximab
+共-肺-49_非小細胞肺癌 ｱﾃｿﾞﾘｽﾞﾏﾌﾞ,
+化学放射線治療　CDDP+S-1,
+呼吸　Pembrolizumab+CBDCA+PEM,
+小児神経芽腫 Dinutuximab_CSF q4w,Dinutuximab
+小児神経芽腫 NGT/CPA q4w,"Cyclophosphamide,Nogitecan"
+小児神経芽腫 NGT/ETP(TE) q4w,"Etoposide,Nogitecan"
+肉腫トラベクテジン,Trabectedin
+肺デュルバルマブ,
+肺癌(非小細胞)カルボプラチン・ペメトレキセド・ゲフィチニブ療法,
+軟部 ADM q3w,Doxorubicin
+骨軟部 ICE (IFO/CBDCA/VP-16),"Carboplatin,Etoposide,Ifosfamide"
+骨軟部 ICE (IFO/CBDCA/VP-16),"Carboplatin,Etoposide,Ifosfamide"
