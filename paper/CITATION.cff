@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use FELIS in your research, please cite it as below."
+authors:
+  - family-names: Ikegami
+    given-names: Masachika
+title: "FELIS: Flexible Exploration for LIquid and Solid Tumor Clinical Sequencing Data"
+version: "4.2.3"
+license: MIT
+repository-code: "https://github.com/MANO-B/FELIS"
