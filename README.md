@@ -1,112 +1,131 @@
 ## FELIS for C-CAT database <img src="source/FELIS.png" width=50>
-FELIS（Flexible Exploration for LIquid and Solid tumor clinical sequencing data）for C-CAT database.  
-[English version of this README file](https://github.com/MANO-B/FELIS/blob/main/README_ENG.md).  
+
+FELIS (Flexible Exploration for LIquid and Solid tumor clinical sequencing data) for the C-CAT database.  
+[English version of this README file](readme_eng.md).  
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
 
-### 実際の使用法の解説やTips
-[こちらを参考に使用いただくとわかりやすいと思います。](Tips.md)  
+### Practical usage guide and tips
+You may find it easier to get started by referring to: [Tips.md](Tips.md)
 
 ### Trial Website
-[こちらのサーバー](https://www.felis-portal.com/felis-ccat/)で、ダミーデータを用いたv4.2.3での動作確認が可能です。  
-[こちらのサーバー](https://www.felis-portal.com/felis-cs/)では、実際のC-CATデータを使ったv4.2.3での動作確認が可能です。  
-動作を試したあとは、実際のデータ解析は基本的に以下に記載の手順のとおりLocal環境で実行ください。  
-  
-You can check the web-appli of v3.0.1 on [this server](https://www.felis-portal.com/felis-ccat/).
-Basically, please execute it in a local environment according to the procedure described below (in Japanese only now).  
+You can test v4.2.3 with dummy data on [this server](https://www.felis-portal.com/felis-ccat/).  
+You can test v4.2.3 with actual C-CAT data on [this server](https://www.felis-portal.com/felis-cs/).  
+After trying it out, please run analyses on your local environment following the procedure described below.
 
-### C-CAT利活用データの解析Webアプリ
-国立がん研究センターに設置されている[がんゲノム情報管理センター(C-CAT)](https://www.ncc.go.jp/jp/c_cat/use/index.html)には保険診療で行われたがん遺伝子パネル検査(Comprehensive Genomic Profiling, CGP検査)の結果と臨床情報が集約されています。この情報を学術研究や医薬品等の開発を目的とした二次利活用する仕組みがあります。現状では所属施設の倫理審査とC-CATでの倫理審査を経た研究でのみ使用可能であり、また病院やアカデミア以外の組織では年間780万円の利用料金が必要と敷居が高いですが、類似した海外のデータベースである[AACR project GENIE](https://www.aacr.org/professionals/research/aacr-project-genie/)と比較して薬剤の情報や臨床情報が詳しい点で優れており、希少がん・希少フラクションの研究においてこれまでになかった切り口での解析が可能になると考えられています。  
-  
-C-CATのデータを用いるに当たってはビッグデータかつリアルワールドデータの解析には特有の問題があり、また一定程度のデータ処理を行うプログラミングの知識が必要になります。GUIを用いたソフトウェアにより解析の敷居を下げることで、臨床医の日常診療におけるクリニカルクエスチョンに基づいた探索的研究を容易とし、C-CAT利活用データの活用を促進するために本ソフトウェアを作成しました。Felisはネコの学名であり、C-CAT関連の命名にはネコの名前縛りがあるようです。
+(For reference) You can check the web app of v3.0.1 on [this server](https://www.felis-portal.com/felis-ccat/).  
+Basically, please execute it in a local environment according to the procedure described below (this documentation is currently primarily in Japanese).  
 
-C-CATからデータを入手可能な方のみが本ソフトウェアを使用可能となる現状はご理解ください。  
-使用方法がよく分からない場合はmaikegamあっとncc.go.jpまでご相談ください。  
+### Web application for analyzing secondary-use C-CAT data
+At the National Cancer Center Japan, the [Center for Cancer Genomics and Advanced Therapeutics (C-CAT)](https://www.ncc.go.jp/jp/c_cat/use/index.html) aggregates results of cancer gene panel testing performed as part of insured clinical practice (Comprehensive Genomic Profiling; CGP testing) along with clinical information. A framework exists for secondary use of these data for academic research and pharmaceutical development.
 
-### 解析手法は以下の論文に基づきます
+At present, the data can only be used for studies that have passed ethics review at the user’s institution and at C-CAT. In addition, organizations outside hospitals/academia are required to pay an annual usage fee of 7.8 million JPY, which makes the barrier to entry high. However, compared with a similar overseas database, [AACR Project GENIE](https://www.aacr.org/professionals/research/aacr-project-genie/), C-CAT is advantageous in that it contains more detailed information on drugs and clinical data. It is therefore expected to enable novel analyses, particularly for rare cancers and rare molecular fractions.
+
+Analyzing C-CAT data involves challenges specific to big data and real-world data, and requires some programming knowledge to perform data processing. We developed this software to lower the barrier to analysis by providing a GUI-based tool, thereby facilitating exploratory research based on clinicians’ day-to-day clinical questions and promoting broader utilization of secondary-use C-CAT data. “Felis” is the scientific name for cats, and it seems that C-CAT-related projects often adopt cat-themed naming conventions.
+
+Please understand that currently this software can only be used by those who are able to obtain data from C-CAT.  
+If you are unsure how to use it, please contact: maikegam [at] ncc.go.jp
+
+### The analytical methods are based on the following papers
 > 1) Tamura T et al., Selection bias due to delayed comprehensive genomic profiling in Japan, Cancer Sci, 114(3):1015-1025, 2023.  
-      左側切断バイアスについては[こちらのwebsite](https://github.com/MANO-B/CCAT)も参照ください。
-> 2) Mochizuki T et al., Factors predictive of second-line chemotherapy in soft tissue sarcoma: An analysis of the National Genomic Profiling Database, Cancer Sci, 115(2):575-588, 2024.  
+      For left-truncation bias, please also refer to [this website](https://github.com/MANO-B/CCAT).
+> 2) Mochizuki T et al., Factors predictive of second-line chemotherapy in soft tissue sarcoma: An analysis of the National Genomic Profiling Database, Cancer Sci, 115(2):575-588, 2024.
 
 ### System Requirements
+
 #### Hardware Requirements
-数千例の解析であれば問題ありませんが、数万例の解析を行う場合は32GB以上のメモリが必要です。    
-生存期間解析はStanを用いたモンテカルロ法でのシミュレーションを行います。4コア以上でできるだけ高速なCPUの使用が望まれます。  
+Analyses of several thousand cases should be fine, but analyses of tens of thousands of cases require at least 32 GB of memory.  
+For survival analyses, Monte Carlo simulation is performed using Stan. A CPU with 4 or more cores, and as fast as possible, is recommended.  
 RAM: 4+ GB  
 CPU: 4+ cores  
-  
-3000例、30遺伝子についての生存期間解析を64 GB RAM, M1MAX MacStudioで行った場合、およそ1時間を要します。  
+
+As a reference, when performing survival analysis for 3,000 cases and 30 genes on a Mac Studio (M1 Max) with 64 GB RAM, it takes approximately 1 hour.
 
 #### Software Requirements
+
 #### Docker file
-Dockerを使用可能であれば面倒なインストール作業をせずにすぐに使用開始可能です。  
-Dockerの使用法は[Windows向け](https://qiita.com/hoshimado/items/51c99ccaee3d4222d99d)や[MacOS向け](https://www.kagoya.jp/howto/cloud/container/dockerformac/)を参照ください。  
-Docker desktop使用時は、CPUは4コア以上、メモリは[可及的に大きく設定](https://dojo.docker.jp/t/topic/52)ください。  
-FELISのDocker fileは[Docker-hub](https://hub.docker.com/r/ikegamitky/)に登録しています。  
-```
-# 先にDocker desktopを起動しておきます
-# Windowsはコマンドプロンプト、Macはターミナルで以下を実行
-# 適宜sudoで実施ください
-# バージョンアップを行う場合もこのコマンドを実行します
+If you can use Docker, you can start using FELIS immediately without complicated installation steps.  
+For how to use Docker, please refer to guides for [Windows](https://qiita.com/hoshimado/items/51c99ccaee3d4222d99d) or [macOS](https://www.kagoya.jp/howto/cloud/container/dockerformac/).  
+When using Docker Desktop, please set CPU to 4+ cores and memory as large as possible (see [this tip](https://dojo.docker.jp/t/topic/52)).  
+FELIS Docker images are available on [Docker Hub](https://hub.docker.com/r/ikegamitky/).  
+
+```bash
+# Start Docker Desktop in advance.
+# On Windows: use Command Prompt. On macOS: use Terminal.
+# Use sudo where appropriate.
+# Run the same command when upgrading.
 docker pull ikegamitky/felis:latest
 
-# バージョンアップが不調の時は、以下の例の様にlatestを変更して直接バージョンを指定するとよいかもしれません。
-# この場合は以降のコマンドにおけるlatestの記載も対応するバージョンに変更して実行します。
+# If upgrading fails, specifying a version explicitly (instead of "latest") may help.
+# In that case, replace "latest" in the commands below accordingly.
 Intel: docker pull ikegamitky/felis:1.6.5
 Apple silicon Mac: docker pull ikegamitky/felis:1.6.5.mac
 
-# 古いソフトが動き続けてしまっているばあいは、以下で終了します。
+# If an old container keeps running, stop and remove it as follows:
 docker ps -a
 docker kill [container id]
 docker rm [container id]
 ```
-使用時は以下のコマンドを入力し、ブラウザで **[http://localhost:3838](http://localhost:3838)** にアクセスするとFELISが起動します。  
-```
+
+To run FELIS, execute the following command and then access **http://localhost:3838** in your browser.
+
+```bash
 docker run -d --rm -p 3838:3838 ikegamitky/felis:latest R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)'
 
-##上記で動かない場合は以下を
-# Docker containerを起動
+## If the above does not work, try the following:
+# Start a Docker container interactively
 docker run -it --rm -p 3838:3838 ikegamitky/felis:latest R
-# Rで以下の2行を実行
+# Run the following two lines in R:
 library(shiny)
 runApp("/srv/shiny-server/felis-cs", launch.browser=F)
 ```
-サーバーでFELISを起動する場合、ターミナルから以下のコマンドを入力後はssh接続は不要です。  
-接続先のIPアドレスが172.25.100.1であれば、ブラウザで **[http://172.25.100.1:3838](http://172.25.100.1:3838)** にアクセスするとFELISが起動します。  
-```
+
+When launching FELIS on a server, after entering the following command from the terminal, you no longer need to keep the SSH session open.  
+If the server IP address is 172.25.100.1, access **http://172.25.100.1:3838** in your browser.
+
+```bash
 # ssh username@servername
 docker run -d -p 3838:3838 ikegamitky/felis:latest nohup shiny-server
 # exit
 ```
-Dockerを使用する場合は**解析ファイルの読み込み**セクションまで飛ばしてください。  
-  
+
+If you use Docker, you can skip ahead to the **Loading analysis files** section.
+
 ##### R language
-適宜[ウェブサイト](https://syunsuke.github.io/r_install_guide_for_beginners/03_installation_of_R.html)を参照しRを導入ください。  
-特にバージョンの指定はありませんが、本ソフトウェアはv4.3.2を使用して作成しました。  
-以下、[コマンドラインからRを起動して作業を行います。](http://kouritsu.biz/installing-r-on-mac/)  
+Please install R by referring to an appropriate guide (e.g., [this website](https://syunsuke.github.io/r_install_guide_for_beginners/03_installation_of_R.html)).  
+No specific version is required, but this software was developed using R v4.3.2.  
+Below, we will work by launching R from the command line (see: [example guide](http://kouritsu.biz/installing-r-on-mac/)).
+
 ##### Rstan
-こちらの[RStan Getting Started (Japanese)](https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started-(Japanese))を参照ください。  
-- MacOSでのインストールには[Xcode CLT](https://qiita.com/payreikit/items/4bb0f863afc7b56d0809)が必要で、さらに[macrtools](https://mac.thecoatlessprofessor.com/macrtools/)を[github](https://github.com)からインストールする関係でgithubへのアカウント登録が必要です。[こちらのウェブサイト](https://qiita.com/tsutsumin_pro/items/52a483d67c9b9e490d76)を参照ください。  
-- WindowsでのインストールはRのバージョンに合わせて[Rtools](https://github.com/stan-dev/rstan/wiki/Configuring-C---Toolchain-for-Windows)をインストールください。  
-- Linuxでのインストールは[適宜](https://github.com/stan-dev/rstan/wiki/Configuring-C-Toolchain-for-Linux)実施ください。  
-```
-## MacOSの場合
-## githubに登録し、PATを入手する
-### 1. Sign in github.
-### 2. Access Settings - Developer Settings in the Dashboard.
+Please refer to [RStan Getting Started (Japanese)](https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started-(Japanese)).  
+
+- For macOS installation, [Xcode CLT](https://qiita.com/payreikit/items/4bb0f863afc7b56d0809) is required, and because you will install [macrtools](https://mac.thecoatlessprofessor.com/macrtools/) from [GitHub](https://github.com), you will need a GitHub account. See also [this page](https://qiita.com/tsutsumin_pro/items/52a483d67c9b9e490d76).  
+- For Windows, install [Rtools](https://github.com/stan-dev/rstan/wiki/Configuring-C---Toolchain-for-Windows) matching your R version.  
+- For Linux, follow the instructions [as appropriate](https://github.com/stan-dev/rstan/wiki/Configuring-C-Toolchain-for-Linux).
+
+```r
+## For macOS
+## Create a GitHub account and obtain a PAT (Personal Access Token)
+### 1. Sign in to GitHub.
+### 2. Open Settings → Developer settings.
 ### 3. Generate a Personal access token (classic) without any checkboxes.
 ### 4. Copy the generated token.
-## ターミナルで以下のコマンドを実行しCommand Line Tools for Xcodeのインストールを行う　
+
+## In Terminal, install Command Line Tools for Xcode:
 xcode-select --install
-## ターミナルで以下のコマンドを実行しHomebrewのインストールを行う　
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-## ターミナルで以下のコマンドを実行しlibompのインストールを行う　
+
+## In Terminal, install Homebrew:
+ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+## In Terminal, install libomp:
 brew install libomp
-# OpenMPライブラリのパスをRに伝えるコマンド
+
+# Commands to tell R the OpenMP library path
 export PKG_LIBS="-fopenmp"
 export PKG_CPPFLAGS="-I/usr/local/opt/libomp/include -Xpreprocessor -fopenmp"
-## Rコンソールで以下のコマンドを実行する
+
+## In the R console, run:
 install.packages("remotes")
-remotes::install_github("coatless-mac/macrtools", auth_token = "入手したPAT")
+remotes::install_github("coatless-mac/macrtools", auth_token = "<YOUR_PAT>")
 options(timeout=1000)
 macrtools::macos_rtools_install()
 dotR <- file.path(Sys.getenv("HOME"), ".R")
@@ -119,63 +138,70 @@ cat(paste("\nCXX17FLAGS += -O3 -mtune=native -arch", arch, "-ftemplate-depth-256
 install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 
 
-## Windowsの場合
-## Rtoolsをインストールする
+## For Windows
+## Install Rtools:
 https://k-metrics.github.io/cabinet/env_install_tls.html
 https://cran.r-project.org/bin/windows/Rtools/
-## Visual Studio のインストール
-## インストール時に、必ず**「C++によるデスクトップ開発」**というワークロードを選択してください。
+
+## Install Visual Studio
+## During installation, be sure to select the workload: **Desktop development with C++**
 https://visualstudio.microsoft.com/ja/vs/community/
-## Rコンソールで以下のコマンドを実行する
+
+## In the R console, run:
 install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 
 
-## Linuxの場合
-## Ubuntu/Debian系の場合: ターミナルで以下を実行します。
+## For Linux
+## For Ubuntu/Debian:
 Bash
 sudo apt-get install -y build-essential cmake git
-## CentOS/RHEL系の場合: ターミナルで以下を実行します。
+
+## For CentOS/RHEL:
 Bash
 sudo yum install -y gcc-c++ cmake git
-## Rコンソールで以下のコマンドを実行する
+
+## In the R console, run:
 install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 ```
+
 ##### Shiny
-Webアプリとするために[Shiny](https://shiny.posit.co)を使用しました。
-```
+We use [Shiny](https://shiny.posit.co) to build the web application.
+```r
 install.packages("shiny")
 ```
+
 ##### Package dependencies
-依存しているパッケージ群を`R`ターミナルからインストールください。  
-依存するライブラリ群を必要に応じてapt/brewなどでinstallすることになり大変ですので、Dockerの使用が望まれます。  
-```
+Please install dependent packages from the `R` console/terminal.  
+Because installing all required system libraries via apt/brew etc. can be burdensome, using Docker is strongly recommended.
+
+```r
 install.packages(c(
   # Shiny / UI
   "shinyBS","shinyjqui","shinyWidgets","shinydashboard","DT","shinythemes","markdown",
 
   # Data handling / plotting
   "dplyr","tidyr","readr","stringr","forcats","data.table",
-  "ggplot2","scales","RColorBrewer","ggsci","ggrepel","patchwork","gridExtra","ggiraph"
+  "ggplot2","scales","RColorBrewer","ggsci","ggrepel","patchwork","gridExtra","ggiraph",
 
   # Tables / reporting
   "gt","gtsummary","flextable",
 
   # Survival / stats
   "survival","survminer","survRM2","flexsurv","rms","PropCIs","pROC",
-  "Matching","dcurves","MatchIt","cobalt"
+  "Matching","dcurves","MatchIt","cobalt",
 
   # ML core (tidymodels meta)
   "tidymodels",
 
-  # ML extras / models (tidymodels周辺)
-  "mltools","bonsai","discrim","klaR","probably","ranger","lightgbm","partykit","rpart","bigstep","twang"
+  # ML extras / models (tidymodels ecosystem)
+  "mltools","bonsai","discrim","klaR","probably","ranger","lightgbm","partykit","rpart","bigstep","twang",
 
   # Dimension reduction / clustering
   "umap","dbscan",
 
   # misc
   "httr","plyr","withr","blorr","betacal",
-  "sjPlot","sjlabelled","aws.s3"
+  "sjPlot","sjlabelled","aws.s3",
 
   # install helpers
   "BiocManager","RcppParallel","remotes"
@@ -193,41 +219,46 @@ install.packages("tranSurv")
 # Windows user
 install.packages("qs2")
 
-# On x64 Mac or Linux, you can enable multi-threading by compiling from source. It is enabled by default on Windows.
+# On x64 Mac or Linux, you can enable multi-threading by compiling from source.
+# It is enabled by default on Windows.
 remotes::install_cran("qs2", type = "source", configure.args = "--with-TBB --with-simd=AVX2")
 
-# On non-x64 systems (e.g. Mac ARM) remove the AVX2 flag.
+# On non-x64 systems (e.g., Mac ARM), remove the AVX2 flag.
 remotes::install_cran("qs2", type = "source", configure.args = "--with-TBB")
 
 
-# drawProteinsのインストールが上手くいかない場合
-# githubのサインイン、PATの発行を行った上で以下を実行
-remotes::install_github('brennanpincardiff/drawProteins', auth_token = "入手したPAT")
+# If installation of drawProteins fails:
+# After signing in to GitHub and issuing a PAT, run:
+remotes::install_github('brennanpincardiff/drawProteins', auth_token = "<YOUR_PAT>")
 
-# Rのバージョンによりrmsのインストールが上手くいかない場合
-# versionは以下URLを確認し適宜変更ください
+# If installation of rms fails due to your R version:
+# Check the appropriate version here and change as needed:
 # https://cran.r-project.org/src/contrib/Archive/rms/
 install.packages("remotes")
 remotes::install_version(package = "rms", version = "6.7.0", dependencies = FALSE)
 ```
 
-##### Rの設定  
-[Rstudio](https://posit.co/download/rstudio-desktop/)の使用をお勧めします。  
-Figureの日本語表示が上手くいかない場合は[こちら](https://ill-identified.hatenablog.com/entry/2021/09/10/231230)を参照ください。  
-  
-### FELISの起動
-- FELISのダウンロード  
-使用するバージョンのFELISのZIPファイルをダウンロードし、適当なフォルダにダウンロード・解凍してください。
-```
+##### R settings
+We recommend using [RStudio](https://posit.co/download/rstudio-desktop/).  
+If Japanese characters are not displayed properly in figures, please refer to [this post](https://ill-identified.hatenablog.com/entry/2021/09/10/231230).
+
+### Launching FELIS
+
+- Downloading FELIS  
+Download the ZIP file for the version you want to use, and extract it to a suitable folder.
+
+```bash
 wget https://github.com/MANO-B/FELIS/raw/main/felis_latest.zip
 unzip felis_latest.zip
-```  
-ここでは"/srv/shiny-server/felis-cs"とします。  
-
-- FELISの起動
-以下のコマンドでWebアプリが起動します。  
-Rstudioですと画面の右上に表示されるRun Appボタンから起動できます。  
 ```
+
+In this README, we assume the installation directory is `/srv/shiny-server/felis-cs`.
+
+- Starting FELIS  
+Run the following commands to start the web application.  
+In RStudio, you can also start it by clicking the **Run App** button shown in the upper-right.
+
+```r
 $ R
 
 R version 4.3.2 (2023-10-31) -- "Eye Holes"
@@ -236,255 +267,268 @@ Platform: aarch64-apple-darwin20 (64-bit)
 .
 .
 .
-'help.start()' で HTML ブラウザによるヘルプがみられます。 
-'q()' と入力すれば R を終了します。
+Type 'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
 
 > library(shiny)
 > runApp('/srv/shiny-server/felis-cs', launch.browser=T)
 ```
+
 <img src="source/appli_GUI.png"  height=500>  
 
-### 解析ファイルの読み込み
-- 解析ファイルの入手
-まずは解析したい症例の情報をC-CAT利活用検索ポータルからダウンロードします。
-設定を英語ではなく日本語バージョンとし、症例を選択した上で、以下の画像の通り  
-・レポートCSV（全データ出力）  
-・症例CSV（全データ出力）  
-の2つのファイルをダウンロードします。ZIPファイルは解凍せずそのまま使用可能です。
-お試し用のダミーデータをダウンロード可能です。  
+### Loading analysis files
+
+- Obtaining analysis files  
+First, download the information for the cases you wish to analyze from the C-CAT secondary-use search portal.  
+Set the portal language to Japanese (not English), select cases, and download the following two files as shown in the screenshots below:
+
+- Report CSV (full data output)  
+- Case CSV (full data output)
+
+The ZIP files can be used without extracting.  
+Dummy data for testing can also be downloaded.
+
 <img src="source/report.png"  height=300>　　<img src="source/case.png" height=300>
 
-**Input C-CAT files**タブを開きます。  
-ダウンロードした症例CSVとレポートCSVを、画面左上のBrowse...ボタンから選択して読み込みます。  
-複数のファイルを選択肢読み込むことも可能です。  
-その他、オプションとして薬剤や組織型を変更する対応表の入力も可能です。  
+Open the **Input C-CAT files** tab.  
+Select and load the downloaded Case CSV and Report CSV from the **Browse...** buttons at the top-left of the screen.  
+You can also load multiple files at once.  
+Optionally, you can provide mapping tables to rename drugs and histology categories.
 
-### 解析対象の指定  
-**Setting**タブを開きます。  
-**Start file loading/analysis settings**ボタンを押すと設定項目が表示されます。  
-多数の項目が設定可能です。  
+### Specifying the analysis cohort
+
+Open the **Setting** tab.  
+Click **Start file loading/analysis settings** to display configuration options.  
+Many settings are available.
+
 <img src="source/setting.png"  height=300>  
 
-#### 組織型に関するフィルタ  
+#### Filters related to histology
 - Filter by histology  
-　　解析対象とする組織型の絞り込みを行います。  
+    Narrow down the histologic types to be analyzed.  
 - Histology type to be analyzed  
-　　一つの組織型として扱って解析したい組織型群を選択します(なければ未選択)。  
+    Select a group of histologies that you want to treat as a single histologic category for analysis (leave unselected if not needed).  
 - Name for histology type  
-　　まとめて解析したい組織型を代表する名前を選択します。  
+    Specify a representative name for the merged histology category.  
 - Minimum patients for each histology  
-　　稀な組織型は発生部位に名前を変更して解析できます。  
-　　解析する組織型の最小症例数を設定します。  
-  
-#### 臨床事項に関するフィルタ  
+    Rare histologies can be analyzed by renaming them to the primary site name.  
+    Set the minimum number of patients per histology to keep as-is.
+
+#### Filters related to clinical variables
 - Filter by sex  
-　　解析対象とする性別の絞り込みを行います。  
+    Filter by sex.  
 - Filter by panel  
-　　解析対象とするがん遺伝子パネル検査の絞り込みを行います。  
+    Filter by the CGP panel.  
 - Age for analysis  
-　　解析対象とする年齢の絞り込みを行います。  
+    Filter by age.  
 - Threshold age for oncoprint  
-　　OncoprintでのYoung/Oldの分類の閾値を設定します。  
+    Set the threshold for the Young/Old classification in Oncoprint.  
 - Filter by performance status  
-　　解析対象とするPSの絞り込みを行います。  
+    Filter by PS.  
 - Filter by smoking status  
-　　解析対象とする喫煙歴の絞り込みを行います。  
+    Filter by smoking history.  
 - Filter by test-year  
-　　検査を実施した年の絞り込みを行います。  
-  
-#### 遺伝子に関するフィルタ  
+    Filter by the year in which CGP testing was performed.
+
+#### Filters related to genes
 - Genes of interest (if any)  
-　　Oncoprintや生存期間解析等で優先する遺伝子を選択します。  
+    Select genes to prioritize in Oncoprint and survival analyses.  
 - Gene-set of interest (if any)  
-　　とくに注目する遺伝子セットがあれば選択します。  
+    Select a gene set of special interest, if applicable.  
 - Case selection based on the mutations  
-　　変異を有する症例・有さない症例のみを選択して解析可能です。
+    You can restrict the cohort to only cases with (or without) specific mutations.  
 - Genes for lolliplot (if any)  
-　　注目する遺伝子を選択してください。完全な描画にはInternet接続が必要です。  
-　　Internet接続がない場合は簡易表示します。  
-　　[Mutplot](https://github.com/VivianBailey/Mutplot)のスクリプトを使用しています。  
+    Select genes of interest. Internet access is required for full rendering.  
+    If there is no Internet access, a simplified view will be used.  
+    This feature uses scripts from [Mutplot](https://github.com/VivianBailey/Mutplot).  
 - Threshold mutation count for lolliplot  
-　　頻度の高い変異を強調するための設定です。  
-　　
-#### 変異の種類に関するフィルタ  
+    A setting to highlight frequent mutations.
+
+#### Filters related to variant types
 - Gene to analyze (if any)  
-　　特に変異の部位やパターンなどを詳細にみたい遺伝子を選択します。  
-　　例：EGFR TKD変異  
+    Select a gene for which you want to examine detailed mutation sites/patterns.  
+    Example: EGFR TKD mutations  
 - Variants  
-　　一つの変異パターンとしてまとめて解析する変異を選択します。  
+    Select variants to be grouped and analyzed as a single mutation pattern.  
 - Name for variants  
-　　変異パターンを命名します。  
-- Pathological significance of the genes    
-　　この遺伝子のみ解析対象とする病的意義を変更可能です。  
+    Name the mutation pattern.  
+- Pathological significance of the genes  
+    You can change the pathological significance categories only for this gene.  
 - Treat specified variants independently?  
-　　指定した変異のみを一つの遺伝子として扱うことが可能です。  
-　　例：EGFR TKD変異をEGFR_TKD遺伝子にリネーム  
-  
-#### その他の設定  
+    You can treat specified variants as if they were a single “gene.”  
+    Example: rename EGFR TKD mutations to EGFR_TKD.
+
+#### Other settings
 - Gene number for oncoprint  
-　　Oncoprintや生存期間解析で対象とする遺伝子の絞り込みを行います。  
-　　特に生存期間解析にかかる時間に影響が出ます。  
-- Oncoprintの表示  
-　　Oncoprintにおけるソートの順序を設定します。
+    Limit the number of genes shown in Oncoprint and survival analyses.  
+    This affects computation time, especially for survival analyses.  
+- Display order of Oncoprint  
+    Configure the sorting order in Oncoprint.  
 - Variants for analysis  
-　　がん化変異のみ解析するか、病的意義に関わらず全ての変異を解析するか選択します。
+    Choose whether to analyze only oncogenic variants or all variants regardless of clinical significance.  
 - How to analyze fusion genes  
-　　パートナー遺伝子が多数ある場合には一つ一つの数が少なくなります。  
-　　NTRK fusion, ALK fusionのようにまとめて解析するかどうか選択します。  
+    When there are many partner genes, each partner may have only a small number of cases.  
+    Choose whether to group fusion genes (e.g., NTRK fusion, ALK fusion) for analysis.  
 - Distance value for DBSCAN clustering  
-　　クラスタリング解析において弁別する距離の閾値を設定します。  
+    Set the distance threshold used in clustering.  
 - Timing for RMST measuring  
-　　Restricted mean survival time解析を行う時点を指定します。  
+    Specify the time point for Restricted Mean Survival Time (RMST) analysis.  
 - CTx lines to analyze  
-　　解析対象とする薬剤のラインを指定します。  
-　　1st-lineのみ指定すると、前治療との比較が実施されません。  
-   
-### 解析の実行  
-Analysisタブを開きます。  
-多数の解析が可能です。説明文が適宜最下部に表示されます。  
-各ボタンに対応したタブに結果が表示されます。  
-表示された図は.pngの拡張子で保存可能です。  
+    Specify the lines of therapy to analyze.  
+    If you select only 1st-line, comparisons with prior therapy will not be performed.
+
+### Running analyses
+
+Open the **Analysis** tab.  
+Many analyses are available. Explanatory text appears at the bottom as needed.  
+Results are shown in the tabs corresponding to each button.  
+Displayed figures can be saved as `.png`.
+
 <img src="source/analysis.png"  height=300>  <img src="source/examples.png"  height=300> 
-  
-#### 症例のまとめを表示  
-選択した症例のまとめを**Case summary**タブに表示します。  
-- 変異パターンで分類して**Summarized by mutation pattern**タブに表示します。  
-- 組織型で分類して**Summarized by histology**タブに表示します。  
 
-#### パネル間の変異数の比較
-- パネルごとの変異のVAFの分布を**Comparison figure**タブに表示します。  
-- 組織型とパネルごとにTMBや変異数をまとめた表を**Comparison figure**タブに表示します。  
-  
-#### Oncoprintを表示  
-- 選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
-- 選択した遺伝子のLolliplotを**Lolliplot for the selected gene**タブに表示します。Internet接続が必要です。
-    上手く表示されない場合はsource/UniProt.txtに[Uniprot ID](https://www.uniprot.org)を追記してください。  
-- 症例の表を**Table of clinical and mutation information per patient**タブに表示します。左上のボタンからダウンロードが可能です。  
-    
-#### 相互排他・共変異を表示
-- [Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995)を用いた遺伝子変異感の相互排他性解析結果を**Mutual exclusivity**タブに表示します。  
-    青が相互排他的、赤が共変異の関係にあることを意味します。  
-    P<0.001の場合にアスタリスクが表示されます。  
-  
-#### 組織型ごとの各遺伝子の変異率を表示  
-- 変異頻度の高い遺伝子について、組織型ごとの遺伝子変異の頻度を**Variation by histology**タブに表示します。  
-  
-#### 遺伝子変異に基づくクラスタリング  
-変異遺伝子に基づくクラスタリングを[UMAP](https://arxiv.org/abs/1802.03426)および[DBSCAN](https://cdn.aaai.org/KDD/1996/KDD96-037.pdf)を用いて実施します。
-結果は**Clustering analysis**タブ以下に表示します。  
-- 各組織型ごとの基礎的情報について**Basic data**タブに表示します。  
-    - Driver: がん化変異が一つ以上検出された症例の割合  
-    - optionおよびtreat: エキスパートパネルで推奨治療があった・治療を受けた頻度(％)  
-    - time_before_CGP: 緩和的化学療法開始からCGP検査までのmedian survival (days)。  
-    - time_after_CGP: CGP検査から死亡までについてのmedian survival (days)。  
-- 各クラスタに集積している組織型や遺伝子変異を**UMAP clustering based on mutations**タブに表示します。  
-    P<0.05で集積している組織型を、他のクラスタと比較したオッズ比が高い順に3つまで表示します。  
-    P<0.05で集積している遺伝子変異を、他のクラスタと比較したオッズ比が高い順に3つまで表示します。  
-- 各クラスタにおける年齢層を**Cluster and age relationship**タブに表示します。  
-- 各クラスタにおける組織型を**Cluster and histology relationship**タブに表示します。  
-- 各組織型が少数のクラスタに集積するのか多数のクラスタに分布するのかをエントロピーとして**Heterogeneity within histologic types**タブに表示します。  
-    Shannon entropyで計算しています。低い値ほど集積傾向があります。  
-- クラスタと組織型の関係性についての表を**Table of clusters and histologies**タブに表示します。  
-    左上のボタンからダウンロードが可能です。  
-- クラスタと遺伝子変異の関係性についての表を**Table of clusters and genetic variants**タブに表示します。  
-    左上のボタンからダウンロードが可能です。  
-- 各組織型のうちEvidence levelのある薬剤に対応する変異が検出された頻度を**Frequency of patients with targeted therapy**タブに表示します。  
-    高いEvidence levelに統一：Evidence level Aの薬剤とBの薬剤の両方がある患者はAとしています。  
-- 各組織型の化学療法開始からCGP検査まで、およびCGP検査から死亡までの平均生存期間の関係を**Relationship between pre-CGP and post-CGP periods**タブに表示します。  
-- 各組織型の症例数と治療についての情報の関係を**Patients per histology and treatment reach rate**タブに表示します。  
-    患者数とEvidence level A, B以上, C以上の薬剤がある割合を散布図としました。  
-    患者数と推奨治療がある割合、推奨治療を受けた割合、推奨治療がある患者が推奨治療を受けた割合を散布図としました。  
-- 各組織型のCGP検査までの期間と治療についての情報の関係を**Pre-CGP period and treatment reach rate**タブに表示します。  
-- 各組織型のCGP検査後の生存期間と治療についての情報の関係を**Post-CGP period and treatment reach rate**タブに表示します。  
-- 各組織型の平均年齢と治療についての情報の関係を**Age and treatment reach rate**タブに表示します。  
-  
-#### CGP検査後の生存期間解析  
-遺伝子変異、治療内容、PSなどに着目したCGP検査後の生存期間解析を実施します。
-log-log transformationを用いて95%信頼区間を算出します。  
-どのような患者が予後不良で早期のCGP検査が推奨されるかがみえてきます。  
-結果は**Survival after CGP**タブ以下に表示します。  
-- 推奨治療の有無や治療内容で群分けをした生存期間解析を**Survival and treatment after CGP**タブに表示します。  
-    UnrecomTreat(+): 推奨治療以外の治療を受けた患者  
-    RecomTreat(+): 推奨治療を受けた患者  
-    Treat(-): CGP検査後に治療を受けなかった患者  
-- 組織型、PS、遺伝子変異の有無で群分けをした生存期間解析を**Survival after CGP and performance status**タブに表示します。  
-- 過去の治療の最良総合効果や治療コース数で群分けをした生存期間解析を**Survival after CGP and previous treatment**タブに表示します。  
-    遺伝子変異の解析は、注目する遺伝子があればいずれかに変異があるか否かで群分けされます。  
-- 遺伝子変異の有無で群分けをしたmedian survival (days)を**Survival after CGP and mutations, forest plot**タブに表示します。  
-    変異頻度が少ない場合は95％信頼区間が表示されません。  
-- 遺伝子変異の有無で群分けをしたKaplan-Meier survival curveを**Survival after CGP and mutations, KM-curve**タブに表示します。  
-- CGP検査後の死亡に関するハザード比のforest plotを**Hazard ratio for survival after CGP**タブに表示します。  
-    95%以上一致する因子は多重共線性があると判断し除外しています。  
-    死亡イベントが2以下の因子は結果が表示されません。  
-- 推奨治療を受けるかどうかを予測するノモグラムを**Factors leading to Treatment, pre-CGP, Nomogram**タブに表示します。  
-- **推奨治療がある患者が**推奨治療を受けるかどうかを予測するノモグラムを**Factors leading to Treatment, post-CGP, Nomogram**タブに表示します。  
-- 推奨治療を受けるかどうかの因子を**Factors leading to Treatment, pre-CGP, Odds ratio**タブに表示します。  
-- **推奨治療がある患者が**推奨治療を受けるかどうかの因子を**Factors leading to Treatment, post-CGP, Odds ratio**タブに表示します。  
-- 推奨治療を受けるかどうかのノモグラムの性能を[Decision curve analysis](https://mskcc-epi-bio.github.io/decisioncurveanalysis/index.html)で評価し**Factors leading to Treatment, decision curve**タブに表示します。
-  結果の考え方については[こちら](https://github.com/MANO-B/FELIS/blob/main/decision_curve_analysis.md)を参照ください。  
-- Decision curve analysisの詳細を**Factors leading to Treatment, table**タブに表示します。  
-    
+#### Show cohort summary
+Show a summary of selected cases in the **Case summary** tab.
+- Summarized by mutation pattern → shown in **Summarized by mutation pattern**.  
+- Summarized by histology → shown in **Summarized by histology**.
 
-#### 化学療法導入の生存期間解析(時間がかかります)  
-左側切断バイアスを考慮した緩和的化学療法導入後の生存期間解析を実施します。
-Stanを用いたシミュレーションのため解析が数十分のオーダーで時間を要します。
-結果は**Survival after CTx**タブ以下に表示します。  
-- 左側切断バイアスを補正した場合、Number at riskで補正した場合、シミュレーションで補正した場合の生存期間解析を**Survival corrected for left-truncation bias**タブに表示します。  
-- 注目する遺伝子の変異の有無で群分けをした生存期間解析を**Survival corrected for left-truncation bias**タブに表示します。  
-    遺伝子変異の解析は、注目する遺伝子があればいずれかに変異があるか否かで群分けされます。  
-    注目する遺伝子がなければもっとも変異頻度が高い遺伝子に変異があるか否かで群分けされます。  
-- 遺伝子変異の有無でmedian survival の差分(days)を計算した結果を**Genetic variants and survival, forest plot**タブに表示します。  
-    死亡イベントが少ない場合は結果が表示されません。  
-- 遺伝子変異の有無で群分けをしたsurvival curveを**Genetic variants and survival, KM-curve**タブに表示します。  
-  
-#### Palliative CTxで使用した薬剤リスト(1st-4th line)  
-- 緩和目的の化学療法の1st-4th lineで使用されたレジメンを抽出し**Analysis**タブ中に表示します。
-以後の解析で注目する薬剤を選択します。  
-入力が不正確と思われる場合があるため、傾向をみる程度の使用が望ましいです。  
-  
-#### 上記ボタンで選択した薬剤の奏効性解析  
-Treatment on time (ToT)に着目して薬剤の奏効期間と遺伝子変異や組織型の関係性を評価します。  
-結果は**Drug response**タブ以下に表示します。  
-- 全薬剤の情報を治療ライン別にまとめて**Drug use, by line of treatment**タブに表示します。  
-- 全薬剤の情報を治療効果別にまとめて**Drug use, by treatment effect**タブに表示します。  
-- 指定ラインの薬剤の情報を変異パターン別にまとめて**Use of designated line agents, by mutation pattern**タブに表示します。  
-- 指定ラインの薬剤の情報を組織型別にまとめて**Use of designated line agents, by histology**タブに表示します。  
-- 指定ラインの薬剤の情報を注目する遺伝子変異別にまとめて**Use of designated line agents, by mutated genes**タブに表示します。  
-- ToTの情報がある指定ライン・指定薬剤の情報を変異パターン別にまとめて**Use of designated lines and drugs with ToT information, by mutation pattern**タブに表示します。  
-- ToTの情報がある指定ライン・指定薬剤の情報を組織型別にまとめて**Use of designated lines and drugs with ToT information, by histology**タブに表示します。  
-- ToTの情報がある指定ライン・指定薬剤の情報を注目する遺伝子変異別にまとめて**Use of designated lines and drugs with ToT information, by mutated genes**タブに表示します。  
-- RESICTの情報がある指定ライン・指定薬剤の情報を変異パターン別にまとめて**Use of designated lines and drugs with RECIST information, by mutation pattern**タブに表示します。  
-- RESICTの情報がある指定ライン・指定薬剤の情報を組織型別にまとめて**Use of designated lines and drugs with RECIST information, by histology**タブに表示します。  
-- RESICTの情報がある指定ライン・指定薬剤の情報を注目する遺伝子変異別にまとめて**Use of designated lines and drugs with RECIST information, by mutated genes**タブに表示します。  
-- 注目する薬剤のToTと、その前治療のToTの関係性のwaterfall plotと散布図を**Time on treatment and pre-treatment for the specified treatment, scatter plot**タブに表示します。  
-    打ち切り症例は除いています。  
-- 注目する薬剤のToTと、その前治療のToT・他の薬剤のToTとの比較、遺伝子変異とToTの関係についてのKaplan-Meier survival curveを**Time on treatment and pre-treatment for the specified treatment, KM-curve**タブに表示します。  
-- 注目する薬剤と組織型に関するToTのKaplan-Meier survival curveを**Time on treatment by tissue type, KM-curve**タブに表示します。  
-- 注目する薬剤と遺伝子変異クラスタに関するToTのKaplan-Meier survival curveを**Time on treatment by gene mutation cluster, KM-curve**タブに表示します。  
-- 注目する薬剤と遺伝子変異の有無に関するToTのmedian OSのforest plotを**Time on treatment by mutated genes, forest plot**タブに表示します。  
-- 注目する薬剤と遺伝子変異の有無に関するToTのKaplan-Meier survival curveを**Time on treatment by mutated genes, KM-curve**タブに表示します。  
-- ToTと注目する遺伝子、注目する変異パターンの関係についてのKaplan-Meier survival curveを**Time on treatment and mutations of interest, KM-curve**タブに表示します。  
-- 治療中断に至る要因のHazard ratioの表を**Hazard ratio on time on treatment**タブに表示します。  
-- Objective responseに至る要因のOdds ratioの表を**Odds ratio on objective response rate**タブに表示します。  
-- Disease controlに至る要因のOdds ratioの表を**Odds ratio on disease control rate**タブに表示します。  
-- 遺伝子変異クラスタごとの奏効性の表を**Mutation clustering and RECIST**タブに表示します。  
-    Clopper–Pearson法を用いて95%信頼区間を算出します。  
-- 変異パターンごとの奏効性の表を**Mutation pattern and RECIST**タブに表示します。  
-- 組織型ごとの奏効性の表を**Histology and RECIST**タブに表示します。  
-- 遺伝子変異ごとの奏効性の表を**Mutated genes and RECIST**タブに表示します。
-- CGP後に使用した薬剤ごとにCGP検査後の生存曲線を**Survival and drug**タブに描画します。  
-  
-#### 説明
-ソフトの使用法などを**Instruction**タブに表示します。  
-　　
-### 今後の予定
-- Pathway間の相互排他性解析を追加  
-- 診断時からの生存期間解析を追加(診断時のstageが登録されている症例が増えればその群分けを追加)  
-- HER2免疫染色、MSIなどパネル検査前に行われた検査の結果と、パネル検査による遺伝子変異と、どちらがより薬剤奏効性を予測するかの解析を追加  
-- Liquid sequencingにおけるvariant frequencyと薬剤奏効性の関連性の解析を追加  
-- VUSも含めて組織型間での変異集積パターンの相違を評価
-- 関数のモジュール化  
+#### Compare mutation counts between panels
+- Show the distribution of VAF by panel in **Comparison figure**.  
+- Show a table summarizing TMB and mutation counts by histology and panel in **Comparison figure**.
 
-### C−CATのデータベースのバージョンごとのFELIS推奨バージョン  
-C-CATのデータはバージョンごとに列名が追加・変更されることがあるため、FELISの適合するバージョンが必要です。  
-C-CAT database version 20240621 ~ 20241217: FELIS version 1.10.3  
+#### Display Oncoprint
+- Display genetic alterations for selected cases in **Oncoprint**.  
+- Display a lollipop plot for the selected gene in **Lolliplot for the selected gene** (Internet required).  
+  If it does not display correctly, add the appropriate [UniProt ID](https://www.uniprot.org) to `source/UniProt.txt`.  
+- Display a patient-level table in **Table of clinical and mutation information per patient**. You can download it from the button at the top-left.
+
+#### Show mutual exclusivity / co-occurrence
+- Display results of mutual exclusivity analysis of gene mutations using the [Rediscover package](https://academic.oup.com/bioinformatics/article/38/3/844/6401995) in **Mutual exclusivity**.  
+  Blue indicates mutual exclusivity; red indicates co-occurrence.  
+  An asterisk is shown when P < 0.001.
+
+#### Display mutation frequencies by histology
+- For frequently mutated genes, display mutation frequencies by histology in **Variation by histology**.
+
+#### Clustering based on gene mutations
+Perform clustering based on mutated genes using [UMAP](https://arxiv.org/abs/1802.03426) and [DBSCAN](https://cdn.aaai.org/KDD/1996/KDD96-037.pdf).  
+Results are displayed under the **Clustering analysis** tab.
+
+- Display basic information for each histology in **Basic data**:  
+    - Driver: proportion of cases with at least one oncogenic mutation  
+    - option / treat: proportion (%) with recommended therapy by the expert panel / proportion (%) who received therapy  
+    - time_before_CGP: median survival (days) from start of palliative chemotherapy to CGP test  
+    - time_after_CGP: median survival (days) from CGP test to death  
+- Display histologies and gene mutations enriched in each cluster in **UMAP clustering based on mutations**:  
+    - Up to the top 3 histologies enriched at P < 0.05 are shown, ordered by higher odds ratio compared with other clusters.  
+    - Up to the top 3 gene mutations enriched at P < 0.05 are shown, ordered by higher odds ratio compared with other clusters.  
+- Display the age distribution by cluster in **Cluster and age relationship**.  
+- Display the histology distribution by cluster in **Cluster and histology relationship**.  
+- Display whether each histology concentrates into a small number of clusters or spreads across many clusters as entropy in **Heterogeneity within histologic types**.  
+    Shannon entropy is used; a lower value indicates stronger concentration.  
+- Display the table of relationships between clusters and histologies in **Table of clusters and histologies** (downloadable).  
+- Display the table of relationships between clusters and gene mutations in **Table of clusters and genetic variants** (downloadable).  
+- Display the frequency of cases with mutations corresponding to drugs with evidence levels (within each histology) in **Frequency of patients with targeted therapy**.  
+    Evidence levels are harmonized to the highest level: if both level A and level B drugs exist, the patient is counted as level A.  
+- Display the relationship between mean survival time from start of chemotherapy to CGP testing and from CGP testing to death for each histology in **Relationship between pre-CGP and post-CGP periods**.  
+- Display the relationship between the number of cases and treatment information for each histology in **Patients per histology and treatment reach rate**:  
+    Scatter plots are created for:  
+    - number of patients vs. proportion with evidence level A/B-or-higher/C-or-higher drugs  
+    - number of patients vs. proportion with recommended therapy / proportion receiving recommended therapy / proportion receiving therapy among those with recommended therapy  
+- Display the relationship between time to CGP testing and treatment information for each histology in **Pre-CGP period and treatment reach rate**.  
+- Display the relationship between post-CGP survival and treatment information for each histology in **Post-CGP period and treatment reach rate**.  
+- Display the relationship between mean age and treatment information for each histology in **Age and treatment reach rate**.
+
+#### Survival analysis after CGP
+Perform survival analysis after CGP focusing on gene mutations, treatments, PS, etc.  
+95% confidence intervals are calculated using a log-log transformation.  
+This may help identify patients with poor prognosis for whom earlier CGP testing could be beneficial.
+
+Results are displayed under the **Survival after CGP** tab.
+
+- Survival analyses stratified by presence/absence of recommended therapy and treatment content are shown in **Survival and treatment after CGP**:  
+    - UnrecomTreat(+): patients who received treatments other than recommended therapy  
+    - RecomTreat(+): patients who received recommended therapy  
+    - Treat(-): patients who did not receive treatment after CGP  
+- Survival analyses stratified by histology, PS, and mutation status are shown in **Survival after CGP and performance status**.  
+- Survival analyses stratified by best overall response and number of treatment courses are shown in **Survival after CGP and previous treatment**.  
+    For mutation analysis, if genes of interest are specified, stratification is performed by whether any of those genes are mutated.  
+- Median survival (days) stratified by mutation status is shown in **Survival after CGP and mutations, forest plot**.  
+    When mutation frequency is low, 95% CIs may not be displayed.  
+- Kaplan–Meier curves stratified by mutation status are shown in **Survival after CGP and mutations, KM-curve**.  
+- Forest plots of hazard ratios for death after CGP are shown in **Hazard ratio for survival after CGP**.  
+    Factors with ≥95% agreement are regarded as multicollinearity and excluded.  
+    Factors with ≤2 death events are not displayed.  
+- A nomogram predicting whether a patient will receive recommended therapy is shown in **Factors leading to Treatment, pre-CGP, Nomogram**.  
+- A nomogram predicting whether a patient **with recommended therapy available** will receive that recommended therapy is shown in **Factors leading to Treatment, post-CGP, Nomogram**.  
+- Odds ratios for factors associated with receiving recommended therapy are shown in **Factors leading to Treatment, pre-CGP, Odds ratio**.  
+- Odds ratios for factors associated with receiving recommended therapy among patients **with recommended therapy available** are shown in **Factors leading to Treatment, post-CGP, Odds ratio**.  
+- Performance of the nomogram is evaluated using [Decision curve analysis](https://mskcc-epi-bio.github.io/decisioncurveanalysis/index.html) and shown in **Factors leading to Treatment, decision curve**.  
+  For how to interpret the results, see [decision_curve_analysis.md](https://github.com/MANO-B/FELIS/blob/main/decision_curve_analysis.md).  
+- Details of decision curve analysis are shown in **Factors leading to Treatment, table**.
+
+#### Survival analysis after initiation of chemotherapy (time-consuming)
+Perform survival analysis after initiation of palliative chemotherapy accounting for left-truncation bias.  
+Because Stan-based simulation is used, the analysis can take on the order of tens of minutes.
+
+Results are displayed under the **Survival after CTx** tab.
+
+- Survival analyses corrected for left-truncation bias using three approaches (bias correction, number-at-risk correction, simulation correction) are shown in **Survival corrected for left-truncation bias**.  
+- Survival analyses stratified by mutation status of genes of interest are shown in **Survival corrected for left-truncation bias**.  
+    If genes of interest are specified, stratification is based on whether any of those genes are mutated.  
+    If no genes are specified, stratification is based on the most frequently mutated gene.  
+- Differences in median survival (days) by mutation status are shown in **Genetic variants and survival, forest plot**.  
+    Results may not be displayed when the number of death events is small.  
+- Survival curves stratified by mutation status are shown in **Genetic variants and survival, KM-curve**.
+
+#### List of regimens used for palliative chemotherapy (1st–4th line)
+Extract regimens used for 1st–4th line palliative chemotherapy and display them within the **Analysis** tab.  
+Select drugs of interest for subsequent analyses.  
+Because inputs may be inaccurate, it is recommended to use this mainly to examine general trends.
+
+#### Response analysis for the drugs selected above
+Evaluate associations between treatment response duration and gene mutations / histology by focusing on Time on Treatment (ToT).  
+Results are displayed under the **Drug response** tab.
+
+- Summarize all drugs by line of treatment in **Drug use, by line of treatment**.  
+- Summarize all drugs by treatment effect in **Drug use, by treatment effect**.  
+- Summarize drugs for the specified line by mutation pattern in **Use of designated line agents, by mutation pattern**.  
+- Summarize drugs for the specified line by histology in **Use of designated line agents, by histology**.  
+- Summarize drugs for the specified line by mutated genes in **Use of designated line agents, by mutated genes**.  
+- Summarize drugs (specified line / specified drugs) with ToT information by mutation pattern in **Use of designated lines and drugs with ToT information, by mutation pattern**.  
+- Summarize drugs (specified line / specified drugs) with ToT information by histology in **Use of designated lines and drugs with ToT information, by histology**.  
+- Summarize drugs (specified line / specified drugs) with ToT information by mutated genes in **Use of designated lines and drugs with ToT information, by mutated genes**.  
+- Summarize drugs (specified line / specified drugs) with RESICT information by mutation pattern in **Use of designated lines and drugs with RESICT information, by mutation pattern**.  
+- Summarize drugs (specified line / specified drugs) with RESICT information by histology in **Use of designated lines and drugs with RECIST information, by histology**.  
+- Summarize drugs (specified line / specified drugs) with RECIST information by mutated genes in **Use of designated lines and drugs with RECIST information, by mutated genes**.  
+- Display waterfall plots and scatter plots for the relationship between ToT for the drug of interest and ToT for prior therapies in **Time on treatment and pre-treatment for the specified treatment, scatter plot**.  
+    Censored cases are excluded.  
+- Display KM curves comparing ToT across prior therapies and other drugs, and the relationship between mutations and ToT, in **Time on treatment and pre-treatment for the specified treatment, KM-curve**.  
+- Display KM curves of ToT by histology for the drug of interest in **Time on treatment by tissue type, KM-curve**.  
+- Display KM curves of ToT by gene-mutation clusters for the drug of interest in **Time on treatment by gene mutation cluster, KM-curve**.  
+- Display forest plots of median OS for ToT by mutation status in **Time on treatment by mutated genes, forest plot**.  
+- Display KM curves of ToT by mutation status in **Time on treatment by mutated genes, KM-curve**.  
+- Display KM curves for relationships among ToT, genes of interest, and mutation patterns of interest in **Time on treatment and mutations of interest, KM-curve**.  
+- Display tables of hazard ratios for factors leading to treatment discontinuation in **Hazard ratio on time on treatment**.  
+- Display tables of odds ratios for factors associated with objective response in **Odds ratio on objective response rate**.  
+- Display tables of odds ratios for factors associated with disease control in **Odds ratio on disease control rate**.  
+- Display response tables by gene-mutation cluster in **Mutation clustering and RECIST**.  
+    95% confidence intervals are calculated using the Clopper–Pearson method.  
+- Display response tables by mutation pattern in **Mutation pattern and RECIST**.  
+- Display response tables by histology in **Histology and RECIST**.  
+- Display response tables by mutated genes in **Mutated genes and RECIST**.  
+- Draw survival curves after CGP for each drug used after CGP in **Survival and drug**.
+
+#### Instruction
+Display descriptions such as how to use the software in the **Instruction** tab.
+
+### Future plans
+- Add mutual exclusivity analyses between pathways  
+- Add survival analysis from the time of diagnosis (and add stratification if more cases have stage recorded at diagnosis)  
+- Add analyses comparing which better predicts drug response: pre-panel tests (e.g., HER2 IHC, MSI) vs. panel-derived gene mutations  
+- Add analyses of associations between variant allele frequency and drug response in liquid sequencing  
+- Evaluate differences in mutation enrichment patterns between histologies, including VUS  
+- Modularize functions
+
+### Recommended FELIS version by C-CAT database version
+Because column names in C-CAT data may be added/changed depending on the database version, you need a compatible FELIS version.  
+C-CAT database version 20240621 ~ 20241217: FELIS version 1.10.3
