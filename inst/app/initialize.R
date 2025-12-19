@@ -3,7 +3,6 @@ DATA_VERSION = "20250626"
 bucket <- "3e040086-data-production-felisanalysisportal"
 key    <- "ic_withdrawn_list.txt"
 Sys.setenv(AWS_EC2_METADATA_DISABLED = "true")
-app_dir  <- normalizePath(dirname(shiny::getAppFile()), winslash = "/", mustWork = TRUE)
 
 CCAT_FLAG <- file.exists("ccat")
 
