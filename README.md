@@ -103,12 +103,6 @@ Please refer to [RStan Getting Started (Japanese)](https://github.com/stan-dev/r
 
 ```r
 ## For macOS
-## Create a GitHub account and obtain a PAT (Personal Access Token)
-### 1. Sign in to GitHub.
-### 2. Open Settings → Developer settings.
-### 3. Generate a Personal access token (classic) without any checkboxes.
-### 4. Copy the generated token.
-
 ## In Terminal, install Command Line Tools for Xcode:
 xcode-select --install
 
@@ -124,7 +118,7 @@ export PKG_CPPFLAGS="-I/usr/local/opt/libomp/include -Xpreprocessor -fopenmp"
 
 ## In the R console, run:
 install.packages("remotes")
-remotes::install_github("coatless-mac/macrtools", auth_token = "<YOUR_PAT>")
+remotes::install_github("coatless-mac/macrtools")
 options(timeout=1000)
 macrtools::macos_rtools_install()
 dotR <- file.path(Sys.getenv("HOME"), ".R")
@@ -228,7 +222,7 @@ remotes::install_cran("qs2", type = "source", configure.args = "--with-TBB")
 
 # If installation of drawProteins fails:
 # After signing in to GitHub and issuing a PAT, run:
-remotes::install_github('brennanpincardiff/drawProteins', auth_token = "<YOUR_PAT>")
+remotes::install_github('brennanpincardiff/drawProteins')
 
 # If installation of rms fails due to your R version:
 # Check the appropriate version here and change as needed:
@@ -242,35 +236,14 @@ We recommend using [RStudio](https://posit.co/download/rstudio-desktop/).
 If Japanese characters are not displayed properly in figures, please refer to [this post](https://ill-identified.hatenablog.com/entry/2021/09/10/231230).
 
 ### Launching FELIS
-
-- Downloading FELIS  
-Download the ZIP file for the version you want to use, and extract it to a suitable folder.
-
+- Installing FELIS  
 ```bash
-wget https://github.com/MANO-B/FELIS/raw/main/felis_latest.zip
-unzip felis_latest.zip
+remotes::install_github('MANO-B/FELIS'")
 ```
-
-In this README, we assume the installation directory is `/srv/shiny-server/felis-cs`.
-
+  
 - Starting FELIS  
-Run the following commands to start the web application.  
-In RStudio, you can also start it by clicking the **Run App** button shown in the upper-right.
-
 ```r
-$ R
-
-R version 4.3.2 (2023-10-31) -- "Eye Holes"
-Copyright (C) 2023 The R Foundation for Statistical Computing
-Platform: aarch64-apple-darwin20 (64-bit)
-.
-.
-.
-Type 'help.start()' for an HTML browser interface to help.
-Type 'q()' to quit R.
-
-> library(shiny)
-> runApp('/srv/shiny-server/felis-cs', launch.browser=T)
+> FELIS::run_app()
 ```
 
 <img src="source/appli_GUI.png"  height=500>  
@@ -520,14 +493,6 @@ Results are displayed under the **Drug response** tab.
 #### Instruction
 Display descriptions such as how to use the software in the **Instruction** tab.
 
-### Future plans
-- Add mutual exclusivity analyses between pathways  
-- Add survival analysis from the time of diagnosis (and add stratification if more cases have stage recorded at diagnosis)  
-- Add analyses comparing which better predicts drug response: pre-panel tests (e.g., HER2 IHC, MSI) vs. panel-derived gene mutations  
-- Add analyses of associations between variant allele frequency and drug response in liquid sequencing  
-- Evaluate differences in mutation enrichment patterns between histologies, including VUS  
-- Modularize functions
-
 ### Recommended FELIS version by C-CAT database version
 Because column names in C-CAT data may be added/changed depending on the database version, you need a compatible FELIS version.  
-C-CAT database version 20240621 ~ 20241217: FELIS version 1.10.3
+C-CAT database version 20240621 ~ 20251231: FELIS version 4.2.5
