@@ -60,9 +60,6 @@ library(furrr)
 library(parallel)
 library(aws.s3)
 
-# devtools::install("~/github/FELIS", dependencies = FALSE, upgrade = "never")
-# FELIS::run_app()
-
 source("initialize.R")
 source("RECIST.R")
 source("survival_function.R")

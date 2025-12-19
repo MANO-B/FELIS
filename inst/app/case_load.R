@@ -784,8 +784,8 @@ Data_case_raw_pre =  reactive({
   return(clin_tmp)
 })
 
-if (CCAT_FLAG & file.exists("source/clinical_data_whole.qs")) {
-  initial_data_case <- QS_READ(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), file="source/clinical_data_whole.qs") %>%
+if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "clinical_data_whole.qs"))) {
+  initial_data_case <- QS_READ(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), file=file.path(app_dir, "source", "clinical_data_whole.qs")) %>%
     dplyr::filter(!C.CAT調査結果.基本項目.ハッシュID %in% ID_exclude)
   initial_data_case = initial_data_case %>% dplyr::mutate(
     症例.背景情報.喫煙年数 = case_when(
@@ -941,6 +941,7 @@ if (CCAT_FLAG & file.exists("source/clinical_data_whole.qs")) {
                         -症例.EP後副作用情報.CTCAEv5.0最悪Grade.名称.
           ) %>%
           dplyr::distinct()
+        print(tempdir())
         QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), clin_tmp, file=file.path(tempdir(), "clinical_data.qs"))
       }
     })

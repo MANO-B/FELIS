@@ -1,5 +1,5 @@
 ---
-title: 'FELIS: web application for integrated analysis of Japan’s national clinicogenomic database (C-CAT)'
+title: 'FELIS: web application for integrated analysis of Japan’s national clinicogenomic database'
 tags:
   - R
   - Shiny
@@ -25,7 +25,7 @@ bibliography: paper.bib
 
 Japan’s national cancer genomic medicine program aggregates comprehensive genomic profiling (CGP) results and linked clinical information at the Center for Cancer Genomics and Advanced Therapeutics (C-CAT) [@kohno2022ccat]. These data create unique opportunities for large-scale, real-world clinicogenomic studies; however, their effective use depends on clinically meaningful questions formulated by domain experts, while the need to design and implement bespoke analytical pipelines remains a substantial barrier to analysis.
 
-FELIS is an open-source, locally deployable web application (R/Shiny) designed for no-code interactive analysis of secondary-use C-CAT datasets. It provides a point-and-click interface for cohort construction, clinicogenomic summarization, visualization, and bias-aware outcome analyses. By lowering technical barriers while remaining compatible with secured/offline environments, FELIS helps clinicians and translational researchers iterate rapidly from a clinical question to a reproducible analysis output.
+FELIS (Flexible Exploration for LIquid and Solid tumor clinical sequencing data) is an open-source, locally deployable web application (R/Shiny) designed for no-code interactive analysis of secondary-use C-CAT datasets. It provides a point-and-click interface for cohort construction, clinicogenomic summarization, visualization, and bias-aware outcome analyses. By lowering technical barriers while remaining compatible with secured/offline environments, FELIS helps clinicians and translational researchers iterate rapidly from a clinical question to a reproducible analysis output.
 
 Several analytical components implemented in FELIS are based on methods previously described in peer-reviewed publications, including variant-based clustering analysis and survival modeling accounting for delayed entry and left truncation. The scientific contribution of FELIS lies in the robust software implementation, integration, and practical accessibility of these methods rather than the introduction of new statistical methodology.
 

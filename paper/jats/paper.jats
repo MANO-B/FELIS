@@ -19,7 +19,7 @@
 <article-id pub-id-type="doi">N/A</article-id>
 <title-group>
 <article-title>FELIS: web application for integrated analysis of Japan’s
-national clinicogenomic database (C-CAT)</article-title>
+national clinicogenomic database</article-title>
 </title-group>
 <contrib-group>
 <contrib contrib-type="author">
@@ -88,7 +88,8 @@ a Creative Commons Attribution 4.0 International License (CC BY
   effective use depends on clinically meaningful questions formulated by
   domain experts, while the need to design and implement bespoke
   analytical pipelines remains a substantial barrier to analysis.</p>
-  <p>FELIS is an open-source, locally deployable web application
+  <p>FELIS (Flexible Exploration for LIquid and Solid tumor clinical
+  sequencing data) is an open-source, locally deployable web application
   (R/Shiny) designed for no-code interactive analysis of secondary-use
   C-CAT datasets. It provides a point-and-click interface for cohort
   construction, clinicogenomic summarization, visualization, and

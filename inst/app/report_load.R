@@ -1,5 +1,5 @@
-if (CCAT_FLAG & file.exists("source/variant_data_whole.qs")) {
-  initial_data_report <- QS_READ(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), file="source/variant_data_whole.qs") %>%
+if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "variant_data_whole.qs"))) {
+  initial_data_report <- QS_READ(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), file=file.path(app_dir, "source", "variant_data_whole.qs")) %>%
     dplyr::filter(!Tumor_Sample_Barcode %in% ID_exclude)
   Data_report_raw <- reactive({ initial_data_report })
 } else {

@@ -1,5 +1,5 @@
-if (CCAT_FLAG & file.exists("source/drug_data_whole.qs")) {
-  initial_data_drug <- QS_READ(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), file="source/drug_data_whole.qs") %>%
+if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "drug_data_whole.qs"))) {
+  initial_data_drug <- QS_READ(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), file=file.path(app_dir, "source", "drug_data_whole.qs")) %>%
     dplyr::filter(!ID %in% ID_exclude)
   Data_drug_raw <- reactive({ initial_data_drug })
 } else {
