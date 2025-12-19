@@ -1,7 +1,7 @@
 ## FELIS for C-CAT database <img src="source/FELIS.png" width=50>
 
 FELIS (Flexible Exploration for LIquid and Solid tumor clinical sequencing data) for the C-CAT database.  
-[English version of this README file](readme_eng.md).  
+[日本語の説明はこちら](README_JPN.md).  
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
 
 ### Practical usage guide and tips
