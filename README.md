@@ -54,11 +54,6 @@ FELIS Docker images are available on [Docker Hub](https://hub.docker.com/r/ikega
 # Run the same command when upgrading.
 docker pull ikegamitky/felis:latest
 
-# If upgrading fails, specifying a version explicitly (instead of "latest") may help.
-# In that case, replace "latest" in the commands below accordingly.
-Intel: docker pull ikegamitky/felis:1.6.5
-Apple silicon Mac: docker pull ikegamitky/felis:1.6.5.mac
-
 # If an old container keeps running, stop and remove it as follows:
 docker ps -a
 docker kill [container id]
@@ -66,16 +61,17 @@ docker rm [container id]
 ```
 
 To run FELIS, execute the following command and then access **http://localhost:3838** in your browser.
-
 ```bash
 docker run -d --rm -p 3838:3838 ikegamitky/felis:latest R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)'
 
 ## If the above does not work, try the following:
 # Start a Docker container interactively
 docker run -it --rm -p 3838:3838 ikegamitky/felis:latest R
-# Run the following two lines in R:
-library(shiny)
-runApp("/srv/shiny-server/felis-cs", launch.browser=F)
+```
+  
+Run the following line in R to start FELIS:
+```r
+> FELIS::run_app()
 ```
 
 When launching FELIS on a server, after entering the following command from the terminal, you no longer need to keep the SSH session open.  
@@ -87,8 +83,9 @@ docker run -d -p 3838:3838 ikegamitky/felis:latest nohup shiny-server
 # exit
 ```
 
-If you use Docker, you can skip ahead to the **Loading analysis files** section.
+If you use the docker image, you can skip ahead to the **Loading analysis files** section.
 
+# Local install
 ##### R language
 Please install R by referring to an appropriate guide (e.g., [this website](https://syunsuke.github.io/r_install_guide_for_beginners/03_installation_of_R.html)).  
 No specific version is required, but this software was developed using R v4.3.2.  
@@ -159,9 +156,6 @@ install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption
 
 ##### Shiny
 We use [Shiny](https://shiny.posit.co) to build the web application.
-```r
-install.packages("shiny")
-```
 
 ##### Package dependencies
 Please install dependent packages from the `R` console/terminal.  
@@ -170,21 +164,22 @@ Because installing all required system libraries via apt/brew etc. can be burden
 ```r
 install.packages(c(
   # Shiny / UI
-  "shinyBS","shinyjqui","shinyWidgets","shinydashboard","DT","shinythemes","markdown",
+  "shiny","shinyBS","shinyjqui","shinyWidgets","shinydashboard","DT","shinythemes","markdown",
 
   # Data handling / plotting
   "dplyr","tidyr","readr","stringr","forcats","data.table",
   "ggplot2","scales","RColorBrewer","ggsci","ggrepel","patchwork","gridExtra","ggiraph",
+  "Rediscover",
 
   # Tables / reporting
   "gt","gtsummary","flextable",
 
   # Survival / stats
   "survival","survminer","survRM2","flexsurv","rms","PropCIs","pROC",
-  "Matching","dcurves","MatchIt","cobalt",
+  "Matching","dcurves","MatchIt","cobalt","tranSurv",
 
   # ML core (tidymodels meta)
-  "tidymodels",
+  "tidymodels","tidybayes",
 
   # ML extras / models (tidymodels ecosystem)
   "mltools","bonsai","discrim","klaR","probably","ranger","lightgbm","partykit","rpart","bigstep","twang",
@@ -202,12 +197,8 @@ install.packages(c(
 
 BiocManager::install(c("maftools","ComplexHeatmap","drawProteins"), update = FALSE)
 
-install.packages("Rediscover")
-install.packages("tidybayes")
 install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 cmdstanr::install_cmdstan()
-install.packages("tranSurv")
-
 
 # Windows user
 install.packages("qs2")
@@ -221,13 +212,11 @@ remotes::install_cran("qs2", type = "source", configure.args = "--with-TBB")
 
 
 # If installation of drawProteins fails:
-# After signing in to GitHub and issuing a PAT, run:
 remotes::install_github('brennanpincardiff/drawProteins')
 
 # If installation of rms fails due to your R version:
 # Check the appropriate version here and change as needed:
 # https://cran.r-project.org/src/contrib/Archive/rms/
-install.packages("remotes")
 remotes::install_version(package = "rms", version = "6.7.0", dependencies = FALSE)
 ```
 

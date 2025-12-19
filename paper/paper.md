@@ -1,69 +1,79 @@
 ---
-title: "FELIS: An R package for reproducible analysis of real-world clinicogenomic sequencing data"
+title: 'FELIS: web application for integrated analysis of Japan’s national clinicogenomic database (C-CAT)'
 tags:
   - R
   - Shiny
-  - clinical genomics
-  - survival analysis
-  - real-world data
   - cancer genomics
+  - comprehensive genomic profiling
+  - clinicogenomics
+  - real-world evidence
+  - survival analysis
 authors:
   - name: Masachika Ikegami
-    orcid: 0000-0003-0491-7142   # ← ORCIDを入れてください
-    affiliation: 1
+    orcid: 0000-0003-0491-7142
+    affiliation: "1, 2"
 affiliations:
-  - name: National Cancer Center Japan
+  - name: Tokyo Metropolitan Cancer and Infectious Diseases Center Komagome Hospital, Tokyo, Japan
     index: 1
-date: 2025-12-25
+  - name: Division of Cellular Signaling, National Cancer Center Research Institute, Tokyo, Japan
+    index: 2
+date: 20 December 2025
 bibliography: paper.bib
 ---
 
-## Summary
+# Summary
 
-Large-scale real-world clinicogenomic datasets provide critical opportunities to study rare cancers, uncommon molecular alterations, and treatment outcomes in routine clinical practice. However, such datasets pose substantial analytical challenges, including data heterogeneity, selection bias, left truncation, and complex confounding structures.
+Japan’s national cancer genomic medicine program aggregates comprehensive genomic profiling (CGP) results and linked clinical information at the Center for Cancer Genomics and Advanced Therapeutics (C-CAT) [@kohno2022ccat]. These data create unique opportunities for large-scale, real-world clinicogenomic studies; however, their effective use depends on clinically meaningful questions formulated by domain experts, while the need to design and implement bespoke analytical pipelines remains a substantial barrier to analysis.
 
-FELIS (Flexible Exploration for LIquid and Solid tumor clinical sequencing data) is an open-source R package that provides an interactive, reproducible, and transparent framework for analyzing real-world clinical sequencing data from liquid and solid tumors. FELIS integrates exploratory visualization, survival analysis, and propensity score–based causal inference methods within a Shiny-based graphical user interface, enabling researchers to perform statistically rigorous analyses without sacrificing transparency or reproducibility.
+FELIS is an open-source, locally deployable web application (R/Shiny) designed for no-code interactive analysis of secondary-use C-CAT datasets. It provides a point-and-click interface for cohort construction, clinicogenomic summarization, visualization, and bias-aware outcome analyses. By lowering technical barriers while remaining compatible with secured/offline environments, FELIS helps clinicians and translational researchers iterate rapidly from a clinical question to a reproducible analysis output.
 
-The software was developed to support analyses of data from the Center for Cancer Genomics and Advanced Therapeutics (C-CAT), Japan’s national clinicogenomic database, but is applicable to other large-scale real-world sequencing datasets with similar structure.
+Several analytical components implemented in FELIS are based on methods previously described in peer-reviewed publications, including variant-based clustering analysis and survival modeling accounting for delayed entry and left truncation. The scientific contribution of FELIS lies in the robust software implementation, integration, and practical accessibility of these methods rather than the introduction of new statistical methodology.
 
-## Statement of Need
+# Statement of need
 
-The increasing adoption of comprehensive genomic profiling in routine oncology practice has generated large volumes of real-world sequencing data. While numerous tools exist for variant annotation and molecular interpretation, there is a lack of open-source software specifically designed to address downstream analytical challenges unique to real-world clinicogenomic data, such as delayed testing, left truncation, selection bias, and treatment heterogeneity.
+Large clinicogenomic resources have accelerated discovery by enabling standardized exploration of molecular and clinical features (e.g., cBioPortal [@cerami2012cbioportal; @gao2013cbioportal] and AACR Project GENIE [@genie2017]). However, C-CAT secondary-use data are typically analyzed in controlled environments under data use agreements, limiting the utility of hosted public portals. Moreover, clinically relevant real-world evidence (RWE) questions in CGP practice often require analysis features that are uncommon in general-purpose genomics portals—for example, survival modeling that accounts for delayed testing and left truncation, which can meaningfully bias CGP-based outcome analyses [@tamura2023lengthbias; @ikegami2023jjcoletter].
+FELIS addresses these gaps by offering:
 
-FELIS addresses this gap by providing a unified analytical environment that combines bias-aware statistical modeling with interactive data exploration. By packaging these methods in a reproducible R package with a graphical user interface, FELIS lowers the barrier to rigorous analysis for clinical researchers and facilitates transparent, auditable research workflows suitable for regulatory and academic settings.
+- **No-code cohort building** from de-identified, preprocessed tables derived from secondary-use C-CAT datasets.
+- **Bias-aware survival analysis** suitable for CGP settings with delayed entry/left truncation.
+- **Clinically oriented outputs** (tables and figures) designed for downstream reporting and manuscript preparation.
+- **Privacy-preserving deployment** on a local workstation or institutional server (including offline/containerized setups), so sensitive data remain within the user’s controlled environment.
 
-## Software Description
+# Software description
 
-### Design and Implementation
+## Architecture and deployment
 
-FELIS is implemented as an R package and distributed via GitHub. The analytical core is written in R and leverages widely used statistical and visualization libraries. The user interface is implemented using Shiny, allowing interactive cohort selection, visualization, and model fitting.
+FELIS is distributed as an R package that launches an interactive Shiny application. It supports (i) direct installation from source and (ii) container-based deployment to promote reproducibility across heterogeneous computing environments. The application is designed to be usable in restricted networks commonly required for secondary-use clinical data.
 
-The software can be executed locally or deployed on a Shiny Server. Application logic is bundled within the package, enabling version-controlled deployment and simplifying maintenance.
+## Data inputs and governance-aware design
 
-### Functionality
+FELIS operates on research-use datasets prepared from C-CAT secondary-use programs. Users load standardized, de-identified tables (e.g., patient-level clinical variables, tumor metadata, treatments, and variant-level calls) generated by local preprocessing within their authorized environment. This design keeps FELIS open source while accommodating access control and governance constraints of national clinicogenomic data.
 
-Key functionalities include:
+## Core functionality
 
-- Interactive exploration of clinicogenomic cohorts  
-- Time-to-event analyses using Kaplan–Meier estimation and Cox proportional hazards models  
-- Multivariable survival modeling with covariate adjustment  
-- Propensity score matching and weighting with diagnostic visualization  
-- Visualization of cohort characteristics and treatment outcomes  
-- Support for tumor-only and tumor–normal sequencing data  
+FELIS provides interactive modules that cover common clinicogenomic workflows:
 
-### Reproducibility
+- **Cohort definition and stratification**: filter and intersect clinical variables (e.g., age, sex, tumor type, stage, lines of therapy) and genomic alterations (genes, variant classes, panels).
+- **Genomic summaries and visualization**: alteration frequency summaries, oncoprint-style views, co-alteration exploration, and subgroup comparisons.
+- **Outcome analysis**: Kaplan–Meier and regression-based survival analyses with options to handle delayed entry/left truncation in CGP settings.
+- **Treatment pattern summarization**: descriptive analyses of real-world treatment sequences and therapy exposure among genomically defined subgroups.
+- **Export for reporting**: download-ready plots and tables to facilitate communication with multidisciplinary teams and manuscript preparation.
 
-FELIS follows standard R package development practices. All analytical steps are explicitly defined in code, outputs are written only to user-writable directories, and version history is tracked via GitHub. This design facilitates reproducible research and independent verification.
+![Representative analyses performed using FELIS.
+(A) OncoPrint summarizing frequently mutated genes across the selected cohort.
+(B) Forest plot showing the estimated effects of gene alterations on survival outcomes.
+(C) Volcano plot illustrating gene-level associations with drug response, highlighting effect sizes and statistical significance.
+(D) Kaplan–Meier survival curves comparing two groups stratified by a user-defined factor within the FELIS interface.](FELIS_ui.png)
 
-## Related Work
+Some of the analytical methods implemented in FELIS have been previously reported in the literature. In particular, the variant-based clustering analysis follows the approach described by Mochizuki[@mochizuki2024cluster], and the bias-aware survival analysis with correction for delayed entry and left truncation is based on Tamura[@tamura2023lengthbias]. FELIS provides a unified and reproducible software implementation of these methods tailored to the data structure and governance constraints of Japan’s national clinicogenomic database (C-CAT).
 
-The methodological framework implemented in FELIS builds on prior peer-reviewed studies addressing biases in real-world clinicogenomic data, including delayed testing and left truncation. In particular, FELIS extends methods described by Tamura et al. (2023) for bias-aware analysis of comprehensive genomic profiling data.
+# Acknowledgements
 
-## Availability
+We thank patients, participating hospitals, and C-CAT data governance teams for enabling secondary use of national clinicogenomic resources. We also thank collaborators and early users who provided feedback on clinical workflows and software usability.
 
-- **Source code:** https://github.com/MANO-B/FELIS  
-- **License:** MIT  
-- **Operating systems:** Platform independent  
-- **Programming language:** R  
+# Funding
 
-## References
+This work was supported by grants by Boehringer Ingelheim, Daiwa Securities Foundation; Japan Cancer Association and Kobayashi Foundation for Cancer Research Young Investigator Research Grant; Japan Agency for Medical Research and Development (#25kk0305033h0001); the Japan Society for the Promotion of Science KAKENHI (22K15571 and 24K18565). 
+
+# References
+

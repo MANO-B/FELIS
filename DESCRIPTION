@@ -1,11 +1,98 @@
 Package: FELIS
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
+Title: Web application for integrated analysis of C-CAT clinicogenomic database
+Version: 4.2.5
+Maintainer: Masachika Ikegami <ikegamitky@gmail.com>
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    person(given = "Masachika",
+           family = "Ikegami",
+           role = c("aut", "cre"),
+           email = "ikegamitky@gmail.com")
+Description: Japan’s national cancer genomic medicine program aggregates
+    comprehensive genomic profiling (CGP) results and linked clinical
+    information at the Center for Cancer Genomics and Advanced Therapeutics
+    (C-CAT). These data create unique opportunities for large-scale, real-world
+    clinicogenomic studies, but effective analysis requires both (i) 
+    high-quality clinical questions and (ii) practical tools that clinicians can
+    use without building bespoke pipelines. FELIS is an open-source, locally
+    deployable web application (R/Shiny) designed for *no-code* interactive
+    analysis of secondary-use C-CAT datasets. It provides a point-and-click
+    interface for cohort construction, clinicogenomic summarization,
+    visualization, and bias-aware outcome analyses. By lowering technical
+    barriers while remaining compatible with secured/offline environments,
+    FELIS helps clinicians and translational researchers iterate rapidly from a
+    clinical question to a reproducible analysis output.
+License: MIT + file LICENSE
 Encoding: UTF-8
+Language: en-US
+Depends: R (>= 3.5.0)
+SystemRequirements: C++ toolchain (Rtools on Windows), GNU make
+Imports:
+    shiny,
+    shinyBS,
+    shinyjqui,
+    shinyWidgets,
+    shinydashboard,
+    DT,
+    shinythemes,
+    markdown,
+    dplyr,
+    tidyr,
+    readr,
+    stringr,
+    forcats,
+    data.table,
+    ggplot2,
+    scales,
+    RColorBrewer,
+    ggsci,
+    ggrepel,
+    patchwork,
+    gridExtra,
+    ggiraph,
+    gt,
+    gtsummary,
+    flextable,
+    survival,
+    survminer,
+    survRM2,
+    flexsurv,
+    rms,
+    PropCIs,
+    pROC,
+    Matching,
+    dcurves,
+    MatchIt,
+    cobalt,
+    tidymodels,
+    mltools,
+    bonsai,
+    discrim,
+    klaR,
+    probably,
+    ranger,
+    lightgbm,
+    partykit,
+    rpart,
+    bigstep,
+    twang,
+    umap,
+    dbscan,
+    httr,
+    plyr,
+    withr,
+    blorr,
+    betacal,
+    sjPlot,
+    sjlabelled,
+    aws.s3,
+    Rediscover,
+    tidybayes,
+    cmdstanr,
+    tranSurv,
+    qs2,
+    rstan,
+    maftools,
+    ComplexHeatmap,
+    drawProteins
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
