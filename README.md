@@ -12,8 +12,7 @@ You can test v4.2.3 with dummy data on [this server](https://www.felis-portal.co
 You can test v4.2.3 with actual C-CAT data on [this server](https://www.felis-portal.com/felis-cs/).  
 After trying it out, please run analyses on your local environment following the procedure described below.
 
-(For reference) You can check the web app of v3.0.1 on [this server](https://www.felis-portal.com/felis-ccat/).  
-Basically, please execute it in a local environment according to the procedure described below (this documentation is currently primarily in Japanese).  
+Basically, please execute it in a local environment according to the procedure described below.  
 
 ### Web application for analyzing secondary-use C-CAT data
 At the National Cancer Center Japan, the [Center for Cancer Genomics and Advanced Therapeutics (C-CAT)](https://www.ncc.go.jp/jp/c_cat/use/index.html) aggregates results of cancer gene panel testing performed as part of insured clinical practice (Comprehensive Genomic Profiling; CGP testing) along with clinical information. A framework exists for secondary use of these data for academic research and pharmaceutical development.
@@ -497,8 +496,8 @@ Results are displayed under the **Drug response** tab.
 - Summarize drugs (specified line / specified drugs) with ToT information by mutation pattern in **Use of designated lines and drugs with ToT information, by mutation pattern**.  
 - Summarize drugs (specified line / specified drugs) with ToT information by histology in **Use of designated lines and drugs with ToT information, by histology**.  
 - Summarize drugs (specified line / specified drugs) with ToT information by mutated genes in **Use of designated lines and drugs with ToT information, by mutated genes**.  
-- Summarize drugs (specified line / specified drugs) with RESICT information by mutation pattern in **Use of designated lines and drugs with RESICT information, by mutation pattern**.  
-- Summarize drugs (specified line / specified drugs) with RESICT information by histology in **Use of designated lines and drugs with RECIST information, by histology**.  
+- Summarize drugs (specified line / specified drugs) with RECIST information by mutation pattern in **Use of designated lines and drugs with RECIST information, by mutation pattern**.  
+- Summarize drugs (specified line / specified drugs) with RECIST information by histology in **Use of designated lines and drugs with RECIST information, by histology**.  
 - Summarize drugs (specified line / specified drugs) with RECIST information by mutated genes in **Use of designated lines and drugs with RECIST information, by mutated genes**.  
 - Display waterfall plots and scatter plots for the relationship between ToT for the drug of interest and ToT for prior therapies in **Time on treatment and pre-treatment for the specified treatment, scatter plot**.  
     Censored cases are excluded.  
