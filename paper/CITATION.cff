@@ -4,6 +4,6 @@ authors:
   - family-names: Ikegami
     given-names: Masachika
 title: "FELIS: Flexible Exploration for LIquid and Solid Tumor Clinical Sequencing Data"
-version: "4.2.3"
+version: "4.2.5"
 license: MIT
 repository-code: "https://github.com/MANO-B/FELIS"
