@@ -238,7 +238,7 @@ If Japanese characters are not displayed properly in figures, please refer to [t
 ### Launching FELIS
 - Installing FELIS  
 ```bash
-remotes::install_github('MANO-B/FELIS'")
+remotes::install_github('MANO-B/FELIS')
 ```
   
 - Starting FELIS  
