@@ -1,5 +1,5 @@
 ---
-title: 'FELIS: a no-code web application for integrated analysis of Japan’s national clinicogenomic database (C-CAT)'
+title: 'FELIS: web application for integrated analysis of Japan’s national clinicogenomic database (C-CAT)'
 tags:
   - R
   - Shiny
@@ -10,14 +10,14 @@ tags:
   - survival analysis
 authors:
   - name: Masachika Ikegami
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0003-0491-7142
     affiliation: "1, 2"
 affiliations:
   - name: Tokyo Metropolitan Cancer and Infectious Diseases Center Komagome Hospital, Tokyo, Japan
     index: 1
   - name: Division of Cellular Signaling, National Cancer Center Research Institute, Tokyo, Japan
     index: 2
-date: 17 December 2025
+date: 20 December 2025
 bibliography: paper.bib
 ---
 
@@ -65,5 +65,9 @@ FELIS currently targets targeted-panel CGP and linked clinical variables in C-CA
 # Acknowledgements
 
 We thank patients, participating hospitals, and C-CAT data governance teams for enabling secondary use of national clinicogenomic resources. We also thank collaborators and early users who provided feedback on clinical workflows and software usability.
+
+# Funding
+
+This work was supported by grants by Boehringer Ingelheim, Daiwa Securities Foundation; Japan Cancer Association and Kobayashi Foundation for Cancer Research Young Investigator Research Grant; Japan Agency for Medical Research and Development (#25kk0305033h0001); the Japan Society for the Promotion of Science KAKENHI (22K15571 and 24K18565). 
 
 # References
