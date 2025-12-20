@@ -92,6 +92,10 @@ custering_analysis_logic <- function() {
           dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
           dplyr::select(-C.CAT調査結果.基本項目.ハッシュID, -cluster, -driver_mutations)
         req(Data_mutation_cord)
+        Data_MAF_target = Data_MAF_target %>%
+          dplyr::filter(Tumor_Sample_Barcode %in% unique(Data_cluster_ID()$C.CAT調査結果.基本項目.ハッシュID))
+        Data_case_target = Data_case_target %>%
+          dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% unique(Data_cluster_ID()$C.CAT調査結果.基本項目.ハッシュID))
         Data_case_target = left_join(Data_case_target,
                                      Data_cluster_ID() %>% dplyr::select(C.CAT調査結果.基本項目.ハッシュID, cluster, driver_mutations),
                                      by = "C.CAT調査結果.基本項目.ハッシュID")
