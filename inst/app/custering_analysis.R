@@ -95,6 +95,7 @@ custering_analysis_logic <- function() {
         Data_case_target = left_join(Data_case_target,
                                      Data_cluster_ID() %>% dplyr::select(C.CAT調査結果.基本項目.ハッシュID, cluster, driver_mutations),
                                      by = "C.CAT調査結果.基本項目.ハッシュID")
+        Data_case_target$cluster[is.na(Data_case_target$cluster)] = max(Data_case_target$cluster, na.rm = T) + 1
         Data_report_tmp = Data_report() %>%
           dplyr::filter(
             !str_detect(Hugo_Symbol, ",") &
@@ -218,7 +219,6 @@ custering_analysis_logic <- function() {
         Total_pts_Liver_no = rep(0, length(Cancername))
         Total_pts_Liver = rep(0, length(Cancername))
 
-        print(Data_case_target$cluster)
         Disease_cluster = data.frame(matrix(rep(0, length(Cancername) * max(Data_case_target$cluster,na.rm = T)),
                                             ncol = max(Data_case_target$cluster,na.rm = T)))
         colnames(Disease_cluster) = seq(1,max(Data_case_target$cluster,na.rm = T))
@@ -234,8 +234,6 @@ custering_analysis_logic <- function() {
           if (nrow(Data_survival_tmp) > 0) {
 
             ## --- pre_CGP ---
-            print(2)
-            print(Data_case_target$cluster)
             if (sum(Data_survival_tmp$time_palliative_enroll, na.rm = TRUE) > 0) {
               survival_simple <- survfit(
                 Surv(time_palliative_enroll, rep(1, nrow(Data_survival_tmp))) ~ 1,
@@ -655,10 +653,11 @@ custering_analysis_logic <- function() {
 
         Data_case_target$cluster = as.factor(Data_case_target$cluster)
         OUTPUT_DATA$clustering_Data_case_target = Data_case_target
-        Data_mutation_cord$cluster = Data_case_target$cluster
-        Data_mutation_cord$Cancers = Data_case_target$Cancers
-        Data_mutation_cord$EP_option = as.factor(Data_case_target$EP_option)
-        Data_mutation_cord$EP_treat = as.factor(Data_case_target$EP_treat)
+        Data_cord_tmp = Data_case_target %>% dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% Data_cluster_ID()$C.CAT調査結果.基本項目.ハッシュID)
+        Data_mutation_cord$cluster = Data_cord_tmp$cluster
+        Data_mutation_cord$Cancers = Data_cord_tmp$Cancers
+        Data_mutation_cord$EP_option = as.factor(Data_cord_tmp$EP_option)
+        Data_mutation_cord$EP_treat = as.factor(Data_cord_tmp$EP_treat)
         Data_mutation_cord$tooltip_text <- paste0(
           "Cluster: ", Data_mutation_cord$cluster, "\n",
           "Histology: ", Data_mutation_cord$Cancers, "\n",

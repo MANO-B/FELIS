@@ -63,7 +63,7 @@ drug_analysis_logic <- function() {
               Hugo_Symbol != "" &
               Evidence_level %in% c("","A","B","C","D","E","F") &
               Variant_Classification != "expression"
-          ) %>% 
+          ) %>%
           dplyr::arrange(desc(Evidence_level)) %>%
           dplyr::distinct(Tumor_Sample_Barcode,
                           Hugo_Symbol,
@@ -95,20 +95,21 @@ drug_analysis_logic <- function() {
           if(input$drug_volcano != "Yes"){
             Data_cluster_ID_list = Data_cluster_ID() %>%
               dplyr::select(C.CAT調査結果.基本項目.ハッシュID, cluster, driver_mutations)
-            Data_cluster_ID_list$cluster = as.factor(Data_cluster_ID_list$cluster)
-            
             Data_case_target = left_join(Data_case_target,
                                          Data_cluster_ID_list,
                                          by = "C.CAT調査結果.基本項目.ハッシュID")
+            Data_case_target$cluster[is.na(Data_case_target$cluster)] = max(Data_case_target$cluster, na.rm = T) + 1
+            Data_cluster_ID_list$cluster = as.factor(Data_cluster_ID_list$cluster)
+            Data_case_target$cluster = as.factor(Data_case_target$cluster)
           } else {
             Data_case_target$cluster = "1"
           }
-          
+
           incProgress(1 / 13)
-          
+
           Data_survival = Data_case_target
           incProgress(1 / 13)
-          
+
           Data_drug = Data_drug_raw_rename()
           Data_drug = Data_drug %>%
             dplyr::filter(ID %in%
@@ -154,11 +155,11 @@ drug_analysis_logic <- function() {
             Data_drug_original = Data_drug_original %>% dplyr::distinct(ID, Drug, .keep_all = T)
           }
           OUTPUT_DATA$drug_analysis_Data_drug_RECIST = Data_drug_RECIST
-          
+
           Data_drug = Data_drug %>% dplyr::filter(Drug_length>0 & !is.na(Drug_length) & is.finite(Drug_length))
           Data_drug = Data_drug %>%
             dplyr::arrange(ID, 治療ライン)
-          
+
           if(input$drug_volcano != "Yes"){
             Data_drug$Drug_length_pre_censor = -1
             Data_drug$Drug_length_pre = -1
@@ -193,7 +194,7 @@ drug_analysis_logic <- function() {
                 Early_AE
               ) %>%
               dplyr::distinct()
-            
+
             colnames(Drug_summary) =
               c("ID", "Drugs", "CTx line", "RECIST", "Reason to finish treatment",
                 "Any adverse effect (G3-G5)",
@@ -212,7 +213,7 @@ drug_analysis_logic <- function() {
             Drug_summary$`Treatment finished or censored`[is.na(Drug_summary$`Treatment finished or censored`)] = "Unknown"
             Drug_summary$`Treatment finished or censored`[Drug_summary$`Treatment finished or censored` == "1"] = "Finished"
             Drug_summary$`Treatment finished or censored`[Drug_summary$`Treatment finished or censored` == "0"] = "Censored"
-            
+
             if(!"LUNG" %in% Data_case_target$症例.基本情報.がん種.OncoTree.LEVEL1. | input$PD_L1 == "No"){
               Data_case_age_sex = Data_case_target %>%
                 dplyr::select(C.CAT調査結果.基本項目.ハッシュID,
@@ -252,7 +253,7 @@ drug_analysis_logic <- function() {
             }
             Drug_summary = Drug_summary %>%
               dplyr::left_join(Data_case_age_sex, by = "ID")
-            
+
             mut_gene_ = input$gene[input$gene %in% unique(Data_MAF_target$Hugo_Symbol)]
             if(length(mut_gene_)==0){
               mut_gene_ = names(sort(table(Data_MAF_target$Hugo_Symbol),decreasing = T))[[1]]
@@ -288,15 +289,15 @@ drug_analysis_logic <- function() {
             ID_diagnosis_list = Data_case_target %>% dplyr::select(C.CAT調査結果.基本項目.ハッシュID,症例.基本情報.がん種.OncoTree.) %>% dplyr::distinct()
             Drug_summary_line$diagnosis = unlist(lapply(list(Drug_summary_line$ID), function(x) {
               as.vector(ID_diagnosis_list$症例.基本情報.がん種.OncoTree.[match(x, ID_diagnosis_list$C.CAT調査結果.基本項目.ハッシュID)])}))
-            remove_cols <- names(Drug_summary_line) %in% names(classification_rules) & 
+            remove_cols <- names(Drug_summary_line) %in% names(classification_rules) &
               sapply(Drug_summary_line, is.logical)
             Drug_summary_line <- Drug_summary_line[, !remove_cols, with = FALSE]
             keep_cols <- names(Drug_summary_line)[names(Drug_summary_line) %in% names(classification_rules)]
             Drug_summary_line <- Drug_summary_line %>%
               mutate(across(all_of(keep_cols), as.factor))
-            
-           
-            
+
+
+
             mut_gene_ = input$gene[input$gene %in% unique(Data_MAF_target$Hugo_Symbol)]
             if(length(mut_gene_)==0){
               mut_gene_ = names(sort(table(Data_MAF_target$Hugo_Symbol),decreasing = T))[[1]]
@@ -330,10 +331,10 @@ drug_analysis_logic <- function() {
               }
             }
             incProgress(1 / 13)
-            
+
 
             Data_drug$serial = 1:length(Data_drug$ID)
-            
+
             Data_drug_TTF = Data_drug
             gb = list()
             gc = list()
@@ -369,7 +370,7 @@ drug_analysis_logic <- function() {
               OUTPUT_DATA$drug_analysis_gb_previous = NULL
             }
             incProgress(1 / 13)
-            
+
             if(nrow(Data_drug_TTF) > 0){
               survfit_t <- survfit(Surv(Drug_length, Drug_length_censor)~1, data=Data_drug_TTF,type = "kaplan-meier", conf.type = "log-log")
               OUTPUT_DATA$drug_analysis_gb_all_selected_line = surv_curv_drug(survfit_t, Data_drug_TTF, paste0("Treatment time, all drugs"), NULL, NULL, NULL)
@@ -378,7 +379,7 @@ drug_analysis_logic <- function() {
             if(is.null(input$gene)){
               mut_gene = names(sort(table(Data_MAF_target$Hugo_Symbol),decreasing = T))[[1]]
             }
-            
+
             Data_drug_TTF = Data_drug_TTF %>% dplyr::mutate(mut = case_when(
               ID %in% unique((Data_MAF_target %>% dplyr::filter(Hugo_Symbol %in% mut_gene))$Tumor_Sample_Barcode) ~ "+",
               TRUE ~ "-"))
@@ -433,9 +434,9 @@ drug_analysis_logic <- function() {
                 OUTPUT_DATA$drug_analysis_gb_regimen = surv_curv_drug(survfit_t, Data_drug_TTF, paste0("Treatment time, ", paste(input$drug, collapse = ";")), diff_0, diff_1 ,diff_2)
               }
             }
-            
+
             `%||%` <- function(a, b) if (!is.null(a)) a else b
-            
+
             Data_drug_TTF <- Data_drug_TTF %>%
               dplyr::mutate(Regimen = case_when(
                 Drug %in% (input$drug_group_1 %||% character(0)) ~ input$drug_group_1_name %||% "Other drugs",
@@ -457,7 +458,7 @@ drug_analysis_logic <- function() {
                 OUTPUT_DATA$drug_analysis_gb_regimen_detail = surv_curv_drug(survfit_t, Data_drug_Drug_length_drug_select, "Treatment time, selected drugs", diff_0, diff_1, diff_2)
               }
             }
-            
+
             if(nrow(Data_drug_TTF) > 0){
               survfit_t <- survfit(Surv(Drug_length, Drug_length_censor)~mut+Regimen_type, data=Data_drug_TTF,type = "kaplan-meier", conf.type = "log-log")
               if(length(unique(Data_drug_TTF$mut)) > 1 & length(unique(Data_drug_TTF$Regimen_type)) > 1){
@@ -470,7 +471,7 @@ drug_analysis_logic <- function() {
                 OUTPUT_DATA$drug_analysis_gb_mutation_regimen = surv_curv_drug(survfit_t, Data_drug_TTF, paste("Treatment time,", paste0(collapse = ";", mut_gene), "and", paste(input$drug, collapse = ";")), diff_0, diff_1, diff_2)
               }
             }
-            
+
             # Survival analysis for mutation, all
             ID_mutation = (Data_MAF_target %>% dplyr::filter(Hugo_Symbol %in% mut_gene))$Tumor_Sample_Barcode
             for(jj in 1:length(mut_gene)){
@@ -583,11 +584,11 @@ drug_analysis_logic <- function() {
             #       subtitle = "Only patients with adverse effect (G3~5)"
             #     )
             # }
-            
-            
+
+
 
             incProgress(1 / 13)
-            
+
             candidate_genes = sort(unique(c(Data_report_raw()$Hugo_Symbol,
                                             paste0(input$special_gene, "_", input$special_gene_mutation_1_name),
                                             paste0(input$special_gene, "_", input$special_gene_mutation_2_name),
@@ -607,11 +608,11 @@ drug_analysis_logic <- function() {
             OUTPUT_DATA$drug_analysis_candidate_cluster = sort(unique(Data_case_target$cluster))
             OUTPUT_DATA$drug_analysis_candidate_meta = c('Lymph_met','Brain_met','Lung_met','Bone_met','Liver_met')
             OUTPUT_DATA$drug_analysis_candidate_AE = names(classification_rules)
-            
+
 
             OUTPUT_DATA$drug_analysis_Data_drug_TTF_comparison = Data_drug_TTF
             incProgress(1 / 13)
-            
+
             k_3 = 1
             if(length(unique(Data_drug_TTF$diagnosis)) >= 1){
               diagnosis_list = (Data_drug_TTF %>%
@@ -630,8 +631,8 @@ drug_analysis_logic <- function() {
               Data_drug_Drug_length_tmp2 = rbind(Data_drug_Drug_length_tmp, Data_drug_Drug_length_tmp2)
               Data_drug_Drug_length_tmp$diagnosis = as.factor(Data_drug_Drug_length_tmp$diagnosis)
               Data_drug_Drug_length_tmp2$diagnosis = as.factor(Data_drug_Drug_length_tmp2$diagnosis)
-              Data_drug_Drug_length_tmp$diagnosis = relevel(Data_drug_Drug_length_tmp$diagnosis, ref=names(sort(table(Data_drug_Drug_length_tmp$diagnosis),decreasing = T))[[1]]) 
-              Data_drug_Drug_length_tmp2$diagnosis = relevel(Data_drug_Drug_length_tmp2$diagnosis, ref=names(sort(table(Data_drug_Drug_length_tmp2$diagnosis),decreasing = T))[[1]]) 
+              Data_drug_Drug_length_tmp$diagnosis = relevel(Data_drug_Drug_length_tmp$diagnosis, ref=names(sort(table(Data_drug_Drug_length_tmp$diagnosis),decreasing = T))[[1]])
+              Data_drug_Drug_length_tmp2$diagnosis = relevel(Data_drug_Drug_length_tmp2$diagnosis, ref=names(sort(table(Data_drug_Drug_length_tmp2$diagnosis),decreasing = T))[[1]])
               if(nrow(Data_drug_Drug_length_tmp) > 0){
                 survfit_t <- survfit(Surv(Drug_length, Drug_length_censor)~diagnosis, data=Data_drug_Drug_length_tmp,type = "kaplan-meier", conf.type = "log-log")
                 if(length(unique(Data_drug_Drug_length_tmp$diagnosis)) > 1){
@@ -662,7 +663,7 @@ drug_analysis_logic <- function() {
                   k_3 = k_3 + 1
                 }
               }
-              
+
               Data_drug_Drug_length_tmp = Data_drug_TTF %>% dplyr::filter(Drug %in% input$drug)
               Data_drug_Drug_length_tmp = Data_drug_Drug_length_tmp %>% dplyr::filter(
                 diagnosis %in% diagnosis_list)
@@ -717,7 +718,7 @@ drug_analysis_logic <- function() {
                     dplyr::filter(Tumor_Sample_Barcode %in%
                                     Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
                     dplyr::arrange(Tumor_Sample_Barcode, Hugo_Symbol, amino.acid.change)
-                  
+
                   ID_special_gene_mutation_1 = (Data_MAF_target_tmp %>%
                                                   dplyr::filter(Hugo_Symbol %in% input$gene_group_1 | str_detect(Hugo_Symbol, paste(paste0(input$gene_group_1, "_"),collapse ="|")) &
                                                                   amino.acid.change %in% input$special_gene_mutation_1 | str_detect(Hugo_Symbol, paste(paste0(input$gene_group_1, "_"),collapse ="|")) &
@@ -740,7 +741,7 @@ drug_analysis_logic <- function() {
                     dplyr::filter(Tumor_Sample_Barcode %in%
                                     Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
                     dplyr::arrange(Tumor_Sample_Barcode, Hugo_Symbol, amino.acid.change)
-                  
+
                   ID_special_gene_mutation_1 = (Data_MAF_target_tmp %>%
                                                   dplyr::filter(Hugo_Symbol %in% input$gene_group_1 | str_detect(Hugo_Symbol, paste(paste0(input$gene_group_1, "_"),collapse ="|")) &
                                                                   amino.acid.change %in% input$special_gene_mutation_1))$Tumor_Sample_Barcode
@@ -756,7 +757,7 @@ drug_analysis_logic <- function() {
                   dplyr::filter(Tumor_Sample_Barcode %in%
                                   Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
                   dplyr::arrange(Tumor_Sample_Barcode, Hugo_Symbol, amino.acid.change)
-                
+
                 ID_special_gene = (Data_MAF_target_tmp %>%
                                      dplyr::filter(Hugo_Symbol == input$special_gene | str_detect(Hugo_Symbol, paste0(input$special_gene, "_"))))$Tumor_Sample_Barcode
                 ID_special_gene_mutation_1 = (Data_MAF_target_tmp %>%
@@ -786,7 +787,7 @@ drug_analysis_logic <- function() {
               dplyr::count(diagnosis) %>%
               dplyr::arrange(-n)
             colnames(oncogenic_genes) = c("gene_mutation", "all_patients")
-            if(length(unique(Data_drug_TTF$diagnosis)) >= 1 & nrow(Data_drug_Drug_length_tmp) > 0 & nrow(oncogenic_genes) > 0){      
+            if(length(unique(Data_drug_TTF$diagnosis)) >= 1 & nrow(Data_drug_Drug_length_tmp) > 0 & nrow(oncogenic_genes) > 0){
               oncogenic_genes = oncogenic_genes[1:min(nrow(oncogenic_genes), 10),]
               gene_table = data.frame(oncogenic_genes$gene_mutation)
               colnames(gene_table) = c("Gene")
@@ -812,7 +813,7 @@ drug_analysis_logic <- function() {
                     )
                   )
                   traditional_fit = survfit(Surv(event = Drug_length_censor,
-                                                 time = Drug_length) ~ gene_mut, 
+                                                 time = Drug_length) ~ gene_mut,
                                             data = Data_drug_Drug_length_tmp)
                   if(nrow(Data_drug_Drug_length_tmp) != traditional_fit[[1]][[1]]){
                     tau0 = ((max((Data_drug_Drug_length_tmp %>% dplyr::filter(gene_mut == 0))$Drug_length, na.rm = T) - 1)/365.25*12)
@@ -825,7 +826,7 @@ drug_analysis_logic <- function() {
                       tau = tau * 365.25 / 12,
                       alpha = 0.05
                     )
-                    
+
                     diff_0 = survdiff(Surv(Drug_length, Drug_length_censor)~gene_mut,
                                       data=Data_drug_Drug_length_tmp, rho=0)
                     diff_1 = survdiff(Surv(Drug_length, Drug_length_censor)~gene_mut,
@@ -856,10 +857,10 @@ drug_analysis_logic <- function() {
               Gene_arrange = gene_table$Gene
               gene_table = gene_table %>% dplyr::mutate(
                 Gene = factor(gene_table$Gene, levels = Gene_arrange))
-              
-              p_mid <- 
+
+              p_mid <-
                 gene_table |>
-                ggplot(aes(y = fct_rev(Gene))) + 
+                ggplot(aes(y = fct_rev(Gene))) +
                 theme_classic() +
                 geom_point(aes(x=diff_median), shape=15, size=3) +
                 geom_linerange(aes(xmin=diff_LL, xmax=diff_UL)) +
@@ -875,7 +876,7 @@ drug_analysis_logic <- function() {
                 annotate("text",
                          x = (max(abs(gene_table$diff_LL), abs(gene_table$diff_UL)) + 0.5)/2,
                          y = length(Gene_arrange) + 1,
-                         label = "diagnosis=long survival") + 
+                         label = "diagnosis=long survival") +
                 theme(legend.position = "none",
                       axis.line.y = element_blank(),
                       axis.ticks.y= element_blank(),
@@ -890,7 +891,7 @@ drug_analysis_logic <- function() {
                   estimate_lab_3 = paste0(format_p(diff_median, digits = 1), " (", format_p(diff_LL, digits = 1), "-", format_p(diff_UL, digits = 1), ")")) %>%
                 dplyr::mutate(
                   patients = paste0(positive_patients, " (", positive_freq, "%)"))
-              gene_table = 
+              gene_table =
                 dplyr::bind_rows(
                   data.frame(
                     Gene = "Dignosis",
@@ -902,7 +903,7 @@ drug_analysis_logic <- function() {
               Gene_arrange = gene_table$Gene
               gene_table = gene_table %>% dplyr::mutate(
                 Gene = factor(gene_table$Gene, levels = Gene_arrange))
-              
+
               p_left <- gene_table  %>% ggplot(aes(y = fct_rev(Gene)))
               p_left <- p_left + geom_text(aes(x = 0, label = Gene), hjust = 0,
                                            fontface = ifelse(gene_table$Gene == "Dignosis", "bold", "bold.italic"))
@@ -913,13 +914,13 @@ drug_analysis_logic <- function() {
               p_left <- p_left + geom_text(aes(x = 4.6, label = estimate_lab_3), hjust = 0,
                                            fontface = ifelse(gene_table$estimate_lab_3 == "RMST difference", "bold", "plain"))
               p_left <- p_left + theme_void() + coord_cartesian(xlim = c(0, 7.2))
-              
+
               # right side of plot - pvalues
               p_right <- gene_table  |> ggplot() +
                 geom_text(aes(x = 0, y = fct_rev(Gene), label = patients), hjust = 0,
                           fontface = ifelse(gene_table$patients == "Patients", "bold", "plain")) +
                 theme_void()
-              
+
               # final plot arrangement
               layout <- c(patchwork::area(t = 0, l = 0, b = 30, r = 7.2),
                           patchwork::area(t = 1, l = 7.2, b = 30, r = 12.5),
@@ -927,14 +928,14 @@ drug_analysis_logic <- function() {
               OUTPUT_DATA$drug_analysis_has = p_left + p_mid + p_right + plot_layout(design = layout)
               OUTPUT_DATA$drug_analysis_gene_table_3 = gene_table
             }
-            
+
             incProgress(1 / 13)
-            
+
             # analysis for common oncogenic mutations
             Data_drug_Drug_length_tmp = Data_drug_TTF %>% dplyr::filter(Drug %in% input$drug)
             hs = list()
             hsc = list()
-            
+
             oncogenic_genes = Data_MAF_target %>%
               dplyr::select(Tumor_Sample_Barcode, Hugo_Symbol) %>%
               dplyr::filter(Tumor_Sample_Barcode %in% Data_drug_Drug_length_tmp$ID) %>%
@@ -970,7 +971,7 @@ drug_analysis_logic <- function() {
                     )
                   )
                   traditional_fit = survfit(Surv(event = Drug_length_censor,
-                                                 time = Drug_length) ~ gene_mut, 
+                                                 time = Drug_length) ~ gene_mut,
                                             data = Data_drug_Drug_length_tmp)
                   if(nrow(Data_drug_Drug_length_tmp) != traditional_fit[[1]][[1]]){
                     tau0 = ((max((Data_drug_Drug_length_tmp %>% dplyr::filter(gene_mut == 0))$Drug_length, na.rm = T) - 1)/365.25*12)
@@ -983,7 +984,7 @@ drug_analysis_logic <- function() {
                       tau = tau * 365.25 / 12,
                       alpha = 0.05
                     )
-                    
+
                     diff_0 = survdiff(Surv(Drug_length, Drug_length_censor)~gene_mut,
                                       data=Data_drug_Drug_length_tmp, rho=0)
                     diff_1 = survdiff(Surv(Drug_length, Drug_length_censor)~gene_mut,
@@ -1020,10 +1021,10 @@ drug_analysis_logic <- function() {
               Gene_arrange = gene_table$Gene
               gene_table = gene_table %>% dplyr::mutate(
                 Gene = factor(gene_table$Gene, levels = Gene_arrange))
-              
-              p_mid <- 
+
+              p_mid <-
                 gene_table |>
-                ggplot(aes(y = fct_rev(Gene))) + 
+                ggplot(aes(y = fct_rev(Gene))) +
                 theme_classic() +
                 geom_point(aes(x=diff_median), shape=15, size=3) +
                 geom_linerange(aes(xmin=diff_LL, xmax=diff_UL)) +
@@ -1039,7 +1040,7 @@ drug_analysis_logic <- function() {
                 annotate("text",
                          x = (max(abs(gene_table$diff_LL), abs(gene_table$diff_UL)) + 0.5)/2,
                          y = length(Gene_arrange) + 1,
-                         label = "mut=long survival") + 
+                         label = "mut=long survival") +
                 theme(legend.position = "none",
                       axis.line.y = element_blank(),
                       axis.ticks.y= element_blank(),
@@ -1054,7 +1055,7 @@ drug_analysis_logic <- function() {
                   estimate_lab_3 = paste0(format_p(diff_median, digits = 1), " (", format_p(diff_LL, digits = 1), "-", format_p(diff_UL, digits = 1), ")")) %>%
                 dplyr::mutate(
                   patients = paste0(positive_patients, " (", positive_freq, "%)"))
-              gene_table = 
+              gene_table =
                 dplyr::bind_rows(
                   data.frame(
                     Gene = "Gene",
@@ -1066,7 +1067,7 @@ drug_analysis_logic <- function() {
               Gene_arrange = gene_table$Gene
               gene_table = gene_table %>% dplyr::mutate(
                 Gene = factor(gene_table$Gene, levels = Gene_arrange))
-              
+
               p_left <- gene_table  %>% ggplot(aes(y = fct_rev(Gene)))
               p_left <- p_left + geom_text(aes(x = 0, label = Gene), hjust = 0,
                                            fontface = ifelse(gene_table$Gene == "Gene", "bold", "bold.italic"))
@@ -1077,7 +1078,7 @@ drug_analysis_logic <- function() {
               p_left <- p_left + geom_text(aes(x = 5.0, label = estimate_lab_3), hjust = 0,
                                            fontface = ifelse(gene_table$estimate_lab_3 == "RMST difference", "bold", "plain"))
               p_left <- p_left + theme_void() + coord_cartesian(xlim = c(0, 7.5))
-              
+
               # right side of plot - pvalues
               p_right <- gene_table  |> ggplot() +
                 geom_text(aes(x = 0, y = fct_rev(Gene), label = patients), hjust = 0,
@@ -1088,7 +1089,7 @@ drug_analysis_logic <- function() {
                           patchwork::area(t = 1, l = 7.5, b = 30, r = 12.5),
                           patchwork::area(t = 0, l = 12.5, b = 30, r = 14))
               OUTPUT_DATA$drug_analysis_h = p_left + p_mid + p_right + plot_layout(design = layout)
-              
+
               for(kk in k:32){
                 hs[[kk]] = ggsurvplot_empty()
               }
@@ -1104,7 +1105,7 @@ drug_analysis_logic <- function() {
               dplyr::count(cluster) %>%
               dplyr::arrange(cluster)
             colnames(oncogenic_genes) = c("cluster", "all_patients")
-            
+
             if(nrow(Data_drug_Drug_length_tmp) > 0 & nrow(oncogenic_genes) > 0){
               gene_table = data.frame(oncogenic_genes$cluster)
               colnames(gene_table) = c("Gene")
@@ -1130,7 +1131,7 @@ drug_analysis_logic <- function() {
                     )
                   )
                   traditional_fit = survfit(Surv(event = Drug_length_censor,
-                                                 time = Drug_length) ~ gene_mut, 
+                                                 time = Drug_length) ~ gene_mut,
                                             data = Data_drug_Drug_length_tmp)
                   if(nrow(Data_drug_Drug_length_tmp) != traditional_fit[[1]][[1]]){
                     tau0 = ((max((Data_drug_Drug_length_tmp %>% dplyr::filter(gene_mut == 0))$Drug_length, na.rm = T) - 1)/365.25*12)
@@ -1143,14 +1144,14 @@ drug_analysis_logic <- function() {
                       tau = tau * 365.25 / 12,
                       alpha = 0.05
                     )
-                    
+
                     diff_0 = survdiff(Surv(Drug_length, Drug_length_censor)~gene_mut,
                                       data=Data_drug_Drug_length_tmp, rho=0)
                     diff_1 = survdiff(Surv(Drug_length, Drug_length_censor)~gene_mut,
                                       data=Data_drug_Drug_length_tmp, rho=1)
                     diff_2 = coxph(Surv(Drug_length, Drug_length_censor)~gene_mut,
                                    data=Data_drug_Drug_length_tmp)
-                    
+
                     mut_gene = paste(oncogenic_genes$cluster[i],
                                      ", top ", i, " gene", sep="")
                     tmp = data.frame(summary(traditional_fit)$table)
@@ -1184,7 +1185,7 @@ drug_analysis_logic <- function() {
               #   Gene = factor(gene_table$Gene, levels = Gene_arrange))
               gene_table = gene_table %>% dplyr::mutate(
                 Gene = factor(gene_table$Gene))
-              
+
               # -Inf, Inf を置き換える新しい列を作る
               min_val <- min(gene_table$diff_LL[gene_table$diff_LL != 0], na.rm = TRUE)
               max_val <- max(gene_table$diff_UL[is.finite(gene_table$diff_UL)], na.rm = TRUE)
@@ -1192,9 +1193,9 @@ drug_analysis_logic <- function() {
               gene_table$diff_UL_plot <- ifelse(is.finite(gene_table$diff_UL), gene_table$diff_UL, max_val)
               gene_table$diff_median_plot <- ifelse(gene_table$diff_median >= gene_table$diff_LL_plot &
                                                       gene_table$diff_median <= gene_table$diff_UL_plot, gene_table$diff_median, NA)
-              p_mid <- 
+              p_mid <-
                 gene_table |>
-                ggplot(aes(y = fct_rev(Gene))) + 
+                ggplot(aes(y = fct_rev(Gene))) +
                 theme_classic() +  scale_x_log10() +
                 geom_point(aes(x=diff_median_plot), shape=15, size=3) +
                 geom_linerange(aes(xmin=diff_LL_plot, xmax=diff_UL_plot)) +
@@ -1211,7 +1212,7 @@ drug_analysis_logic <- function() {
                 annotate("text",
                          x = sqrt(min_val ^ 1.1),
                          y = length(Gene_arrange) + 1,
-                         label = "cluster=long survival") + 
+                         label = "cluster=long survival") +
                 theme(legend.position = "none",
                       axis.line.y = element_blank(),
                       axis.ticks.y= element_blank(),
@@ -1226,7 +1227,7 @@ drug_analysis_logic <- function() {
                   estimate_lab_3 = paste0(format_p(diff_median, digits = 1), " (", format_p(diff_LL, digits = 1), "-", format_p(diff_UL, digits = 1), ")")) %>%
                 dplyr::mutate(
                   patients = paste0(positive_patients, " (", positive_freq, "%)"))
-              gene_table = 
+              gene_table =
                 dplyr::bind_rows(
                   data.frame(
                     Gene = "Cluster",
@@ -1238,7 +1239,7 @@ drug_analysis_logic <- function() {
               Gene_arrange = gene_table$Gene
               gene_table = gene_table %>% dplyr::mutate(
                 Gene = factor(gene_table$Gene, levels = Gene_arrange))
-              
+
               p_left <- gene_table  %>% ggplot(aes(y = fct_rev(Gene)))
               p_left <- p_left + geom_text(aes(x = 0, label = Gene), hjust = 0,
                                            fontface = ifelse(gene_table$Gene == "Cluster", "bold", "bold.italic"))
@@ -1268,15 +1269,15 @@ drug_analysis_logic <- function() {
 
             incProgress(1 / 13)
           }
-          
+
           if(input$drug_volcano != "Yes"){
-            
+
             Data_drug_RECIST = Data_drug_RECIST %>%
               dplyr::filter(Drug %in% input$drug) %>%
               dplyr::filter(治療ライン %in% input$target_line) %>%
               dplyr::arrange(ID, 治療ライン)
-            
-            
+
+
             Drug_summary_RECIST = Data_drug_RECIST %>%
               dplyr::select(
                 ID,
@@ -1330,7 +1331,7 @@ drug_analysis_logic <- function() {
                 )
               }
             }
-            
+
             Drug_summary_RECIST_line$`Reason to finish treatment`[is.na(Drug_summary_RECIST_line$`Reason to finish treatment`)] = "Unknown"
             Drug_summary_RECIST_line$`Reason to finish treatment`[Drug_summary_RECIST_line$`Reason to finish treatment` == "その他理由で中止"] = "Other reason"
             Drug_summary_RECIST_line$`Reason to finish treatment`[Drug_summary_RECIST_line$`Reason to finish treatment` == "不明"] = "Unknown"
@@ -1343,18 +1344,18 @@ drug_analysis_logic <- function() {
             Drug_summary_RECIST_line$`Treatment finished or censored`[is.na(Drug_summary_RECIST_line$`Treatment finished or censored`)] = "Unknown"
             Drug_summary_RECIST_line$`Treatment finished or censored`[Drug_summary_RECIST_line$`Treatment finished or censored` == "1"] = "Finished"
             Drug_summary_RECIST_line$`Treatment finished or censored`[Drug_summary_RECIST_line$`Treatment finished or censored` == "0"] = "Censored"
-            
+
             ID_diagnosis_list = Data_case_target %>% dplyr::select(C.CAT調査結果.基本項目.ハッシュID,症例.基本情報.がん種.OncoTree.)
             Drug_summary_RECIST_line$diagnosis = unlist(lapply(list(Drug_summary_RECIST_line$ID), function(x) {
               as.vector(ID_diagnosis_list$症例.基本情報.がん種.OncoTree.[match(x, ID_diagnosis_list$C.CAT調査結果.基本項目.ハッシュID)])}))
-            
-            remove_cols <- names(Drug_summary_RECIST_line) %in% names(classification_rules) & 
+
+            remove_cols <- names(Drug_summary_RECIST_line) %in% names(classification_rules) &
               sapply(Drug_summary_RECIST_line, is.logical)
             Drug_summary_RECIST_line <- Drug_summary_RECIST_line[, !remove_cols, with = FALSE]
             keep_cols_RECIST <- names(Drug_summary_RECIST_line)[names(Drug_summary_RECIST_line) %in% names(classification_rules)]
             Drug_summary_RECIST_line <- Drug_summary_RECIST_line %>%
               mutate(across(all_of(keep_cols_RECIST), as.factor))
-            
+
             Drug_summary_for_table = Drug_summary_RECIST_line
             Drug_summary_for_table = Drug_summary_for_table %>%
               dplyr::left_join(
@@ -1366,7 +1367,7 @@ drug_analysis_logic <- function() {
                   YoungOld == "Younger" ~ paste0("Younger than ", input$mid_age + 1),
                   TRUE ~ paste0(input$mid_age + 1, " and older")
                 ))
-            
+
             translation_map <- list(
               "Family cancer history" = c("あり" = "Yes", "なし" = "No", "不明" = "Unknown"),
               "Double cancer in a different organ" = c("あり" = "Yes", "なし" = "No", "不明" = "Unknown"),
@@ -1414,12 +1415,12 @@ drug_analysis_logic <- function() {
               Drug_summary_for_table[is.na(get(col)), (col) := "Unknown"]
               Drug_summary_for_table[, (col) := translation_map[[col]][get(col)]]
               Drug_summary_for_table[is.na(get(col)), (col) := "Unknown"]
-            }      
+            }
             OUTPUT_DATA$drug_analysis_Drug_summary_for_table = Drug_summary_for_table
 
             Drug_summary_RECIST_line = Drug_summary_RECIST_line %>%
               dplyr::left_join(Data_case_age_sex, by = "ID")
-            
+
             mut_gene_ = input$gene[input$gene %in% unique(Data_MAF_target$Hugo_Symbol)]
             if(length(mut_gene_)==0){
               mut_gene_ = names(sort(table(Data_MAF_target$Hugo_Symbol),decreasing = T))[[1]]
@@ -1528,7 +1529,7 @@ drug_analysis_logic <- function() {
               Data_survival_tmp = Data_survival_tmp %>%
                 dplyr::select(-MMR_IHC)
             }
-            
+
             Data_survival_tmp = Data_survival_tmp %>%
               dplyr::distinct(C.CAT調査結果.基本項目.ハッシュID, .keep_all = TRUE) %>%
               dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% Data_forest$ID)
@@ -1540,7 +1541,7 @@ drug_analysis_logic <- function() {
             colnames_tmp[colnames_tmp == "cluster"] = "Cluster"
             colnames_tmp[colnames_tmp == "症例.基本情報.がん種.OncoTree.LEVEL1."] = "Histology_dummy"
             colnames(Data_survival_tmp) = colnames_tmp
-            
+
             #Data_survival_tmp$Histology_dummy = paste0(Data_survival_tmp$Histology_dummy,"_NOS")
             Data_survival_tmp$Age[is.na(Data_survival_tmp$Age)] <- "不明"
             Data_forest = left_join(Data_forest, Data_survival_tmp, by="ID")
@@ -1563,7 +1564,7 @@ drug_analysis_logic <- function() {
                 TRUE ~ -1
               )
             )
-            
+
             Data_forest$Cluster = factor(Data_forest$Cluster)
             gene_names = unique(c(input$drug_multi_gene))
             for(i in seq_len(length(gene_names))){
@@ -1611,7 +1612,7 @@ drug_analysis_logic <- function() {
             Factor_names = Factor_names[!Factor_names %in% c('ID', 'Drug',
                                                              "Drug_length_censor", "Drug_length",
                                                              "最良総合効果", "ORR_data", "DCR_data")]
-            
+
             Data_forest_tmp = Data_forest %>% dplyr::filter(!is.na(Drug_length_censor))
             Disease_tmp = unique(sort(Data_forest_tmp$Histology))
             Disease_tmp2 = unique(sort(Data_forest_tmp$Histology_dummy))
@@ -1776,10 +1777,10 @@ drug_analysis_logic <- function() {
             Data_forest_tmp_x = Data_forest_tmp
             Factor_names_x = Factor_names
             Factor_names_x_univariant = Factor_names_univariant
-            
-            
+
+
             incProgress(1 / 13)
-            
+
             Data_forest_tmp_1 = Data_forest  %>%
               dplyr::filter(ORR_data != -1) %>%
               dplyr::select(-ID, -Drug,
@@ -1957,7 +1958,7 @@ drug_analysis_logic <- function() {
                 }
               }
             }
-            
+
             Data_forest_tmp_1_univariant = Data_forest_tmp_1
             if(length(colnames(Data_forest_tmp_1)) > 1){
               Factor_names_tmp_1 = colnames(Data_forest_tmp_1)
@@ -1978,9 +1979,9 @@ drug_analysis_logic <- function() {
             }
             Data_forest_tmp_7 = Data_forest_tmp_1
             Data_forest_tmp_7_univariant = Data_forest_tmp_1_univariant
-            
+
             incProgress(1 / 13)
-            
+
             Data_forest_tmp_2 = Data_forest  %>%
               dplyr::filter(DCR_data != -1) %>%
               dplyr::select(-ID, -Drug,
@@ -2166,16 +2167,16 @@ drug_analysis_logic <- function() {
                 }
               }
             }
-            
+
             Data_forest_tmp_8 = Data_forest_tmp_2
             Data_forest_tmp_8_univariant = Data_forest_tmp_2_univariant
 
             incProgress(1 / 13)
-            
+
             if(input$AE_analysis != "No"){
               col_added = col_added - 1
             }
-            
+
             Data_forest_tmp_1 = Data_forest_AE %>%
               dplyr::filter(Drug_length>0 & !is.na(Drug_length) & is.finite(Drug_length)) %>%
               dplyr::filter(ORR_data != -1) %>%
@@ -2356,7 +2357,7 @@ drug_analysis_logic <- function() {
                 }
               }
             }
-            
+
             Data_forest_tmp_1_univariant = Data_forest_tmp_1
             if(length(colnames(Data_forest_tmp_1)) > 1){
               Factor_names_tmp_1 = colnames(Data_forest_tmp_1)
@@ -2378,7 +2379,7 @@ drug_analysis_logic <- function() {
             Data_forest_tmp_9 = Data_forest_tmp_1
             Data_forest_tmp_9_univariant = Data_forest_tmp_1_univariant
           }
-          
+
           incProgress(1 / 13)
          Data_drug_survival_1_save = Data_drug_original %>%
             dplyr::arrange(ID) %>%
@@ -2417,7 +2418,7 @@ drug_analysis_logic <- function() {
 
         }
       })
-      
+
     }
   })
   rm(analysis_env)
@@ -2428,7 +2429,7 @@ output$figure_drug_1 = renderPlot({
   req(input$ToT_var_1)  # NULL のときはスキップ
   # if(input$ToT_var_1 == "AE_matrix"){
   #   OUTPUT_DATA$drug_analysis_gb_AE_heatmap
-  # } else 
+  # } else
   if(input$ToT_var_1 == "previous"){
     OUTPUT_DATA$drug_analysis_gb_previous
   } else if(input$ToT_var_1 == "selected_line"){
@@ -2463,7 +2464,7 @@ output$figure_drug_1 = renderPlot({
 })
 
 
-output$select_table_var_drug_2 = renderUI({ 
+output$select_table_var_drug_2 = renderUI({
   req(OUTPUT_DATA$Data_drug_Data_case_target,
       OUTPUT_DATA$drug_analysis_keep_cols,
       OUTPUT_DATA$drug_analysis_keep_cols_RECIST)
@@ -2599,7 +2600,7 @@ table_drug_tot_create_summary <- function(data, config) {
       tbl_summary(
         statistic = list(all_continuous() ~ c("{N_nonmiss}",
                                               "{mean} ({sd})",
-                                              "{median} ({p25}, {p75})", 
+                                              "{median} ({p25}, {p75})",
                                               "{min}, {max}"),
                          all_categorical() ~ "{n} ({p}%)"),
         type = list(all_continuous() ~ "continuous2",
@@ -2615,7 +2616,7 @@ table_drug_tot_create_summary <- function(data, config) {
         by = !!sym(config$by_var),
         statistic = list(all_continuous() ~ c("{N_nonmiss}",
                                               "{mean} ({sd})",
-                                              "{median} ({p25}, {p75})", 
+                                              "{median} ({p25}, {p75})",
                                               "{min}, {max}"),
                          all_categorical() ~ "{n} ({p}%)"),
         type = list(all_continuous() ~ "continuous2",
@@ -2626,16 +2627,16 @@ table_drug_tot_create_summary <- function(data, config) {
         ),
         missing = "ifany")
   }
-  
+
   # Apply standard modifications
   summary_result %>%
     modify_table_body(
-      ~ .x %>% 
+      ~ .x %>%
         mutate(across(starts_with("stat_"), ~ str_replace_all(.x, "\\(0\\.0%\\)", "(<0.1%)")))
     ) %>%
     modify_caption(config$caption) %>%
-    add_n() %>% 
-    bold_labels() %>% 
+    add_n() %>%
+    bold_labels() %>%
     as_gt()
 }
 
@@ -2650,17 +2651,17 @@ output$table_drug_ToT_1 <- render_gt({
       OUTPUT_DATA$drug_analysis_keep_cols,
       OUTPUT_DATA$drug_analysis_keep_cols_RECIST
   )
-  
+
   # Get dataset configuration
   dataset_config <- table_drug_tot_get_dataset(input$table_var_drug_dataset)
-  
+
   # Apply additional req() for specific dataset
   do.call(req, dataset_config$req_items)
-  
+
   # Get data and columns
   Drug_summary <- dataset_config$data
   keep_cols_select <- dataset_config$keep_cols
-  
+
   # Determine table configuration
   if (input$table_var_drug_2 %in% keep_cols_select) {
     # Handle dynamic variables from keep_cols_select
@@ -2673,7 +2674,7 @@ output$table_drug_ToT_1 <- render_gt({
     # Handle predefined variables
     table_config <- table_drug_tot_get_table_config(input$table_var_drug_2, input$mid_age)
   }
-  
+
   # Create and return summary table
   table_drug_tot_create_summary(Drug_summary, table_config)
 })
@@ -2748,7 +2749,7 @@ output$table_outcome_3 = DT::renderDataTable(server = TRUE,{
         dplyr::filter(Tumor_Sample_Barcode %in%
                         Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
         dplyr::arrange(Tumor_Sample_Barcode, Hugo_Symbol, amino.acid.change)
-      
+
       ID_special_gene_ = (Data_MAF_target_tmp %>%
                             dplyr::filter(Hugo_Symbol == input$special_gene | str_detect(Hugo_Symbol, paste0(input$special_gene, "_"))))$Tumor_Sample_Barcode
       ID_special_gene_mutation_1_ = (Data_MAF_target_tmp %>%
@@ -2776,7 +2777,7 @@ output$table_outcome_3 = DT::renderDataTable(server = TRUE,{
     )
     column_name = input$special_gene
   }
-  
+
   Table_outcome_mutation_total = NULL
   drug_list = list(input$drug, input$drug_group_1, input$drug_group_2, input$drug_group_3, input$drug_group_4)
   for(drug_count in 1:5){
@@ -2811,7 +2812,7 @@ output$table_outcome_3 = DT::renderDataTable(server = TRUE,{
         for(i in 1:(nrow(Table_outcome_mutation)-1)){
           Table_outcome_mutation$N[i+1] = tmp2$n[i]
         }
-        
+
         tmp2 = Data_summary_mutation %>% group_by(mutation, ORR_data) %>% tally()
         Table_outcome_mutation$OR[1] = sum((tmp2 %>% dplyr::filter(ORR_data == 1))$n)
         for(i in 1:(nrow(Table_outcome_mutation)-1)){
@@ -2826,7 +2827,7 @@ output$table_outcome_3 = DT::renderDataTable(server = TRUE,{
             Table_outcome_mutation$DC[i+1] = (tmp2 %>% dplyr::filter(DCR_data == 1 & mutation == Table_outcome_mutation[[column_name]][i+1]))$n
           }
         }
-        
+
         for(i in 1:nrow(Table_outcome_mutation)){
           Table_outcome_mutation$ORR[i] = format_p(Table_outcome_mutation$OR[i] / Table_outcome_mutation$N[i], digits = 3)
           Table_outcome_mutation$DCR[i] = format_p(Table_outcome_mutation$DC[i] / Table_outcome_mutation$N[i], digits = 3)
@@ -2861,15 +2862,15 @@ output$figure_drug_8 = render_gt({
   )
   Data_forest_tmp_8 = OUTPUT_DATA$drug_analysis_Data_forest_tmp_8
   Data_forest_tmp_8_univariant = OUTPUT_DATA$drug_analysis_Data_forest_tmp_8_univariant
-  
+
   if(length(colnames(Data_forest_tmp_8)) > 1){
     Data_forest_tmp_8 = data.frame( lapply(Data_forest_tmp_8, as.factor) )
     Data_forest_tmp_8_univariant = data.frame( lapply(Data_forest_tmp_8_univariant, as.factor) )
     if("Histology" %in% colnames(Data_forest_tmp_8)){
-      Data_forest_tmp_8$Histology <- relevel(Data_forest_tmp_8$Histology, ref=names(sort(table(Data_forest_tmp_8$Histology),decreasing = T))[[1]]) 
+      Data_forest_tmp_8$Histology <- relevel(Data_forest_tmp_8$Histology, ref=names(sort(table(Data_forest_tmp_8$Histology),decreasing = T))[[1]])
     }
     if("Histology" %in% colnames(Data_forest_tmp_8_univariant)){
-      Data_forest_tmp_8_univariant$Histology <- relevel(Data_forest_tmp_8_univariant$Histology, ref=names(sort(table(Data_forest_tmp_8_univariant$Histology),decreasing = T))[[1]]) 
+      Data_forest_tmp_8_univariant$Histology <- relevel(Data_forest_tmp_8_univariant$Histology, ref=names(sort(table(Data_forest_tmp_8_univariant$Histology),decreasing = T))[[1]])
     }
     colnames_tmp = colnames(Data_forest_tmp_8)
     colnames_tmp[colnames_tmp == "Lymph_met"] = "Lymphatic metastasis"
@@ -2889,7 +2890,7 @@ output$figure_drug_8 = render_gt({
     colnames_tmp[colnames_tmp == "PS"] = "Performance status"
     colnames_tmp[colnames_tmp == "Lines"] = "CTx line"
     colnames(Data_forest_tmp_8_univariant) = colnames_tmp
-    univ_tab <- Data_forest_tmp_8_univariant %>% 
+    univ_tab <- Data_forest_tmp_8_univariant %>%
       tbl_uvregression(                         ## 単変量解析の表を生成
         method = glm,                           ## 実行したい回帰（一般化線形モデル）を定義
         y = DCR_data,
@@ -2902,7 +2903,7 @@ output$figure_drug_8 = render_gt({
       add_q() |> # adjusts global p-values for multiple testing
       bold_p() |> # bold p-values under a given threshold (default 0.05)
       apply_custom_format(columns = c("estimate", "conf.low", "conf.high", "p.value", "q.value")) %>%
-      bold_labels() 
+      bold_labels()
     m1 <- glm(DCR_data ~., data = Data_forest_tmp_8, family = binomial(link = "logit"))
     final_mv_reg <- m1 %>%
       stats::step(direction = "backward", trace = FALSE)
@@ -2944,14 +2945,14 @@ figure_drug_6_create_column_mapping <- function() {
 # Helper function to rename columns and factors
 figure_drug_6_rename_columns_and_factors <- function(data, factor_names_main, factor_names_univ) {
   mapping <- figure_drug_6_create_column_mapping()
-  
+
   # Rename data columns
   colnames_tmp <- colnames(data)
   for (old_name in names(mapping)) {
     colnames_tmp[colnames_tmp == old_name] <- mapping[[old_name]]
   }
   colnames(data) <- colnames_tmp
-  
+
   # Rename factor names
   rename_factor_vector <- function(factor_vec) {
     for (old_name in names(mapping)) {
@@ -2959,10 +2960,10 @@ figure_drug_6_rename_columns_and_factors <- function(data, factor_names_main, fa
     }
     return(factor_vec)
   }
-  
+
   factor_names_main_renamed <- rename_factor_vector(factor_names_main)
   factor_names_univ_renamed <- rename_factor_vector(factor_names_univ)
-  
+
   return(list(
     data = data,
     factor_names_main = factor_names_main_renamed,
@@ -2971,21 +2972,21 @@ figure_drug_6_rename_columns_and_factors <- function(data, factor_names_main, fa
 }
 
 # Helper function to filter factor names
-figure_drug_6_filter_factor_names <- function(factor_names_main, factor_names_univ, 
+figure_drug_6_filter_factor_names <- function(factor_names_main, factor_names_univ,
                                               remove_cluster = TRUE, remove_genes = FALSE, gene_names = NULL) {
-  
+
   # Remove Cluster if requested
   if (remove_cluster) {
     factor_names_main <- factor_names_main[factor_names_main != "Cluster"]
     factor_names_univ <- factor_names_univ[factor_names_univ != "Cluster"]
   }
-  
+
   # Remove genes if requested
   if (remove_genes && !is.null(gene_names)) {
     factor_names_main <- factor_names_main[!factor_names_main %in% gene_names]
     factor_names_univ <- factor_names_univ[!factor_names_univ %in% gene_names]
   }
-  
+
   return(list(
     main = factor_names_main,
     univ = factor_names_univ
@@ -2994,21 +2995,21 @@ figure_drug_6_filter_factor_names <- function(factor_names_main, factor_names_un
 
 # Helper function to perform Cox regression analysis
 figure_drug_6_perform_cox_regression_analysis <- function(data, factor_names_main, factor_names_univ, drug_names) {
-  
+
   # Create Cox regression formula
   formula_str <- paste0("Surv(Drug_length, Drug_length_censor) ~ ",
                         paste(paste0("`", factor_names_main, "`"), collapse = "+"))
   cox_formula <- as.formula(formula_str)
-  
+
   # Fit Cox regression model
   linelistsurv_cox <- coxph(
     formula = cox_formula,
     data = data,
     control = coxph.control(iter.max = 50)
   )
-  
+
   # Univariate analysis
-  univ_tab <- data %>% 
+  univ_tab <- data %>%
     tbl_uvregression(
       method = coxph,
       y = Surv(time = Drug_length, event = Drug_length_censor),
@@ -3022,15 +3023,15 @@ figure_drug_6_perform_cox_regression_analysis <- function(data, factor_names_mai
     bold_p() %>%
     apply_custom_format(columns = c("estimate", "conf.low", "conf.high", "p.value", "q.value")) %>%
     bold_labels()
-  
+
   # Stepwise selection for multivariable model
   final_mv_reg <- linelistsurv_cox %>%
     stats::step(direction = "backward", trace = FALSE)
-  
+
   # Generate final table
-  caption_base <- paste0("Hazard ratio for Treatment discontinuation with ", 
+  caption_base <- paste0("Hazard ratio for Treatment discontinuation with ",
                          paste(drug_names, collapse = ";"))
-  
+
   if (!is.null(final_mv_reg$xlevels)) {
     mv_tab <- final_mv_reg %>%
       tbl_regression(exponentiate = TRUE) %>%
@@ -3039,7 +3040,7 @@ figure_drug_6_perform_cox_regression_analysis <- function(data, factor_names_mai
       bold_p() %>%
       apply_custom_format(columns = c("estimate", "conf.low", "conf.high", "p.value", "q.value")) %>%
       bold_labels()
-    
+
     result <- tbl_merge(
       tbls = list(univ_tab, mv_tab),
       tab_spanner = c("**Univariate**", "**Multivariable**")
@@ -3051,14 +3052,14 @@ figure_drug_6_perform_cox_regression_analysis <- function(data, factor_names_mai
       modify_caption(paste0(caption_base, ", no significant factor in multivariable analysis (Only factors with >2 events observed)")) %>%
       as_gt()
   }
-  
+
   return(result)
 }
 
 # Main function for treatment discontinuation analysis
-figure_drug_6_generate_discontinuation_table <- function(data, factor_names_main, factor_names_univ, drug_names, 
+figure_drug_6_generate_discontinuation_table <- function(data, factor_names_main, factor_names_univ, drug_names,
                                                          remove_cluster = TRUE, remove_genes = FALSE, gene_names = NULL) {
-  
+
   # Filter factor names based on requirements
   filtered_factors <- figure_drug_6_filter_factor_names(
     factor_names_main = factor_names_main,
@@ -3067,19 +3068,19 @@ figure_drug_6_generate_discontinuation_table <- function(data, factor_names_main
     remove_genes = remove_genes,
     gene_names = gene_names
   )
-  
+
   # Check if we have factors to analyze
   if (length(filtered_factors$main) == 0) {
     return(NULL)
   }
-  
+
   # Rename columns and factors
   renamed_data <- figure_drug_6_rename_columns_and_factors(
     data = data,
     factor_names_main = filtered_factors$main,
     factor_names_univ = filtered_factors$univ
   )
-  
+
   # Perform Cox regression analysis
   result <- figure_drug_6_perform_cox_regression_analysis(
     data = renamed_data$data,
@@ -3087,7 +3088,7 @@ figure_drug_6_generate_discontinuation_table <- function(data, factor_names_main
     factor_names_univ = renamed_data$factor_names_univ,
     drug_names = drug_names
   )
-  
+
   return(result)
 }
 
@@ -3133,16 +3134,16 @@ figure_drug_preprocess_analysis_data <- function(data_main, data_univ, remove_ge
   if("Cluster" %in% colnames(data_univ) && !remove_genes) {
     data_univ <- data_univ %>% dplyr::select(-Cluster)
   }
-  
+
   # Remove gene columns if requested
   if(remove_genes && !is.null(gene_names)) {
     existing_genes <- intersect(colnames(data_main), gene_names)
     data_main[, (existing_genes) := NULL]
-    
+
     existing_genes <- intersect(colnames(data_univ), gene_names)
     data_univ[, (existing_genes) := NULL]
   }
-  
+
   return(list(main = data_main, univ = data_univ))
 }
 
@@ -3151,7 +3152,7 @@ figure_drug_convert_and_rename_data <- function(data_main, data_univ) {
   # Convert to factors
   data_main <- data.frame(lapply(data_main, as.factor))
   data_univ <- data.frame(lapply(data_univ, as.factor))
-  
+
   # Convert Drug_length to months
   if("Drug_length" %in% colnames(data_main)) {
     data_main$Drug_length <- as.integer(data_main$Drug_length) / 365.25 * 12
@@ -3159,27 +3160,27 @@ figure_drug_convert_and_rename_data <- function(data_main, data_univ) {
   if("Drug_length" %in% colnames(data_univ)) {
     data_univ$Drug_length <- as.integer(data_univ$Drug_length) / 365.25 * 12
   }
-  
+
   # Relevel Histology factor
   if("Histology" %in% colnames(data_main)) {
-    data_main$Histology <- relevel(data_main$Histology, 
+    data_main$Histology <- relevel(data_main$Histology,
                                    ref = names(sort(table(data_main$Histology), decreasing = TRUE))[[1]])
   }
   if("Histology" %in% colnames(data_univ)) {
-    data_univ$Histology <- relevel(data_univ$Histology, 
+    data_univ$Histology <- relevel(data_univ$Histology,
                                    ref = names(sort(table(data_univ$Histology), decreasing = TRUE))[[1]])
   }
-  
+
   # Relevel Cluster factor (for figure_drug_9_2)
   if("Cluster" %in% colnames(data_main)) {
-    data_main$Cluster <- relevel(data_main$Cluster, 
+    data_main$Cluster <- relevel(data_main$Cluster,
                                  ref = names(sort(table(data_main$Cluster), decreasing = TRUE))[[1]])
   }
   if("Cluster" %in% colnames(data_univ)) {
-    data_univ$Cluster <- relevel(data_univ$Cluster, 
+    data_univ$Cluster <- relevel(data_univ$Cluster,
                                  ref = names(sort(table(data_univ$Cluster), decreasing = TRUE))[[1]])
   }
-  
+
   # Rename columns
   rename_columns <- function(data) {
     colnames_tmp <- colnames(data)
@@ -3195,17 +3196,17 @@ figure_drug_convert_and_rename_data <- function(data_main, data_univ) {
     colnames(data) <- colnames_tmp
     return(data)
   }
-  
+
   data_main <- rename_columns(data_main)
   data_univ <- rename_columns(data_univ)
-  
+
   return(list(main = data_main, univ = data_univ))
 }
 
 # Helper function for performing regression analysis
 figure_drug_perform_adverse_effect_analysis <- function(data_main, data_univ, drug_names) {
   # Univariate analysis
-  univ_tab <- data_univ %>% 
+  univ_tab <- data_univ %>%
     tbl_uvregression(
       method = glm,
       y = Adverse_effect,
@@ -3219,11 +3220,11 @@ figure_drug_perform_adverse_effect_analysis <- function(data_main, data_univ, dr
     bold_p() %>%
     apply_custom_format(columns = c("estimate", "conf.low", "conf.high", "p.value", "q.value")) %>%
     bold_labels()
-  
+
   # Multivariable analysis
   m1 <- glm(Adverse_effect ~ ., data = data_main, family = binomial(link = "logit"))
   final_mv_reg <- m1 %>% stats::step(direction = "backward", trace = FALSE)
-  
+
   # Generate final table
   if(!is.null(final_mv_reg$xlevels)) {
     mv_tab <- final_mv_reg %>%
@@ -3233,23 +3234,23 @@ figure_drug_perform_adverse_effect_analysis <- function(data_main, data_univ, dr
       bold_p() %>%
       apply_custom_format(columns = c("estimate", "conf.low", "conf.high", "p.value", "q.value")) %>%
       bold_labels()
-    
+
     result <- tbl_merge(
       tbls = list(univ_tab, mv_tab),
       tab_spanner = c("**Univariate**", "**Multivariable**")
     ) %>%
-      modify_caption(paste("Factors for adverse effect,", 
-                           paste(drug_names, collapse = ";"), 
+      modify_caption(paste("Factors for adverse effect,",
+                           paste(drug_names, collapse = ";"),
                            "multivariable regression (Only patients with >2 events observed)")) %>%
       as_gt()
   } else {
     result <- univ_tab %>%
-      modify_caption(paste("Factors for adverse effect,", 
-                           paste(drug_names, collapse = ";"), 
+      modify_caption(paste("Factors for adverse effect,",
+                           paste(drug_names, collapse = ";"),
                            "(Only patients with >2 events observed), no significant factor in multivariable analysis")) %>%
       as_gt()
   }
-  
+
   return(result)
 }
 
@@ -3258,16 +3259,16 @@ figure_drug_generate_adverse_effect_table <- function(data_main, data_univ, drug
   if(length(colnames(data_main)) <= 1) {
     return(NULL)
   }
-  
+
   # Preprocess data
   processed_data <- figure_drug_preprocess_analysis_data(data_main, data_univ, remove_genes, gene_names)
-  
+
   # Convert data types and rename columns
   converted_data <- figure_drug_convert_and_rename_data(processed_data$main, processed_data$univ)
-  
+
   # Perform analysis
   result <- figure_drug_perform_adverse_effect_analysis(converted_data$main, converted_data$univ, drug_names)
-  
+
   return(result)
 }
 
@@ -3298,7 +3299,7 @@ output$figure_drug_9_2 <- render_gt({
   )
 })
 
-output$select_table_var_volcano_2_AE = renderUI({ 
+output$select_table_var_volcano_2_AE = renderUI({
   req(OUTPUT_DATA$drug_analysis_regimen_choice_RECIST_AE)
   radioButtons(
     inputId = "table_var_volcano_2_AE",
@@ -3338,7 +3339,7 @@ output$figure_survival_drug = renderPlot({
               if (length(input$drug) > 2) "..." else ""
             ),
           TRUE ~ "Without above, only other drugs"
-        )) 
+        ))
       survival_drug_function(Data_drug_survival_1 = Data_drug_survival_1,
                              name_1 = paste0(
                                paste(head(input$drug, 2), collapse = ";"),
@@ -3407,13 +3408,13 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
   } else if(figure_survival_drug_var_2 != "Bayes"){
     adjustment = figure_survival_drug_var_2 == "Number at risk"
     traditional_fit = survfit(Surv(event = censor,
-                                   time = time_palliative_final) ~ mutation, 
+                                   time = time_palliative_final) ~ mutation,
                               data = Data_drug_survival_1)
     if(length(unique(Data_drug_survival_1$mutation)) > 1){
       survival_compare_and_plot_CTx(
         data = Data_drug_survival_1,
         time_var1 = "time_palliative_enroll",
-        time_var2 = "time_palliative_final", 
+        time_var2 = "time_palliative_final",
         status_var = "censor",
         group_var = "mutation",
         plot_title = paste0("Survival from drug initiation, ", paste(traditional_fit[[1]],collapse = "/"), " patients"),
@@ -3435,9 +3436,9 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
         Data_drug_survival_1 = Data_drug_survival_1
         ENTIRE = "whole"
       }
-      
+
       traditional_fit = survfit(Surv(event = censor,
-                                     time = time_palliative_final) ~ mutation, 
+                                     time = time_palliative_final) ~ mutation,
                                 data = Data_drug_survival_1)
       if(nrow(Data_drug_survival_1) != traditional_fit[[1]][[1]]){
         Data_drug_survival_1$gene_mut = Data_drug_survival_1$mutation == name_2
@@ -3463,11 +3464,11 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
         Data_survival_tmp2 = Data_survival_tmp_pos %>% dplyr::filter(
           time_enroll_final > time_90) %>%
           dplyr::arrange(time_enroll_final)
-        
+
         Data_survival_tmp2$time_enroll_final = time_90 - (time_10 - 1)
         idx <- 1:nrow(Data_survival_tmp2)
         Data_survival_tmp = rbind(Data_survival_tmp, Data_survival_tmp2[idx[idx < max(idx)*(1-survival_rate_10)],])
-        
+
         Data_survival_tmp_neg = Data_drug_survival_1_curve %>%
           dplyr::filter(gene_mut == FALSE)
         if(sum(Data_survival_tmp_neg$censor) > 0){
@@ -3489,12 +3490,12 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
         Data_survival_tmp4 = Data_survival_tmp_neg %>% dplyr::filter(
           time_enroll_final > time_90) %>%
           dplyr::arrange(time_enroll_final)
-        
+
         Data_survival_tmp4$time_enroll_final = time_90 - (time_10 - 1)
         idx <- 1:nrow(Data_survival_tmp4)
         Data_survival_tmp3 = rbind(Data_survival_tmp3, Data_survival_tmp4[idx[idx < max(idx)*(1-survival_rate_10)],])
-        Data_drug_survival_1 = rbind(Data_survival_tmp, Data_survival_tmp3)  
-        
+        Data_drug_survival_1 = rbind(Data_survival_tmp, Data_survival_tmp3)
+
         Data_survival_tmp_pos = Data_drug_survival_1_curve %>%
           dplyr::filter(gene_mut == TRUE)
         if(sum(Data_survival_tmp_pos$censor) > 0){
@@ -3519,10 +3520,10 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
         Data_survival_tmp6$time_palliative_enroll = time_90 - (time_10 - 1)
         idx <- 1:nrow(Data_survival_tmp6)
         Data_survival_tmp5 = rbind(Data_survival_tmp5, Data_survival_tmp6[idx[idx < max(idx)*(1-survival_rate_10)],])
-        
+
         Data_survival_tmp_neg = Data_drug_survival_1_curve %>%
           dplyr::filter(gene_mut == FALSE)
-        
+
         if(sum(Data_survival_tmp_neg$censor) > 0){
           fit = survfit(Surv(time_palliative_enroll, censor) ~ 1, data = Data_survival_tmp_neg)
           time_10 = min(90, quantile(fit, 0.10)$quantile[[1]],na.rm = T)
@@ -3545,11 +3546,11 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
         Data_survival_tmp8$time_palliative_enroll = time_90 - (time_10 - 1)
         idx <- 1:nrow(Data_survival_tmp8)
         Data_survival_tmp7 = rbind(Data_survival_tmp7, Data_survival_tmp8[idx[idx < max(idx)*(1-survival_rate_10)],])
-        
+
         Median_entry_pos = median(Data_survival_tmp5$time_palliative_enroll)
         Median_entry_neg = median(Data_survival_tmp7$time_palliative_enroll)
-        Data_drug_survival_1_2 = rbind(Data_survival_tmp5, Data_survival_tmp7)  
-        
+        Data_drug_survival_1_2 = rbind(Data_survival_tmp5, Data_survival_tmp7)
+
         Data_drug_survival_1 = Data_drug_survival_1 %>%
           dplyr::mutate(delay_1 = case_when(
             time_palliative_enroll <= Median_entry_pos &
@@ -3560,12 +3561,12 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
               gene_mut == FALSE ~ "SPT to entry early",
             time_palliative_enroll > Median_entry_neg &
               gene_mut == FALSE ~ "SPT to entry later"))
-        
+
         if(sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == TRUE & delay_1 == "SPT to entry later"))$censor) >= 1 &
            sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == FALSE & delay_1 == "SPT to entry later"))$censor) >= 1 &
            sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == TRUE & delay_1 != "SPT to entry later"))$censor) >= 1 &
            sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == FALSE & delay_1 != "SPT to entry later"))$censor) >= 1){
-          
+
           stan_weibull_survival_model_data <-
             list(
               Median_pos = as.integer(Median_entry_pos),
@@ -3591,7 +3592,7 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
               ycen_early_neg = Data_drug_survival_1$time_enroll_final[Data_drug_survival_1$censor == 0 & Data_drug_survival_1$delay_1 != "SPT to entry later" & Data_drug_survival_1$gene_mut == FALSE],
               ycen_late_neg = Data_drug_survival_1$time_enroll_final[Data_drug_survival_1$censor == 0 & Data_drug_survival_1$delay_1 == "SPT to entry later" & Data_drug_survival_1$gene_mut == FALSE]
             )
-          
+
           if(DOCKER){
             stan_model_compiled <- readRDS(stan_model_factor_save_path_cmdstan)
             stan_weibull_survival_model_fit <- stan_model_compiled$sample(
@@ -3612,25 +3613,25 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
                           control=list(adapt_delta=0.99, max_treedepth = 10),
                           seed=1234, chains=4, iter=3 / 2 * ITER, warmup=ITER / 2, thin=1, refresh=500, verbose = FALSE)
           }
-          
+
           stan_weibull_survival_model_draws <- tidybayes::tidy_draws(stan_weibull_survival_model_fit)
           stan_weibull_survival_model_draws_total <-
             stan_weibull_survival_model_draws %>%
             dplyr::select(.chain, .iteration, .draw, starts_with("yhat_total")) %>%
             tidyr::gather(key = key, value = yhat_total, starts_with("yhat_total")) %>%
-            dplyr::select(-key) 
+            dplyr::select(-key)
           stan_weibull_survival_model_draws_total_exp <-
             stan_weibull_survival_model_draws %>%
             dplyr::select(.chain, .iteration, .draw, starts_with("yhat_factor_total")) %>%
             tidyr::gather(key = key, value = yhat_total_exp, starts_with("yhat_factor_total")) %>%
-            dplyr::select(-key) 
-          
+            dplyr::select(-key)
+
           median_os_list_weibull_total_exp = matrix(stan_weibull_survival_model_draws_total_exp$yhat_total_exp, nrow=4 * ITER)
           median_os_list_weibull_total = matrix(stan_weibull_survival_model_draws_total$yhat_total, nrow=4 * ITER)
           median_os_list_weibull_total_exp = rowMedians(median_os_list_weibull_total_exp,na.rm = T)
           median_os_list_weibull_total = rowMedians(median_os_list_weibull_total,na.rm = T)
           median_os_list_weibull_bias = median_os_list_weibull_total - median_os_list_weibull_total_exp
-          
+
           median_os_summary_weibull_total = quantile(median_os_list_weibull_total, probs = c(0.025, 0.5, 0.975))
           median_os_summary_weibull_total_exp = quantile(median_os_list_weibull_total_exp, probs = c(0.025, 0.5, 0.975))
           median_os_summary_weibull_bias = quantile(median_os_list_weibull_bias, probs = c(0.025, 0.5, 0.975))
@@ -3638,22 +3639,22 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
           yhat_weibull_sort_total_exp = sort(stan_weibull_survival_model_draws_total_exp$yhat_total_exp)
           yhat_weibull_sort_average_total = yhat_weibull_sort_total[1:nrow(Data_drug_survival_1_curve) * as.integer(length(yhat_weibull_sort_total)/nrow(Data_drug_survival_1_curve))]
           yhat_weibull_sort_average_total_exp = yhat_weibull_sort_total_exp[1:nrow(Data_drug_survival_1_curve) * as.integer(length(yhat_weibull_sort_total_exp)/nrow(Data_drug_survival_1_curve))]
-          
+
           Data_drug_survival_1_curve$factor_neg = yhat_weibull_sort_average_total
           Data_drug_survival_1_curve$factor_pos = yhat_weibull_sort_average_total_exp
           Data_drug_survival_1_curve$factor_neg[Data_drug_survival_1_curve$factor_neg > 10000] = 10000
           Data_drug_survival_1_curve$factor_pos[Data_drug_survival_1_curve$factor_pos > 10000] = 10000
-          
+
           traditional_fit = survfit(Surv(event = censor,
                                          time = time_palliative_final) ~ gene_mut,
                                     data = Data_drug_survival_1_curve)
           simulation_fit_neg = survfit(Surv(event = rep(1,nrow(Data_drug_survival_1_curve)),
-                                            time = factor_neg) ~ 1, 
+                                            time = factor_neg) ~ 1,
                                        data = Data_drug_survival_1_curve)
           simulation_fit_pos = survfit(Surv(event = rep(1,nrow(Data_drug_survival_1_curve)),
-                                            time = factor_pos) ~ 1, 
+                                            time = factor_pos) ~ 1,
                                        data = Data_drug_survival_1_curve)
-          
+
           g_surv_drug_tmp = ggsurvplot(
             fit = list(traditional_fit = traditional_fit,
                        simulation_fit_neg = simulation_fit_neg,
@@ -3674,7 +3675,7 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
             pval = FALSE,
             risk.table = TRUE,
             risk.table.y.text = FALSE,
-            tables.theme = clean_theme(), 
+            tables.theme = clean_theme(),
             legend = c(0.8,0.8),
             xlim = c(0, max(Data_drug_survival_1_curve$time_palliative_final) * 1.05),
             cumevents = FALSE,
@@ -3685,7 +3686,7 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
                             paste0(name_2, ", Unadjusted"),
                             paste0(name_1, ", Adjusted"),
                             paste0(name_2, ", Adjusted"))
-          ) +   
+          ) +
             labs(title = paste(paste0("Treated regimens including ", paste(input$drug, collapse = ";")), "/n", sum(traditional_fit[[1]]), " patients ",
                                "Median OS ",
                                format_p(summary(traditional_fit)$table[[13]] / 365.25 * 12, digits = 1)," (",
@@ -3696,7 +3697,7 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
                                format_p(summary(traditional_fit)$table[[16]] / 365.25 * 12, digits = 1),"-",
                                format_p(summary(traditional_fit)$table[[18]] / 365.25 * 12, digits = 1),") (",
                                name_2_short,", unadj.)/",
-                               format_p(median_os_summary_weibull_total[[2]] / 365.25 * 12, digits = 1), 
+                               format_p(median_os_summary_weibull_total[[2]] / 365.25 * 12, digits = 1),
                                " (", format_p(median_os_summary_weibull_total[[1]] / 365.25 * 12, digits = 1), "-",
                                format_p(median_os_summary_weibull_total[[3]] / 365.25 * 12, digits = 1), ") (",
                                name_1_short,", adj.)/",
@@ -3707,8 +3708,8 @@ survival_drug_function = function(Data_drug_survival_1, name_1, name_2, name_1_s
                                sep=""),
                  subtitle = paste("Survival difference, ",name_1_short, "-", name_2_short, ": ",
                                   format_p(median_os_summary_weibull_bias[[2]] / 365.25 * 12, digits = 1), " (",
-                                  format_p(median_os_summary_weibull_bias[[1]] / 365.25 * 12, digits = 1), "-", 
-                                  format_p(median_os_summary_weibull_bias[[3]] / 365.25 * 12, digits = 1), 
+                                  format_p(median_os_summary_weibull_bias[[1]] / 365.25 * 12, digits = 1), "-",
+                                  format_p(median_os_summary_weibull_bias[[3]] / 365.25 * 12, digits = 1),
                                   ") months, median (95% CI)",
                                   sep=""))
           g_surv_drug_tmp$table <- g_surv_drug_tmp$table + theme(plot.title = element_blank(),
@@ -3736,12 +3737,12 @@ output$figure_drug_7_1 = render_gt({
   if(length(colnames(Data_forest_tmp_7)) > 1){
     Data_forest_tmp_7 = data.frame( lapply(Data_forest_tmp_7, as.factor) )
     Data_forest_tmp_7_univariant = data.frame( lapply(Data_forest_tmp_7_univariant, as.factor) )
-    
+
     if("Histology" %in% colnames(Data_forest_tmp_7)){
-      Data_forest_tmp_7$Histology <- relevel(Data_forest_tmp_7$Histology, ref=names(sort(table(Data_forest_tmp_7$Histology),decreasing = T))[[1]]) 
+      Data_forest_tmp_7$Histology <- relevel(Data_forest_tmp_7$Histology, ref=names(sort(table(Data_forest_tmp_7$Histology),decreasing = T))[[1]])
     }
     if("Histology" %in% colnames(Data_forest_tmp_7_univariant)){
-      Data_forest_tmp_7_univariant$Histology <- relevel(Data_forest_tmp_7_univariant$Histology, ref=names(sort(table(Data_forest_tmp_7_univariant$Histology),decreasing = T))[[1]]) 
+      Data_forest_tmp_7_univariant$Histology <- relevel(Data_forest_tmp_7_univariant$Histology, ref=names(sort(table(Data_forest_tmp_7_univariant$Histology),decreasing = T))[[1]])
     }
     colnames_tmp = colnames(Data_forest_tmp_7)
     colnames_tmp[colnames_tmp == "Lymph_met"] = "Lymphatic metastasis"
@@ -3761,7 +3762,7 @@ output$figure_drug_7_1 = render_gt({
     colnames_tmp[colnames_tmp == "PS"] = "Performance status"
     colnames_tmp[colnames_tmp == "Lines"] = "CTx line"
     colnames(Data_forest_tmp_7_univariant) = colnames_tmp
-    univ_tab <- Data_forest_tmp_7_univariant %>% 
+    univ_tab <- Data_forest_tmp_7_univariant %>%
       tbl_uvregression(                         ## 単変量解析の表を生成
         method = glm,                           ## 実行したい回帰（一般化線形モデル）を定義
         y = ORR_data,
@@ -3774,7 +3775,7 @@ output$figure_drug_7_1 = render_gt({
       add_q() |> # adjusts global p-values for multiple testing
       bold_p() |> # bold p-values under a given threshold (default 0.05)
       apply_custom_format(columns = c("estimate", "conf.low", "conf.high", "p.value", "q.value")) %>%
-      bold_labels() 
+      bold_labels()
     m1 <- glm(ORR_data ~., data = Data_forest_tmp_7, family = binomial(link = "logit"))
     final_mv_reg <- m1 %>%
       stats::step(direction = "backward", trace = FALSE)
@@ -3813,12 +3814,12 @@ output$figure_drug_7_2 = render_gt({
   if(length(colnames(Data_forest_tmp_7)) > 1){
     Data_forest_tmp_7 = data.frame( lapply(Data_forest_tmp_7, as.factor) )
     Data_forest_tmp_7_univariant = data.frame( lapply(Data_forest_tmp_7_univariant, as.factor) )
-    
+
     if("Histology" %in% colnames(Data_forest_tmp_7)){
-      Data_forest_tmp_7$Histology <- relevel(Data_forest_tmp_7$Histology, ref=names(sort(table(Data_forest_tmp_7$Histology),decreasing = T))[[1]]) 
+      Data_forest_tmp_7$Histology <- relevel(Data_forest_tmp_7$Histology, ref=names(sort(table(Data_forest_tmp_7$Histology),decreasing = T))[[1]])
     }
     if("Histology" %in% colnames(Data_forest_tmp_7_univariant)){
-      Data_forest_tmp_7_univariant$Histology <- relevel(Data_forest_tmp_7_univariant$Histology, ref=names(sort(table(Data_forest_tmp_7_univariant$Histology),decreasing = T))[[1]]) 
+      Data_forest_tmp_7_univariant$Histology <- relevel(Data_forest_tmp_7_univariant$Histology, ref=names(sort(table(Data_forest_tmp_7_univariant$Histology),decreasing = T))[[1]])
     }
     colnames_tmp = colnames(Data_forest_tmp_7)
     colnames_tmp[colnames_tmp == "Lymph_met"] = "Lymphatic metastasis"
@@ -3838,7 +3839,7 @@ output$figure_drug_7_2 = render_gt({
     colnames_tmp[colnames_tmp == "PS"] = "Performance status"
     colnames_tmp[colnames_tmp == "Lines"] = "CTx line"
     colnames(Data_forest_tmp_7_univariant) = colnames_tmp
-    univ_tab <- Data_forest_tmp_7_univariant %>% 
+    univ_tab <- Data_forest_tmp_7_univariant %>%
       tbl_uvregression(                         ## 単変量解析の表を生成
         method = glm,                           ## 実行したい回帰（一般化線形モデル）を定義
         y = ORR_data,
@@ -3851,7 +3852,7 @@ output$figure_drug_7_2 = render_gt({
       add_q() |> # adjusts global p-values for multiple testing
       bold_p() |> # bold p-values under a given threshold (default 0.05)
       apply_custom_format(columns = c("estimate", "conf.low", "conf.high", "p.value", "q.value")) %>%
-      bold_labels() 
+      bold_labels()
     m1 <- glm(ORR_data ~., data = Data_forest_tmp_7, family = binomial(link = "logit"))
     final_mv_reg <- m1 %>%
       stats::step(direction = "backward", trace = FALSE)
@@ -3883,7 +3884,7 @@ output$figure_volcano_1_AE = renderPlot({
 })
 
 
-output$select_table_var_volcano_2 = renderUI({ 
+output$select_table_var_volcano_2 = renderUI({
   req(OUTPUT_DATA$drug_analysis_regimen_choice_RECIST)
   radioButtons(
     inputId = "table_var_volcano_2",
@@ -3904,7 +3905,7 @@ output$table_volcano = DT::renderDataTable(server = TRUE,{
 })
 
 
-output$select_table_var_volcano_1 = renderUI({ 
+output$select_table_var_volcano_1 = renderUI({
   req(OUTPUT_DATA$drug_analysis_regimen_choice_ToT)
   radioButtons(
     inputId = "table_var_volcano_1",
@@ -3922,9 +3923,9 @@ output$figure_volcano_ToT_1 = renderPlot({
 output$table_volcano_ToT = DT::renderDataTable(server = TRUE,{
   req(OUTPUT_DATA$drug_analysis_df_volcano_ToT)
   DT::datatable(OUTPUT_DATA$drug_analysis_df_volcano_ToT,
-                filter = 'top', 
-                extensions = c('Buttons'), 
-                options = list(pageLength = 100, 
+                filter = 'top',
+                extensions = c('Buttons'),
+                options = list(pageLength = 100,
                                scrollX = TRUE,
                                scrollY = "1000px",
                                scrollCollapse = TRUE,
@@ -4022,7 +4023,7 @@ output$figure_survival_drug_interactive_1 = renderPlot({
   if(!all(is.null(input$gene_survival_drug_interactive_1_AEG))){
     Data_survival_1 = Data_survival_1 %>% dplyr::filter(Overall_AE_grage %in% input$gene_survival_drug_interactive_1_AEG)
   }
-  
+
   ID_2 = unique(Data_drug_TTF_comparison$ID)
   if(!all(is.null(input$gene_survival_drug_interactive_2_P_1))){
     ID_2 = intersect(ID_2, (Data_MAF_target %>% dplyr::filter(Hugo_Symbol %in% input$gene_survival_drug_interactive_2_P_1))$Tumor_Sample_Barcode)
@@ -4344,10 +4345,10 @@ output$figure_CI_AE = renderPlot({
   Data_drug$ToT = Data_drug$ToT / 365.25 * 12
   Data_drug$TTAE = Data_drug$TTAE / 365.25 * 12
   Data_drug$TTD = Data_drug$TTD / 365.25 * 12
-  
+
   max_samples = isolate(input$AE_max_samples)
   max_samples = ifelse(is.null(max_samples), 5000, max_samples)
-  
+
   Data_drug_analysis = Data_drug %>%
     dplyr::filter(Drug %in% input$figure_CI_AE_var) %>%
     dplyr::mutate(
@@ -4379,7 +4380,7 @@ output$figure_CI_AE = renderPlot({
   )
   Data_drug_analysis = Data_drug_analysis %>%
     dplyr::left_join(Data_case_age_sex_diagnosis, by = "ID")
-  
+
   Data_drug_analysis <- Data_drug_analysis %>%
     mutate(
       # 各症例の観察終了時間を決定
@@ -4414,11 +4415,11 @@ output$figure_CI_AE = renderPlot({
     Data_drug_analysis = Data_drug_analysis
     ENTIRE = "whole"
   }
-  
-  
+
+
   # 多変量解析：共変量を含む
   covariates_matrix <- model.matrix(
-    ~ ORR_data + Age + Sex + Smoking + 治療ライン + Diagnosis, 
+    ~ ORR_data + Age + Sex + Smoking + 治療ライン + Diagnosis,
     data = Data_drug_analysis
   )[, -1]  # 切片を除去
   crr_multivariate <- crr(
@@ -4458,7 +4459,7 @@ output$figure_CI_AE = renderPlot({
       time = cif_result[[group_name]]$time,
       est = cif_result[[group_name]]$est,
       var = cif_result[[group_name]]$var,
-      effectiveness = factor(effectiveness, 
+      effectiveness = factor(effectiveness,
                              levels = c("0", "1"),
                              labels = c("No Response", "Response")),
       event_type = factor(event_type,
@@ -4476,7 +4477,7 @@ output$figure_CI_AE = renderPlot({
     filter(event_type == "Adverse Event")
   p2 <- ggplot(adverse_only, aes(x = time, y = est, color = effectiveness)) +
     geom_step(size = 1.5) +
-    geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper, fill = effectiveness), 
+    geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper, fill = effectiveness),
                 alpha = 0.3, linetype = 0) +
     scale_color_manual(values = c("No Response" = "#E31A1C", "Response" = "#1F78B4")) +
     scale_fill_manual(values = c("No Response" = "#E31A1C", "Response" = "#1F78B4")) +
@@ -4502,18 +4503,18 @@ output$figure_CI_AE = renderPlot({
       panel.grid.minor = element_blank()
     )
   # 統計結果を追加
-  hr_text <- paste("Adjusted HR:", 
+  hr_text <- paste("Adjusted HR:",
                    round(exp(crr_multivariate$coef[1]), 2),
-                   "\n95% CI:", 
+                   "\n95% CI:",
                    round(exp(crr_multivariate$coef[1] - 1.96 * sqrt(crr_multivariate$var[1,1])), 2), "-",
                    round(exp(crr_multivariate$coef[1] + 1.96 * sqrt(crr_multivariate$var[1,1])), 2),
                    "\np =", round(crr_results$p_value[1], 3))
   p2_final <- p2 +
-    annotate("text", 
-             x = max(adverse_only$time) * 0.6, 
+    annotate("text",
+             x = max(adverse_only$time) * 0.6,
              y = max(adverse_only$est) * 0.1,
              label = hr_text,
-             size = 4, 
+             size = 4,
              hjust = 0,
              vjust = 1,
              box.margin = unit(0.5, "lines"))

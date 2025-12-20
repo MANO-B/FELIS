@@ -77,6 +77,7 @@ survival_CGP_analysis_logic <- function() {
       Data_case_target = left_join(Data_case_target,
                                    Data_cluster_ID_list,
                                    by = "C.CAT調査結果.基本項目.ハッシュID")
+      Data_case_target$cluster[is.na(Data_case_target$cluster)] = max(Data_case_target$cluster, na.rm = T) + 1
       Data_drug = Data_drug_raw()
       OUTPUT_DATA$figure_surv_CGP_Data_drug = Data_drug
       Data_case_target = Data_case_target %>%

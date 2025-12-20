@@ -48,21 +48,21 @@ survival_CTx_analysis_logic <- function() {
                       time_2L_enroll
         )
       incProgress(1 / 13)
-      
+
       Data_case_target$Cancers = Data_case_target$症例.基本情報.がん種.OncoTree.
       Data_case_target$enroll_censor = 1
       Data_case_target = Data_case_target %>%
         dplyr::distinct(.keep_all = TRUE, C.CAT調査結果.基本項目.ハッシュID)
       Data_drug = Data_drug_raw()
       OUTPUT_DATA$figure_surv_Bayes_Data_drug = Data_drug
-      
+
       Data_MAF = Data_report() %>%
         dplyr::filter(
           !str_detect(Hugo_Symbol, ",") &
             Hugo_Symbol != "" &
             Evidence_level %in% c("","A","B","C","D","E","F") &
             Variant_Classification != "expression"
-        ) %>% 
+        ) %>%
         dplyr::arrange(desc(Evidence_level)) %>%
         dplyr::distinct(Tumor_Sample_Barcode,
                         Hugo_Symbol,
@@ -71,7 +71,7 @@ survival_CTx_analysis_logic <- function() {
       if(length(Data_MAF[Data_MAF$TMB > 30,]$TMB) > 0){
         Data_MAF[Data_MAF$TMB > 30,]$TMB = 30
       }
-      
+
       Data_report_TMB = Data_MAF %>%
         dplyr::filter(Tumor_Sample_Barcode %in%
                         Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
@@ -80,7 +80,12 @@ survival_CTx_analysis_logic <- function() {
       colnames(Data_report_TMB) = c("C.CAT調査結果.基本項目.ハッシュID", "TMB")
       Data_case_target = left_join(Data_case_target, Data_report_TMB,
                                    by = "C.CAT調査結果.基本項目.ハッシュID")
-      
+      Data_cluster_ID_list = Data_cluster_ID() %>%
+        dplyr::select(C.CAT調査結果.基本項目.ハッシュID, cluster)
+      Data_case_target = left_join(Data_case_target,
+                                   Data_cluster_ID_list,
+                                   by = "C.CAT調査結果.基本項目.ハッシュID")
+      Data_case_target$cluster[is.na(Data_case_target$cluster)] = max(Data_case_target$cluster, na.rm = T) + 1
       Data_MAF_target = Data_MAF %>%
         dplyr::filter(Tumor_Sample_Barcode %in%
                         Data_case_target$C.CAT調査結果.基本項目.ハッシュID)
@@ -118,7 +123,7 @@ survival_CTx_analysis_logic <- function() {
         OUTPUT_DATA$figure_surv_interactive_candidate_Histology_Bayes = sort(unique(Data_survival_interactive$Cancers))
         OUTPUT_DATA$figure_surv_interactive_candidate_cluster_Bayes = sort(unique(Data_survival_interactive$cluster))
         OUTPUT_DATA$figure_surv_interactive_candidate_PS_Bayes = sort(unique(Data_survival_interactive$症例.背景情報.ECOG.PS.名称.))
-        OUTPUT_DATA$figure_surv_interactive_candidate_meta_Bayes = c('Lymph_met','Brain_met','Lung_met','Bone_met','Liver_met') 
+        OUTPUT_DATA$figure_surv_interactive_candidate_meta_Bayes = c('Lymph_met','Brain_met','Lung_met','Bone_met','Liver_met')
         OUTPUT_DATA$figure_surv_Bayes_Data_MAF_target = Data_MAF_target
         OUTPUT_DATA$figure_surv_Bayes_Data_case_target = Data_case_target
       }
@@ -151,7 +156,7 @@ observeEvent(input$start_Bayes_compare_prediction, {
         !is.na(time_palliative_enroll) &
           !is.na(time_enroll_final) &
           is.finite(time_palliative_enroll) &
-          is.finite(time_enroll_final) & 
+          is.finite(time_enroll_final) &
           time_palliative_enroll > 0 &
           time_enroll_final > 0 &
           !is.na(censor) &
@@ -168,61 +173,61 @@ observeEvent(input$start_Bayes_compare_prediction, {
       # 転移部位のマッピングを定義
       metastasis_mapping <- c(
         "Lymph_met" = "Lymph_met",
-        "Brain_met" = "Brain_met", 
+        "Brain_met" = "Brain_met",
         "Lung_met" = "Lung_met",
         "Bone_met" = "Bone_met",
         "Liver_met" = "Liver_met"
       )
-      
+
       # ID抽出関数を定義
       extract_group_ids <- function(group_num) {
         # 初期IDセット
         IDs <- unique(Data_survival_interactive$C.CAT調査結果.基本項目.ハッシュID)
-        
+
         # 動的に入力名を構築
         input_prefix <- paste0("gene_survival_interactive_", group_num, "_")
         input_postfix <- "_Bayes"
         # 遺伝子フィルタ（P_1: 必須変異1）
         p1_input <- input[[paste0(input_prefix, "P_1", input_postfix)]]
         if(!all(is.null(p1_input))) {
-          IDs <- intersect(IDs, (Data_MAF_target %>% 
+          IDs <- intersect(IDs, (Data_MAF_target %>%
                                    dplyr::filter(Hugo_Symbol %in% p1_input))$Tumor_Sample_Barcode)
         }
-        
+
         # 遺伝子フィルタ（P_2: 必須変異2）
         p2_input <- input[[paste0(input_prefix, "P_2", input_postfix)]]
         if(!all(is.null(p2_input))) {
-          IDs <- intersect(IDs, (Data_MAF_target %>% 
+          IDs <- intersect(IDs, (Data_MAF_target %>%
                                    dplyr::filter(Hugo_Symbol %in% p2_input))$Tumor_Sample_Barcode)
         }
-        
+
         # 遺伝子除外（W: 除外変異）
         w_input <- input[[paste0(input_prefix, "W", input_postfix)]]
         if(!all(is.null(w_input))) {
-          IDs <- setdiff(IDs, (Data_MAF_target %>% 
+          IDs <- setdiff(IDs, (Data_MAF_target %>%
                                  dplyr::filter(Hugo_Symbol %in% w_input))$Tumor_Sample_Barcode)
         }
-        
+
         # 臨床データフィルタ
         clinical_filters <- list(
           L = "CTx_lines_before_CGP",
-          R = "pre_CGP_best_RECIST", 
+          R = "pre_CGP_best_RECIST",
           A = "YoungOld",
           S = "症例.基本情報.性別.名称.",
           H = "Cancers",
           C = "cluster"
         )
-        
+
         for(filter_key in names(clinical_filters)) {
           filter_input <- input[[paste0(input_prefix, filter_key, input_postfix)]]
           if(!all(is.null(filter_input))) {
             column_name <- clinical_filters[[filter_key]]
             filter_expr <- paste0(column_name, " %in% filter_input")
-            IDs <- intersect(IDs, (Data_survival_interactive %>% 
+            IDs <- intersect(IDs, (Data_survival_interactive %>%
                                      dplyr::filter(!!parse_expr(filter_expr)))$C.CAT調査結果.基本項目.ハッシュID)
           }
         }
-        
+
         # 転移部位フィルタ（M: 複数選択可能、OR条件）
         m_input <- input[[paste0(input_prefix, "M", input_postfix)]]
         if(!all(is.null(m_input))) {
@@ -231,27 +236,27 @@ observeEvent(input$start_Bayes_compare_prediction, {
             if(met_type %in% names(metastasis_mapping)) {
               column_name <- metastasis_mapping[[met_type]]
               filter_expr <- paste0(column_name, " == 'Yes'")
-              met_ids <- union(met_ids, (Data_survival_interactive %>% 
+              met_ids <- union(met_ids, (Data_survival_interactive %>%
                                            dplyr::filter(!!parse_expr(filter_expr)))$C.CAT調査結果.基本項目.ハッシュID)
             }
           }
           IDs <- intersect(IDs, met_ids)
         }
-        
+
         # 薬剤フィルタ（D）
         d_input <- input[[paste0(input_prefix, "D", input_postfix)]]
         if(!all(is.null(d_input))) {
-          IDs <- intersect(IDs, (Data_drug %>% 
+          IDs <- intersect(IDs, (Data_drug %>%
                                    dplyr::filter(Drug %in% d_input))$ID)
         }
-        
+
         return(IDs)
       }
-      
+
       # Group1とGroup2のIDを取得
       ID_1 <- extract_group_ids(1)
       ID_2 <- extract_group_ids(2)
-      
+
       run_custom_survival_analysis(
         Data_survival = Data_survival_interactive,
         id_set_1 = ID_1,
@@ -260,7 +265,7 @@ observeEvent(input$start_Bayes_compare_prediction, {
         label_2 = "Group 2"
       )
     })
-  })  
+  })
   rm(Bayes_env)
   gc()
 })
@@ -288,7 +293,7 @@ observeEvent(input$start_Bayes_basic_prediction, {
         !is.na(time_palliative_enroll) &
           !is.na(time_enroll_final) &
           is.finite(time_palliative_enroll) &
-          is.finite(time_enroll_final) & 
+          is.finite(time_enroll_final) &
           time_palliative_enroll > 0 &
           time_enroll_final > 0 &
           !is.na(censor) &
@@ -325,7 +330,7 @@ observeEvent(input$start_Bayes_basic_prediction, {
       Data_survival_tmp2$time_enroll_final = time_90 - (time_10 - 1)
       idx <- 1:nrow(Data_survival_tmp2)
       Data_drug_survival_1 = rbind(Data_survival_tmp, Data_survival_tmp2[idx[idx < max(idx)*(1-survival_rate_10)],])
-      
+
       if(sum(Data_survival_curve$censor) > 0 ){
         fit = survfit(Surv(time_palliative_enroll, enroll_censor) ~ 1, data = Data_survival_curve)
         time_10 = max(90, quantile(fit, 0.10)$quantile[[1]],na.rm = T)
@@ -348,12 +353,12 @@ observeEvent(input$start_Bayes_basic_prediction, {
       Data_survival_tmp6$time_palliative_enroll = time_90 - (time_10 - 1)
       idx <- 1:nrow(Data_survival_tmp6)
       Data_drug_survival_2 = rbind(Data_survival_tmp5, Data_survival_tmp6[idx[idx < max(idx)*(1-survival_rate_10)],])
-      
+
       Median_entry = median(Data_survival_tmp5$time_palliative_enroll)
       Data_MAF_target = Data_MAF_target %>%
         dplyr::filter(Tumor_Sample_Barcode %in%
                         Data_survival_curve$C.CAT調査結果.基本項目.ハッシュID)
-      
+
       Data_drug_survival_1 = Data_drug_survival_1 %>%
         dplyr::mutate(delay_1 = case_when(
           Data_drug_survival_1$time_palliative_enroll <= Median_entry ~ "SPT to entry early",
@@ -361,7 +366,7 @@ observeEvent(input$start_Bayes_basic_prediction, {
       Cancername = sort(unique(Data_survival_curve$Cancers))
       Total_pts = as.vector(table((Data_survival_curve %>%
                                      dplyr::distinct(C.CAT調査結果.基本項目.ハッシュID, .keep_all = T))$Cancers))
-      
+
       incProgress(1 / 13)
       stan_weibull_survival_model_data <-
         list(
@@ -377,7 +382,7 @@ observeEvent(input$start_Bayes_basic_prediction, {
           ycen_early = Data_drug_survival_1$time_enroll_final[Data_drug_survival_1$censor == 0 & Data_drug_survival_1$delay_1 != "SPT to entry later"],
           ycen_late = Data_drug_survival_1$time_enroll_final[Data_drug_survival_1$censor == 0 & Data_drug_survival_1$delay_1 == "SPT to entry later"]
         )
-      
+
       if(DOCKER){
         stan_model_compiled <- readRDS(stan_model_simple_save_path_cmdstan)
         stan_weibull_survival_model_fit <- stan_model_compiled$sample(
@@ -399,61 +404,61 @@ observeEvent(input$start_Bayes_basic_prediction, {
                       seed=1234, chains=4, iter=as.integer(ITER * 3 / 2),warmup=as.integer(ITER / 2), thin=1, refresh=500, verbose = FALSE)
       }
       incProgress(1 / 13)
-      
+
       stan_weibull_survival_model_draws <- tidybayes::tidy_draws(stan_weibull_survival_model_fit)
       stan_weibull_survival_model_draws_total_exp <-
         stan_weibull_survival_model_draws %>%
         dplyr::select(.chain, .iteration, .draw, starts_with("yhat_exp_total")) %>%
         tidyr::gather(key = key, value = yhat_total_exp, starts_with("yhat_exp_total")) %>%
-        dplyr::select(-key) 
+        dplyr::select(-key)
       stan_weibull_survival_model_draws_bef_exp <-
         stan_weibull_survival_model_draws %>%
         dplyr::select(.chain, .iteration, .draw, starts_with("y_exptmp")) %>%
         tidyr::gather(key = key, value = yhat_bef_exp, starts_with("y_exptmp")) %>%
-        dplyr::select(-key) 
+        dplyr::select(-key)
       stan_weibull_survival_model_draws_aft_exp <-
         stan_weibull_survival_model_draws %>%
         dplyr::select(.chain, .iteration, .draw, starts_with("yhat_exp_uncens")) %>%
         tidyr::gather(key = key, value = yhat_aft_exp, starts_with("yhat_exp_uncens")) %>%
-        dplyr::select(-key) 
+        dplyr::select(-key)
       stan_weibull_survival_model_draws_ear <-
         stan_weibull_survival_model_draws %>%
         dplyr::select(.chain, .iteration, .draw, starts_with("yhat_early")) %>%
         tidyr::gather(key = key, value = yhat_ear, starts_with("yhat_early")) %>%
-        dplyr::select(-key) 
+        dplyr::select(-key)
       stan_weibull_survival_model_draws_lat <-
         stan_weibull_survival_model_draws %>%
         dplyr::select(.chain, .iteration, .draw, starts_with("yhat_late")) %>%
         tidyr::gather(key = key, value = yhat_lat, starts_with("yhat_late")) %>%
-        dplyr::select(-key) 
-      
+        dplyr::select(-key)
+
       median_os_list_weibull_total_exp = matrix(stan_weibull_survival_model_draws_total_exp$yhat_total_exp, nrow=4 * ITER)
       median_os_list_weibull_total_exp = rowMedians(median_os_list_weibull_total_exp,na.rm = T)
-      
+
       median_os_summary_weibull_total_exp = quantile(median_os_list_weibull_total_exp, probs = c(0.025, 0.5, 0.975))
       yhat_weibull_sort_total_exp = sort(stan_weibull_survival_model_draws_total_exp$yhat_total_exp)
       yhat_weibull_sort_average_total_exp = yhat_weibull_sort_total_exp[1:length(Data_survival_curve$censor) * as.integer(length(yhat_weibull_sort_total_exp)/length(Data_survival_curve$censor))]
-      
+
       Data_survival_curve$left_adj = yhat_weibull_sort_average_total_exp
       Data_survival_curve$left_adj[Data_survival_curve$left_adj > 10000] = 10000
-      
-      
+
+
       independence_check = with(Data_survival_curve, cKendall(
         trun = time_palliative_enroll,
         obs = time_palliative_final,
         delta = censor,
         trans = "linear"))
-      
-      
+
+
       traditional_fit = survfit(Surv(event = censor,
-                                     time = time_palliative_final) ~ 1, 
+                                     time = time_palliative_final) ~ 1,
                                 data = Data_survival_curve)
       delayed_entry_fit = survfit(Surv(event = censor,
                                        time = time_palliative_enroll,
                                        time2 = time_palliative_final) ~ 1,
                                   data = Data_survival_curve)
       simulation_fit_2 = survfit(Surv(event = rep(1,length(Data_survival_curve$left_adj)),
-                                      time = left_adj) ~ 1, 
+                                      time = left_adj) ~ 1,
                                  data = Data_survival_curve)
       hsb_base = Data_survival_curve
       hsb_base$diagnosis = " ALL"
@@ -480,7 +485,7 @@ observeEvent(input$start_Bayes_basic_prediction, {
         surv.median.line = "hv",
         risk.table = TRUE,
         risk.table.y.text = FALSE,
-        tables.theme = clean_theme(), 
+        tables.theme = clean_theme(),
         legend = c(0.8,0.90),
         cumevents = FALSE,
         cumcensor = FALSE,
@@ -491,7 +496,7 @@ observeEvent(input$start_Bayes_basic_prediction, {
         legend.labs = c("All patients, Unadjusted",
                         "All patients, Number at risk adjusted",
                         "All patients, Adj. right cens. & left trunc.")
-      ) + 
+      ) +
         labs(title = paste(traditional_fit[[1]], " patients; Median OS ",
                            format_p(summary(traditional_fit)$table[[7]] / 365.25 * 12, digits = 1)," (",
                            format_p(summary(traditional_fit)$table[[8]] / 365.25 * 12, digits = 1),"-",
@@ -538,7 +543,7 @@ observeEvent(input$start_Bayes_basic_prediction, {
         surv.median.line = "hv",
         risk.table = TRUE,
         risk.table.y.text = FALSE,
-        tables.theme = clean_theme(), 
+        tables.theme = clean_theme(),
         legend = c(0.8,0.90),
         cumevents = FALSE,
         cumcensor = FALSE,
@@ -549,7 +554,7 @@ observeEvent(input$start_Bayes_basic_prediction, {
         legend.labs = c("All patients, Unadjusted",
                         # "All patients, Number at risk adjusted",
                         "All patients, Adj. right cens. & left trunc.")
-      ) + 
+      ) +
         labs(title = paste(traditional_fit[[1]], " patients; Median OS ",
                            format_p(summary(traditional_fit)$table[[7]] / 365.25 * 12, digits = 1)," (",
                            format_p(summary(traditional_fit)$table[[8]] / 365.25 * 12, digits = 1),"-",
@@ -873,7 +878,7 @@ observeEvent(input$start_Bayes_basic_prediction, {
         }
       }
     })
-  })  
+  })
   rm(Bayes_env)
   gc()
 })
@@ -901,7 +906,7 @@ observeEvent(input$start_Bayes_mutation_prediction, {
       !is.na(time_palliative_enroll) &
         !is.na(time_enroll_final) &
         is.finite(time_palliative_enroll) &
-        is.finite(time_enroll_final) & 
+        is.finite(time_enroll_final) &
         time_palliative_enroll > 0 &
         time_enroll_final > 0 &
         !is.na(censor) &
@@ -927,7 +932,7 @@ observeEvent(input$start_Bayes_mutation_prediction, {
     oncogenic_genes = rbind(oncogenic_genes %>% dplyr::filter(gene_mutation %in% input$gene),
                             oncogenic_genes %>% dplyr::filter(!gene_mutation %in% input$gene))
     oncogenic_genes = oncogenic_genes[1:min(length(oncogenic_genes$all_patients), input$Bayes_mutation_no),]
-    
+
     gene_table = data.frame(oncogenic_genes$gene_mutation)
     colnames(gene_table) = c("Gene")
     gene_table$positive_patients = oncogenic_genes$all_patients
@@ -952,16 +957,16 @@ observeEvent(input$start_Bayes_mutation_prediction, {
             TRUE ~ FALSE
           )
         )
-        
+
         mut_gene = paste0(oncogenic_genes$gene_mutation[i],
                           ", top ", i, " gene")
         traditional_fit = survfit(Surv(event = censor,
-                                       time = time_palliative_final) ~ gene_mut, 
+                                       time = time_palliative_final) ~ gene_mut,
                                   data = Data_survival)
         if(length(Data_survival[,1]) != traditional_fit[[1]][[1]]){
           gene_table$negative_mortal_event[i] = summary(traditional_fit)$table[7]
           gene_table$positive_mortal_event[i] = summary(traditional_fit)$table[8]
-          
+
           Data_survival_curve = Data_survival
           Data_survival_tmp_pos = Data_survival_curve %>%
             dplyr::filter(gene_mut == TRUE)
@@ -984,11 +989,11 @@ observeEvent(input$start_Bayes_mutation_prediction, {
           Data_survival_tmp2 = Data_survival_tmp_pos %>% dplyr::filter(
             time_enroll_final > time_90) %>%
             dplyr::arrange(time_enroll_final)
-          
+
           Data_survival_tmp2$time_enroll_final = time_90 - (time_10 - 1)
           idx <- 1:nrow(Data_survival_tmp2)
           Data_survival_tmp = rbind(Data_survival_tmp, Data_survival_tmp2[idx[idx < max(idx)*(1-survival_rate_10)],])
-          
+
           Data_survival_tmp_neg = Data_survival_curve %>%
             dplyr::filter(gene_mut == FALSE)
           if(sum(Data_survival_tmp_neg$censor) > 0){
@@ -1010,12 +1015,12 @@ observeEvent(input$start_Bayes_mutation_prediction, {
           Data_survival_tmp4 = Data_survival_tmp_neg %>% dplyr::filter(
             time_enroll_final > time_90) %>%
             dplyr::arrange(time_enroll_final)
-          
+
           Data_survival_tmp4$time_enroll_final = time_90 - (time_10 - 1)
           idx <- 1:nrow(Data_survival_tmp4)
           Data_survival_tmp3 = rbind(Data_survival_tmp3, Data_survival_tmp4[idx[idx < max(idx)*(1-survival_rate_10)],])
-          Data_drug_survival_1 = rbind(Data_survival_tmp, Data_survival_tmp3)  
-          
+          Data_drug_survival_1 = rbind(Data_survival_tmp, Data_survival_tmp3)
+
           Data_survival_tmp_pos = Data_survival_curve %>%
             dplyr::filter(gene_mut == TRUE)
           if(sum(Data_survival_tmp_pos$censor) > 0 ){
@@ -1040,10 +1045,10 @@ observeEvent(input$start_Bayes_mutation_prediction, {
           Data_survival_tmp6$time_palliative_enroll = time_90 - (time_10 - 1)
           idx <- 1:nrow(Data_survival_tmp6)
           Data_survival_tmp5 = rbind(Data_survival_tmp5, Data_survival_tmp6[idx[idx < max(idx)*(1-survival_rate_10)],])
-          
+
           Data_survival_tmp_neg = Data_survival_curve %>%
             dplyr::filter(gene_mut == FALSE)
-          
+
           if(sum(Data_survival_tmp_neg$censor) > 0 ){
             fit = survfit(Surv(time_palliative_enroll, enroll_censor) ~ 1, data = Data_survival_tmp_neg)
             time_10 = max(90, quantile(fit, 0.10)$quantile[[1]],na.rm = T)
@@ -1066,11 +1071,11 @@ observeEvent(input$start_Bayes_mutation_prediction, {
           Data_survival_tmp8$time_palliative_enroll = time_90 - (time_10 - 1)
           idx <- 1:nrow(Data_survival_tmp8)
           Data_survival_tmp7 = rbind(Data_survival_tmp7, Data_survival_tmp8[idx[idx < max(idx)*(1-survival_rate_10)],])
-          
+
           Median_entry_pos = median(Data_survival_tmp5$time_palliative_enroll)
           Median_entry_neg = median(Data_survival_tmp7$time_palliative_enroll)
-          Data_drug_survival_1_2 = rbind(Data_survival_tmp5, Data_survival_tmp7)  
-          
+          Data_drug_survival_1_2 = rbind(Data_survival_tmp5, Data_survival_tmp7)
+
           Data_drug_survival_1 = Data_drug_survival_1 %>%
             dplyr::mutate(delay_1 = case_when(
               time_palliative_enroll <= Median_entry_pos &
@@ -1081,12 +1086,12 @@ observeEvent(input$start_Bayes_mutation_prediction, {
                 gene_mut == FALSE ~ "SPT to entry early",
               time_palliative_enroll > Median_entry_neg &
                 gene_mut == FALSE ~ "SPT to entry later"))
-          
+
           if(sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == TRUE & delay_1 == "SPT to entry later"))$censor) >= 1 &
              sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == FALSE & delay_1 == "SPT to entry later"))$censor) >= 1 &
              sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == TRUE & delay_1 != "SPT to entry later"))$censor) >= 1 &
              sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == FALSE & delay_1 != "SPT to entry later"))$censor) >= 1){
-            
+
             stan_weibull_survival_model_data <-
               list(
                 Median_pos = as.integer(Median_entry_pos),
@@ -1112,7 +1117,7 @@ observeEvent(input$start_Bayes_mutation_prediction, {
                 ycen_early_neg = Data_drug_survival_1$time_enroll_final[Data_drug_survival_1$censor == 0 & Data_drug_survival_1$delay_1 != "SPT to entry later" & Data_drug_survival_1$gene_mut == FALSE],
                 ycen_late_neg = Data_drug_survival_1$time_enroll_final[Data_drug_survival_1$censor == 0 & Data_drug_survival_1$delay_1 == "SPT to entry later" & Data_drug_survival_1$gene_mut == FALSE]
               )
-            
+
             if(DOCKER){
               stan_model_compiled <- readRDS(stan_model_factor_save_path_cmdstan)
               stan_weibull_survival_model_fit <- stan_model_compiled$sample(
@@ -1138,19 +1143,19 @@ observeEvent(input$start_Bayes_mutation_prediction, {
               stan_weibull_survival_model_draws %>%
               dplyr::select(.chain, .iteration, .draw, starts_with("yhat_total")) %>%
               tidyr::gather(key = key, value = yhat_total, starts_with("yhat_total")) %>%
-              dplyr::select(-key) 
+              dplyr::select(-key)
             stan_weibull_survival_model_draws_total_exp <-
               stan_weibull_survival_model_draws %>%
               dplyr::select(.chain, .iteration, .draw, starts_with("yhat_factor_total")) %>%
               tidyr::gather(key = key, value = yhat_total_exp, starts_with("yhat_factor_total")) %>%
-              dplyr::select(-key) 
-            
+              dplyr::select(-key)
+
             median_os_list_weibull_total_exp = matrix(stan_weibull_survival_model_draws_total_exp$yhat_total_exp, nrow=4 * ITER)
             median_os_list_weibull_total = matrix(stan_weibull_survival_model_draws_total$yhat_total, nrow=4 * ITER)
             median_os_list_weibull_total_exp = rowMedians(median_os_list_weibull_total_exp,na.rm = T)
             median_os_list_weibull_total = rowMedians(median_os_list_weibull_total,na.rm = T)
             median_os_list_weibull_bias = median_os_list_weibull_total - median_os_list_weibull_total_exp
-            
+
             median_os_summary_weibull_total = quantile(median_os_list_weibull_total, probs = c(0.025, 0.5, 0.975))
             median_os_summary_weibull_total_exp = quantile(median_os_list_weibull_total_exp, probs = c(0.025, 0.5, 0.975))
             median_os_summary_weibull_bias = quantile(median_os_list_weibull_bias, probs = c(0.025, 0.5, 0.975))
@@ -1158,20 +1163,20 @@ observeEvent(input$start_Bayes_mutation_prediction, {
             yhat_weibull_sort_total_exp = sort(stan_weibull_survival_model_draws_total_exp$yhat_total_exp)
             yhat_weibull_sort_average_total = yhat_weibull_sort_total[1:length(Data_survival_curve$censor) * as.integer(length(yhat_weibull_sort_total)/length(Data_survival_curve$censor))]
             yhat_weibull_sort_average_total_exp = yhat_weibull_sort_total_exp[1:length(Data_survival_curve$censor) * as.integer(length(yhat_weibull_sort_total_exp)/length(Data_survival_curve$censor))]
-            
+
             Data_survival_curve$factor_neg = yhat_weibull_sort_average_total
             Data_survival_curve$factor_pos = yhat_weibull_sort_average_total_exp
             Data_survival_curve$factor_neg[Data_survival_curve$factor_neg > 10000] = 10000
             Data_survival_curve$factor_pos[Data_survival_curve$factor_pos > 10000] = 10000
-            
+
             traditional_fit = survfit(Surv(event = censor,
                                            time = time_palliative_final) ~ gene_mut,
                                       data = Data_survival_curve)
             simulation_fit_neg = survfit(Surv(event = rep(1,length(Data_survival_curve$factor_neg)),
-                                              time = factor_neg) ~ 1, 
+                                              time = factor_neg) ~ 1,
                                          data = Data_survival_curve)
             simulation_fit_pos = survfit(Surv(event = rep(1,length(Data_survival_curve$factor_pos)),
-                                              time = factor_pos) ~ 1, 
+                                              time = factor_pos) ~ 1,
                                          data = Data_survival_curve)
             hs[[k]] = ggsurvplot(
               fit = list(traditional_fit = traditional_fit,
@@ -1195,7 +1200,7 @@ observeEvent(input$start_Bayes_mutation_prediction, {
               pval = FALSE,
               risk.table = TRUE,
               risk.table.y.text = FALSE,
-              tables.theme = clean_theme(), 
+              tables.theme = clean_theme(),
               legend = c(0.8,0.8),
               xlim = c(0, max(Data_survival_curve$time_palliative_final) * 1.05),
               cumevents = FALSE,
@@ -1207,7 +1212,7 @@ observeEvent(input$start_Bayes_mutation_prediction, {
                               paste(mut_gene, "(+), Unadjusted"),
                               paste(mut_gene, "(-), Adjusted for Delayed Entry"),
                               paste(mut_gene, "(+), Adjusted for Delayed Entry"))
-            ) +   
+            ) +
               labs(title = paste(sum(traditional_fit[[1]]), " patients ",
                                  "Median OS ",
                                  format_p(summary(traditional_fit)$table[[13]] / 365.25 * 12, digits = 1)," (",
@@ -1216,7 +1221,7 @@ observeEvent(input$start_Bayes_mutation_prediction, {
                                  format_p(summary(traditional_fit)$table[[14]] / 365.25 * 12, digits = 1), " (",
                                  format_p(summary(traditional_fit)$table[[16]] / 365.25 * 12, digits = 1),"-",
                                  format_p(summary(traditional_fit)$table[[18]] / 365.25 * 12, digits = 1),") (mut(+), unadj.)/\n",
-                                 format_p(median_os_summary_weibull_total[[2]] / 365.25 * 12, digits = 1), 
+                                 format_p(median_os_summary_weibull_total[[2]] / 365.25 * 12, digits = 1),
                                  " (", format_p(median_os_summary_weibull_total[[1]] / 365.25 * 12, digits = 1), "-",
                                  format_p(median_os_summary_weibull_total[[3]] / 365.25 * 12, digits = 1), ") (mut(-), adj.)/",
                                  format_p(median_os_summary_weibull_total_exp[[2]] / 365.25 * 12, digits = 1), " (",
@@ -1226,8 +1231,8 @@ observeEvent(input$start_Bayes_mutation_prediction, {
                                  sep=""),
                    subtitle = paste("Survival difference with gene mutation: ",
                                     format_p(median_os_summary_weibull_bias[[2]] / 365.25 * 12, digits = 1), " (",
-                                    format_p(median_os_summary_weibull_bias[[1]] / 365.25 * 12, digits = 1), "-", 
-                                    format_p(median_os_summary_weibull_bias[[3]] / 365.25 * 12, digits = 1), 
+                                    format_p(median_os_summary_weibull_bias[[1]] / 365.25 * 12, digits = 1), "-",
+                                    format_p(median_os_summary_weibull_bias[[3]] / 365.25 * 12, digits = 1),
                                     ") months, median (95% CI)",
                                     sep=""))
             hs[[k]]$table <- hs[[k]]$table + theme(plot.title = element_blank(),
@@ -1251,13 +1256,13 @@ observeEvent(input$start_Bayes_mutation_prediction, {
       }
     })
     incProgress(1 / 13)
-    
+
     Gene_arrange = gene_table$Gene
     gene_table = gene_table %>% dplyr::mutate(
       Gene = factor(gene_table$Gene, levels = Gene_arrange))
-    p_mid <- 
+    p_mid <-
       gene_table |>
-      ggplot(aes(y = fct_rev(Gene))) + 
+      ggplot(aes(y = fct_rev(Gene))) +
       theme_classic() +
       geom_point(aes(x=diff_median), shape=15, size=3) +
       geom_linerange(aes(xmin=diff_LL, xmax=diff_UL))  +
@@ -1273,12 +1278,12 @@ observeEvent(input$start_Bayes_mutation_prediction, {
       annotate("text",
                x = (max(abs(gene_table$diff_LL), abs(gene_table$diff_UL)) + 0.5)/2,
                y = length(Gene_arrange) + 1,
-               label = "mut=long survival") + 
+               label = "mut=long survival") +
       theme(axis.line.y = element_blank(),
             axis.ticks.y= element_blank(),
             axis.text.y= element_blank(),
             axis.title.y= element_blank())
-    
+
     gene_table <- gene_table %>%
       dplyr::mutate(
         estimate_lab_1 = paste0(format_p(positive_median, digits = 1), " (", format_p(positive_LL, digits = 1), "-", format_p(positive_UL, digits = 1), ")")) %>%
@@ -1288,7 +1293,7 @@ observeEvent(input$start_Bayes_mutation_prediction, {
         estimate_lab_3 = paste0(format_p(diff_median, digits = 1), " (", format_p(diff_LL, digits = 1), "-", format_p(diff_UL, digits = 1), ")")) %>%
       dplyr::mutate(
         patients = paste0(positive_patients, " (", positive_freq, "%)"))
-    gene_table = 
+    gene_table =
       dplyr::bind_rows(
         data.frame(
           Gene = "Gene",
@@ -1300,7 +1305,7 @@ observeEvent(input$start_Bayes_mutation_prediction, {
     Gene_arrange = gene_table$Gene
     gene_table = gene_table %>% dplyr::mutate(
       Gene = factor(gene_table$Gene, levels = Gene_arrange))
-    
+
     p_left <- gene_table  %>% ggplot(aes(y = fct_rev(Gene)))
     p_left <- p_left + geom_text(aes(x = 0, label = Gene), hjust = 0,
                                  fontface = ifelse(gene_table$Gene == "Gene", "bold", "bold.italic"))
@@ -1311,23 +1316,23 @@ observeEvent(input$start_Bayes_mutation_prediction, {
     p_left <- p_left + geom_text(aes(x = 4.8, label = estimate_lab_3), hjust = 0,
                                  fontface = ifelse(gene_table$estimate_lab_3 == "Survival difference", "bold", "plain"))
     p_left <- p_left + theme_void() + coord_cartesian(xlim = c(0, 7.5))
-    
+
     # right side of plot - pvalues
     p_right <- gene_table  |> ggplot() +
       geom_text(aes(x = 0, y = fct_rev(Gene), label = patients), hjust = 0,
                 fontface = ifelse(gene_table$patients == "Patients", "bold", "plain")) +
       theme_void()
-    
+
     # final plot arrangement
     layout <- c(patchwork::area(t = 0, l = 0, b = 30, r = 7.5),
                 patchwork::area(t = 1, l = 7.5, b = 30, r = 12.5),
                 patchwork::area(t = 0, l = 13.5, b = 30, r = 14))
-    
+
     h[[1]] = p_left + p_mid + p_right + plot_layout(design = layout)
     OUTPUT_DATA$figure_surv_Bayes_h = h
     OUTPUT_DATA$figure_surv_Bayes_hs = hs
     OUTPUT_DATA$figure_surv_Bayes_gene_table = gene_table
-  })  
+  })
   rm(Bayes_env)
   gc()
 })
@@ -1352,7 +1357,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
       !is.na(time_palliative_enroll) &
         !is.na(time_enroll_final) &
         is.finite(time_palliative_enroll) &
-        is.finite(time_enroll_final) & 
+        is.finite(time_enroll_final) &
         time_palliative_enroll > 0 &
         time_enroll_final > 0 &
         !is.na(censor) &
@@ -1378,7 +1383,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
       oncogenic_genes = oncogenic_genes %>%
         dplyr::arrange(desc(all_patients))
       oncogenic_genes = oncogenic_genes[1:min(nrow(oncogenic_genes), input$Bayes_diagnosis_no),]
-      
+
       gene_table = data.frame(oncogenic_genes$gene_mutation)
       colnames(gene_table) = c("Gene")
       gene_table$positive_patients = oncogenic_genes$all_patients
@@ -1403,15 +1408,15 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
               TRUE ~ FALSE
             )
           )
-          
+
           mut_gene = oncogenic_genes$gene_mutation[i]
           traditional_fit = survfit(Surv(event = censor,
-                                         time = time_palliative_final) ~ gene_mut, 
+                                         time = time_palliative_final) ~ gene_mut,
                                     data = Data_survival)
           if(length(Data_survival[,1]) != traditional_fit[[1]][[1]]){
             gene_table$negative_mortal_event[i] = summary(traditional_fit)$table[7]
             gene_table$positive_mortal_event[i] = summary(traditional_fit)$table[8]
-            
+
             Data_survival_curve = Data_survival
             Data_survival_tmp_pos = Data_survival_curve %>%
               dplyr::filter(gene_mut == TRUE)
@@ -1434,11 +1439,11 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
             Data_survival_tmp2 = Data_survival_tmp_pos %>% dplyr::filter(
               time_enroll_final > time_90) %>%
               dplyr::arrange(time_enroll_final)
-            
+
             Data_survival_tmp2$time_enroll_final = time_90 - (time_10 - 1)
             idx <- 1:nrow(Data_survival_tmp2)
             Data_survival_tmp = rbind(Data_survival_tmp, Data_survival_tmp2[idx[idx < max(idx)*(1-survival_rate_10)],])
-            
+
             Data_survival_tmp_neg = Data_survival_curve %>%
               dplyr::filter(gene_mut == FALSE)
             if(sum(Data_survival_tmp_neg$censor) > 0 ){
@@ -1460,12 +1465,12 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
             Data_survival_tmp4 = Data_survival_tmp_neg %>% dplyr::filter(
               time_enroll_final > time_90) %>%
               dplyr::arrange(time_enroll_final)
-            
+
             Data_survival_tmp4$time_enroll_final = time_90 - (time_10 - 1)
             idx <- 1:nrow(Data_survival_tmp4)
             Data_survival_tmp3 = rbind(Data_survival_tmp3, Data_survival_tmp4[idx[idx < max(idx)*(1-survival_rate_10)],])
-            Data_drug_survival_1 = rbind(Data_survival_tmp, Data_survival_tmp3)  
-            
+            Data_drug_survival_1 = rbind(Data_survival_tmp, Data_survival_tmp3)
+
             Data_survival_tmp_pos = Data_survival_curve %>%
               dplyr::filter(gene_mut == TRUE)
             if(sum(Data_survival_tmp_pos$censor) > 0 ){
@@ -1490,10 +1495,10 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
             Data_survival_tmp6$time_palliative_enroll = time_90 - (time_10 - 1)
             idx <- 1:nrow(Data_survival_tmp6)
             Data_survival_tmp5 = rbind(Data_survival_tmp5, Data_survival_tmp6[idx[idx < max(idx)*(1-survival_rate_10)],])
-            
+
             Data_survival_tmp_neg = Data_survival_curve %>%
               dplyr::filter(gene_mut == FALSE)
-            
+
             if(sum(Data_survival_tmp_neg$censor) > 0 ){
               fit = survfit(Surv(time_palliative_enroll, enroll_censor) ~ 1, data = Data_survival_tmp_neg)
               time_10 = max(90, quantile(fit, 0.10)$quantile[[1]],na.rm = T)
@@ -1516,11 +1521,11 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
             Data_survival_tmp8$time_palliative_enroll = time_90 - (time_10 - 1)
             idx <- 1:nrow(Data_survival_tmp8)
             Data_survival_tmp7 = rbind(Data_survival_tmp7, Data_survival_tmp8[idx[idx < max(idx)*(1-survival_rate_10)],])
-            
+
             Median_entry_pos = median(Data_survival_tmp5$time_palliative_enroll)
             Median_entry_neg = median(Data_survival_tmp7$time_palliative_enroll)
-            Data_drug_survival_1_2 = rbind(Data_survival_tmp5, Data_survival_tmp7)  
-            
+            Data_drug_survival_1_2 = rbind(Data_survival_tmp5, Data_survival_tmp7)
+
             Data_drug_survival_1 = Data_drug_survival_1 %>%
               dplyr::mutate(delay_1 = case_when(
                 time_palliative_enroll <= Median_entry_pos &
@@ -1531,12 +1536,12 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
                   gene_mut == FALSE ~ "SPT to entry early",
                 time_palliative_enroll > Median_entry_neg &
                   gene_mut == FALSE ~ "SPT to entry later"))
-            
+
             if(sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == TRUE & delay_1 == "SPT to entry later"))$censor) >= 1 &
                sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == FALSE & delay_1 == "SPT to entry later"))$censor) >= 1 &
                sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == TRUE & delay_1 != "SPT to entry later"))$censor) >= 1 &
                sum((Data_drug_survival_1 %>% dplyr::filter(gene_mut == FALSE & delay_1 != "SPT to entry later"))$censor) >= 1){
-              
+
               stan_weibull_survival_model_data <-
                 list(
                   Median_pos = as.integer(Median_entry_pos),
@@ -1562,7 +1567,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
                   ycen_early_neg = Data_drug_survival_1$time_enroll_final[Data_drug_survival_1$censor == 0 & Data_drug_survival_1$delay_1 != "SPT to entry later" & Data_drug_survival_1$gene_mut == FALSE],
                   ycen_late_neg = Data_drug_survival_1$time_enroll_final[Data_drug_survival_1$censor == 0 & Data_drug_survival_1$delay_1 == "SPT to entry later" & Data_drug_survival_1$gene_mut == FALSE]
                 )
-              
+
               if(DOCKER){
                 stan_model_compiled <- readRDS(stan_model_factor_save_path_cmdstan)
                 stan_weibull_survival_model_fit <- stan_model_compiled$sample(
@@ -1588,20 +1593,20 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
                 stan_weibull_survival_model_draws %>%
                 dplyr::select(.chain, .iteration, .draw, starts_with("yhat_total")) %>%
                 tidyr::gather(key = key, value = yhat_total, starts_with("yhat_total")) %>%
-                dplyr::select(-key) 
+                dplyr::select(-key)
               stan_weibull_survival_model_draws_total_exp <-
                 stan_weibull_survival_model_draws %>%
                 dplyr::select(.chain, .iteration, .draw, starts_with("yhat_factor_total")) %>%
                 tidyr::gather(key = key, value = yhat_total_exp, starts_with("yhat_factor_total")) %>%
-                dplyr::select(-key) 
-              
+                dplyr::select(-key)
+
               median_os_list_weibull_total_exp = matrix(stan_weibull_survival_model_draws_total_exp$yhat_total_exp, nrow=4 * ITER)
               median_os_list_weibull_total = matrix(stan_weibull_survival_model_draws_total$yhat_total, nrow=4 * ITER)
               median_os_list_weibull_total_exp = rowMedians(median_os_list_weibull_total_exp,na.rm = T)
               median_os_list_weibull_total = rowMedians(median_os_list_weibull_total,na.rm = T)
               median_os_list_weibull_bias = median_os_list_weibull_total - median_os_list_weibull_total_exp
-              
-              
+
+
               median_os_summary_weibull_total = quantile(median_os_list_weibull_total, probs = c(0.025, 0.5, 0.975))
               median_os_summary_weibull_total_exp = quantile(median_os_list_weibull_total_exp, probs = c(0.025, 0.5, 0.975))
               median_os_summary_weibull_bias = quantile(median_os_list_weibull_bias, probs = c(0.025, 0.5, 0.975))
@@ -1609,20 +1614,20 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
               yhat_weibull_sort_total_exp = sort(stan_weibull_survival_model_draws_total_exp$yhat_total_exp)
               yhat_weibull_sort_average_total = yhat_weibull_sort_total[1:length(Data_survival_curve$censor) * as.integer(length(yhat_weibull_sort_total)/length(Data_survival_curve$censor))]
               yhat_weibull_sort_average_total_exp = yhat_weibull_sort_total_exp[1:length(Data_survival_curve$censor) * as.integer(length(yhat_weibull_sort_total_exp)/length(Data_survival_curve$censor))]
-              
+
               Data_survival_curve$factor_neg = yhat_weibull_sort_average_total
               Data_survival_curve$factor_pos = yhat_weibull_sort_average_total_exp
               Data_survival_curve$factor_neg[Data_survival_curve$factor_neg > 10000] = 10000
               Data_survival_curve$factor_pos[Data_survival_curve$factor_pos > 10000] = 10000
-              
+
               traditional_fit = survfit(Surv(event = censor,
                                              time = time_palliative_final) ~ gene_mut,
                                         data = Data_survival_curve)
               simulation_fit_neg = survfit(Surv(event = rep(1,length(Data_survival_curve$factor_neg)),
-                                                time = factor_neg) ~ 1, 
+                                                time = factor_neg) ~ 1,
                                            data = Data_survival_curve)
               simulation_fit_pos = survfit(Surv(event = rep(1,length(Data_survival_curve$factor_pos)),
-                                                time = factor_pos) ~ 1, 
+                                                time = factor_pos) ~ 1,
                                            data = Data_survival_curve)
               hsba[[kb]] = Data_survival_curve
               hsba[[kb]]$diagnosis = mut_gene
@@ -1648,7 +1653,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
                 pval = FALSE,
                 risk.table = TRUE,
                 risk.table.y.text = FALSE,
-                tables.theme = clean_theme(), 
+                tables.theme = clean_theme(),
                 legend = c(0.8,0.8),
                 xlim = c(0, max(Data_survival_curve$time_palliative_final) * 1.05),
                 cumevents = FALSE,
@@ -1660,7 +1665,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
                                 paste0(mut_gene, ", Unadjusted"),
                                 paste0("Others, Adjusted for Delayed Entry"),
                                 paste0(mut_gene, ", Adjusted for Delayed Entry"))
-              ) +   
+              ) +
                 labs(title = paste(sum(traditional_fit[[1]]), " patients ",
                                    "Median OS ",
                                    format_p(summary(traditional_fit)$table[[13]] / 365.25 * 12, digits = 1)," (",
@@ -1669,7 +1674,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
                                    format_p(summary(traditional_fit)$table[[14]] / 365.25 * 12, digits = 1), " (",
                                    format_p(summary(traditional_fit)$table[[16]] / 365.25 * 12, digits = 1),"-",
                                    format_p(summary(traditional_fit)$table[[18]] / 365.25 * 12, digits = 1),") (", mut_gene, ", unadj.)/\n",
-                                   format_p(median_os_summary_weibull_total[[2]] / 365.25 * 12, digits = 1), 
+                                   format_p(median_os_summary_weibull_total[[2]] / 365.25 * 12, digits = 1),
                                    " (", format_p(median_os_summary_weibull_total[[1]] / 365.25 * 12, digits = 1), "-",
                                    format_p(median_os_summary_weibull_total[[3]] / 365.25 * 12, digits = 1), ") (others, adj.)/",
                                    format_p(median_os_summary_weibull_total_exp[[2]] / 365.25 * 12, digits = 1), " (",
@@ -1679,8 +1684,8 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
                                    sep=""),
                      subtitle = paste("Survival difference with diagnosis: ",
                                       format_p(median_os_summary_weibull_bias[[2]] / 365.25 * 12, digits = 1), " (",
-                                      format_p(median_os_summary_weibull_bias[[1]] / 365.25 * 12, digits = 1), "-", 
-                                      format_p(median_os_summary_weibull_bias[[3]] / 365.25 * 12, digits = 1), 
+                                      format_p(median_os_summary_weibull_bias[[1]] / 365.25 * 12, digits = 1), "-",
+                                      format_p(median_os_summary_weibull_bias[[3]] / 365.25 * 12, digits = 1),
                                       ") months, median (95% CI)",
                                       sep=""))
               hsb[[kb]]$table <- hsb[[kb]]$table + theme(plot.title = element_blank(),
@@ -1710,7 +1715,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
           surv_data = surv_data %>% dplyr::select(factor_pos, diagnosis)
           surv_data$censor = 1
           simulation_fit_diagnosis = survfit(Surv(event = censor,
-                                                  time = factor_pos) ~ diagnosis, 
+                                                  time = factor_pos) ~ diagnosis,
                                              data = surv_data)
           survdiff_diagnosis = surv_median(simulation_fit_diagnosis)
           text_median = paste0(paste(text_median, collapse = "/"), " months")
@@ -1734,14 +1739,14 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
             pval = FALSE,
             risk.table = TRUE,
             risk.table.y.text = FALSE,
-            tables.theme = clean_theme(), 
+            tables.theme = clean_theme(),
             legend = c(0.8,0.8),
             xlim = c(0, max(Data_survival_curve$time_palliative_final) * 1.05),
             cumevents = FALSE,
             cumcensor = FALSE,
             break.x.by = 365.25 * 2.5,
             xscale = "d_m"
-          ) +   
+          ) +
             labs(title = "Median OS by diagnosis, left-truncation bias adjusted",
                  subtitle = text_median
             )
@@ -1761,7 +1766,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
             surv_data = rbind(surv_data, surv_data_tmp)
             surv_data$censor = 1
             simulation_fit_diagnosis = survfit(Surv(event = censor,
-                                                    time = factor_pos) ~ diagnosis, 
+                                                    time = factor_pos) ~ diagnosis,
                                                data = surv_data)
             survdiff_diagnosis = surv_median(simulation_fit_diagnosis)
             text_median = paste0(OUTPUT_DATA$figure_surv_Bayes_text_median_base, "/", paste(text_median, collapse = "/"), " months")
@@ -1785,14 +1790,14 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
               pval = FALSE,
               risk.table = TRUE,
               risk.table.y.text = FALSE,
-              tables.theme = clean_theme(), 
+              tables.theme = clean_theme(),
               legend = c(0.8,0.8),
               xlim = c(0, max(Data_survival_curve$time_palliative_final) * 1.05),
               cumevents = FALSE,
               cumcensor = FALSE,
               break.x.by = 365.25 * 2.5,
               xscale = "d_m"
-            ) +   
+            ) +
               labs(title = "Median OS by diagnosis, left-truncation bias adjusted",
                    subtitle = text_median
               )
@@ -1800,7 +1805,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
                                                        plot.subtitle = element_blank())
             kb = kb + 1
           }
-          table_ToT <- 
+          table_ToT <-
             data.frame(Cohort = as.character(),
                        Duration_months = as.character(),
                        No_total = as.numeric(),
@@ -1841,7 +1846,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
             surv_data = rbind(surv_data, surv_data_tmp)
           }
           simulation_fit_diagnosis = survfit(Surv(event = censor,
-                                                  time = time_palliative_final) ~ diagnosis, 
+                                                  time = time_palliative_final) ~ diagnosis,
                                              data = surv_data)
           for(cohort in 1:length(summary(simulation_fit_diagnosis, times=365.25 / 12, extend=TRUE)$time)){
             for(mths in (0:10)*30){
@@ -1873,9 +1878,9 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
       Gene_arrange = gene_table$Gene
       gene_table = gene_table %>% dplyr::mutate(
         Gene = factor(gene_table$Gene, levels = Gene_arrange))
-      p_mid <- 
+      p_mid <-
         gene_table |>
-        ggplot(aes(y = fct_rev(Gene))) + 
+        ggplot(aes(y = fct_rev(Gene))) +
         theme_classic() +
         geom_point(aes(x=diff_median), shape=15, size=3) +
         geom_linerange(aes(xmin=diff_LL, xmax=diff_UL)) +
@@ -1891,12 +1896,12 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
         annotate("text",
                  x = (max(abs(gene_table$diff_LL), abs(gene_table$diff_UL)) + 0.5)/2,
                  y = length(Gene_arrange) + 1,
-                 label = "diagnosis=long survival") + 
+                 label = "diagnosis=long survival") +
         theme(axis.line.y = element_blank(),
               axis.ticks.y= element_blank(),
               axis.text.y= element_blank(),
               axis.title.y= element_blank())
-      
+
       gene_table <- gene_table %>%
         dplyr::mutate(
           estimate_lab_1 = paste0(format_p(positive_median, digits = 1), " (", format_p(positive_LL, digits = 1), "-", format_p(positive_UL, digits = 1), ")")) %>%
@@ -1906,7 +1911,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
           estimate_lab_3 = paste0(format_p(diff_median, digits = 1), " (", format_p(diff_LL, digits = 1), "-", format_p(diff_UL, digits = 1), ")")) %>%
         dplyr::mutate(
           patients = paste0(positive_patients, " (", positive_freq, "%)"))
-      gene_table = 
+      gene_table =
         dplyr::bind_rows(
           data.frame(
             Gene = "Diagnosis",
@@ -1918,7 +1923,7 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
       Gene_arrange = gene_table$Gene
       gene_table = gene_table %>% dplyr::mutate(
         Gene = factor(gene_table$Gene, levels = Gene_arrange))
-      
+
       p_left <- gene_table  %>% ggplot(aes(y = fct_rev(Gene)))
       p_left <- p_left + geom_text(aes(x = 0, label = Gene), hjust = 0,
                                    fontface = ifelse(gene_table$Gene == "Diagnosis", "bold", "bold.italic"))
@@ -1929,23 +1934,23 @@ observeEvent(input$start_Bayes_diagnosis_prediction, {
       p_left <- p_left + geom_text(aes(x = 5.4, label = estimate_lab_3), hjust = 0,
                                    fontface = ifelse(gene_table$estimate_lab_3 == "Survival difference", "bold", "plain"))
       p_left <- p_left + theme_void() + coord_cartesian(xlim = c(0, 9.0))
-      
+
       # right side of plot - pvalues
       p_right <- gene_table  |> ggplot() +
         geom_text(aes(x = 0, y = fct_rev(Gene), label = patients), hjust = 0,
                   fontface = ifelse(gene_table$patients == "Patients", "bold", "plain")) +
         theme_void()
-      
+
       # final plot arrangement
       layout <- c(patchwork::area(t = 0, l = 0, b = 30, r = 9.0),
                   patchwork::area(t = 1, l = 7.5, b = 30, r = 14.0),
                   patchwork::area(t = 0, l = 13.5, b = 30, r = 15.5))
-      
+
       hb[[1]] = p_left + p_mid + p_right + plot_layout(design = layout)
       OUTPUT_DATA$figure_surv_Bayes_gene_table_hb = gene_table
       OUTPUT_DATA$figure_surv_Bayes_hb = hb
       OUTPUT_DATA$figure_surv_Bayes_hsb = hsb
-      
+
     }
   })
   rm(Bayes_env)

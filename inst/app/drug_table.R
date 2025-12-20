@@ -53,14 +53,14 @@ drug_table_logic <- function() {
           -PD_L1
         )
       }
-      
+
       Data_MAF = Data_report() %>%
         dplyr::filter(
           !str_detect(Hugo_Symbol, ",") &
             Hugo_Symbol != "" &
             Evidence_level %in% c("","A","B","C","D","E","F") &
             Variant_Classification != "expression"
-        ) %>% 
+        ) %>%
         dplyr::arrange(desc(Evidence_level)) %>%
         dplyr::distinct(Tumor_Sample_Barcode,
                         Hugo_Symbol,
@@ -69,8 +69,8 @@ drug_table_logic <- function() {
       if(length(Data_MAF[Data_MAF$TMB > 30,]$TMB) > 0){
         Data_MAF[Data_MAF$TMB > 30,]$TMB = 30
       }
-      
-      
+
+
       Data_MAF_target = Data_MAF %>%
         dplyr::filter(Tumor_Sample_Barcode %in%
                         Data_case_target$C.CAT調査結果.基本項目.ハッシュID)
@@ -80,7 +80,7 @@ drug_table_logic <- function() {
       } else {
         Data_MAF_target = Data_MAF_target %>%
           dplyr::filter(!Hugo_Symbol %in% c("TMB", "MSI") | Evidence_level == "F")
-        
+
       }
       Data_MAF_target_tmp = Data_MAF_target  %>%
         dplyr::distinct(Tumor_Sample_Barcode,
@@ -191,12 +191,13 @@ drug_table_logic <- function() {
         Data_case_age_sex = left_join(Data_case_age_sex,
                                      Data_cluster_ID_list,
                                      by = c("ID" = "C.CAT調査結果.基本項目.ハッシュID"))
+        Data_case_age_sex$cluster[is.na(Data_case_age_sex$cluster)] = max(Data_case_age_sex$cluster, na.rm = T) + 1
         Data_case_age_sex$cluster = as.factor(Data_case_age_sex$cluster)
-        
+
         Drug_summary = Drug_summary %>%
           dplyr::left_join(Data_case_age_sex, by = "ID")
-        
-        remove_cols <- names(Drug_summary) %in% names(classification_rules) & 
+
+        remove_cols <- names(Drug_summary) %in% names(classification_rules) &
           sapply(Drug_summary, is.logical)
         Drug_summary <- Drug_summary[, !remove_cols, with = FALSE] %>%
           dplyr::select(where(~ any(!is.na(.))))
@@ -214,7 +215,7 @@ drug_table_logic <- function() {
               dplyr::filter(Tumor_Sample_Barcode %in%
                               Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
               dplyr::arrange(Tumor_Sample_Barcode, Hugo_Symbol, amino.acid.change)
-            
+
             ID_special_gene_mutation_1 = (Data_MAF_target_tmp %>%
                                             dplyr::filter(Hugo_Symbol %in% input$gene_group_1 | str_detect(Hugo_Symbol, paste(paste0(input$gene_group_1, "_"),collapse ="|")) &
                                                             amino.acid.change %in% input$special_gene_mutation_1 | str_detect(Hugo_Symbol, paste(paste0(input$gene_group_1, "_"),collapse ="|")) &
@@ -237,7 +238,7 @@ drug_table_logic <- function() {
               dplyr::filter(Tumor_Sample_Barcode %in%
                               Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
               dplyr::arrange(Tumor_Sample_Barcode, Hugo_Symbol, amino.acid.change)
-            
+
             ID_special_gene_mutation_1 = (Data_MAF_target_tmp %>%
                                             dplyr::filter(Hugo_Symbol %in% input$gene_group_1 | str_detect(Hugo_Symbol, paste(paste0(input$gene_group_1, "_"),collapse ="|")) &
                                                             amino.acid.change %in% input$special_gene_mutation_1))$Tumor_Sample_Barcode
@@ -253,7 +254,7 @@ drug_table_logic <- function() {
             dplyr::filter(Tumor_Sample_Barcode %in%
                             Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
             dplyr::arrange(Tumor_Sample_Barcode, Hugo_Symbol, amino.acid.change)
-          
+
           ID_special_gene = (Data_MAF_target_tmp %>%
                                dplyr::filter(Hugo_Symbol == input$special_gene | str_detect(Hugo_Symbol, paste0(input$special_gene, "_"))))$Tumor_Sample_Barcode
           ID_special_gene_mutation_1 = (Data_MAF_target_tmp %>%
@@ -278,7 +279,7 @@ drug_table_logic <- function() {
         #   Drug_summary_line_renamed = Drug_summary_line_renamed %>% dplyr::filter(`CTx line` %in% input$target_line)
         # }
         incProgress(1 / 3)
-        
+
         Drug_summary_diagnosis_renamed = Drug_summary_line_renamed
         ID_diagnosis_list = Data_case_target %>% dplyr::select(C.CAT調査結果.基本項目.ハッシュID,症例.基本情報.がん種.OncoTree.) %>% dplyr::distinct()
         Drug_summary_diagnosis_renamed$diagnosis = unlist(lapply(list(Drug_summary_diagnosis_renamed$ID), function(x) {
@@ -326,12 +327,12 @@ drug_table_logic <- function() {
 
 # メイン関数：集計テーブル作成
 create_summary_table <- function(data, group_var = NULL, caption, is_detailed = TRUE) {
-  
+
   # data.table形式の場合はdata.frameに変換
   if ("data.table" %in% class(data)) {
     data <- as.data.frame(data)
   }
-  
+
   # 集計表の作成
   if (!is_detailed) {
     # 簡略表示バージョン
@@ -379,7 +380,7 @@ create_summary_table <- function(data, group_var = NULL, caption, is_detailed = 
         statistic = list(
           all_continuous() ~ c("{N_nonmiss}",
                                "{mean} ({sd})",
-                               "{median} ({p25}, {p75})", 
+                               "{median} ({p25}, {p75})",
                                "{min}, {max}"),
           all_categorical() ~ "{n} ({p}%)"
         ),
@@ -426,18 +427,18 @@ prepare_table_data <- function(base_data, table_var, target_line, mid_age = NULL
   if ("data.table" %in% class(base_data)) {
     base_data <- as.data.frame(base_data)
   }
-  
+
   # 基本フィルタリング
   filtered_data <- base_data %>%
     dplyr::filter(`CTx line` %in% target_line) %>%
     dplyr::select(-ID)
-  
+
   # 特殊なデータセット処理
   if (table_var %in% c("mutations", "diagnosis", "gene")) {
     # これらの場合は異なるデータセットを使用
     return(get_special_dataset(table_var))
   }
-  
+
   return(filtered_data)
 }
 
@@ -448,12 +449,12 @@ get_special_dataset <- function(table_var) {
                    "diagnosis" = OUTPUT_DATA$drug_table_Drug_summary_diagnosis_renamed %>% dplyr::select(-ID, -separation_value),
                    "gene" = OUTPUT_DATA$drug_table_Drug_summary_mutation %>% dplyr::select(-ID, -separation_value, -diagnosis)
   )
-  
+
   # data.table形式の場合はdata.frameに変換
   if ("data.table" %in% class(result)) {
     result <- as.data.frame(result)
   }
-  
+
   return(result)
 }
 
@@ -514,7 +515,7 @@ get_group_and_caption <- function(table_var, mid_age = NULL, target_line = NULL)
 output$table_drug_all_1 <- render_gt({
   # 必要な入力値チェック
   req(input$target_line, input$table_var_drug_1, input$drug_table_layout)
-  
+
   # 表示モード確認（詳細/簡略）
   is_detailed = input$drug_table_layout != "No"
 
@@ -525,14 +526,14 @@ output$table_drug_all_1 <- render_gt({
     target_line = input$target_line,
     mid_age = input$mid_age
   )
-  
+
   # グループ変数とキャプション設定
   config <- get_group_and_caption(
     table_var = input$table_var_drug_1,
     mid_age = input$mid_age,
     target_line = input$target_line
   )
-  
+
   # テーブル作成
   create_summary_table(
     data = table_data,
