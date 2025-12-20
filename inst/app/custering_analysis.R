@@ -239,8 +239,8 @@ custering_analysis_logic <- function() {
           if (nrow(Data_survival_tmp) > 0) {
 
             ## --- pre_CGP ---
-            print(3)
-            print(nrow(Data_survival_tmp))
+            print(2)
+            print(Data_case_target$cluster)
             if (sum(Data_survival_tmp$time_palliative_enroll, na.rm = TRUE) > 0) {
               survival_simple <- survfit(
                 Surv(time_palliative_enroll, rep(1, nrow(Data_survival_tmp))) ~ 1,
@@ -393,8 +393,6 @@ custering_analysis_logic <- function() {
         Summary_Table$time_after_CGP = Num_post_CGP
         incProgress(1 / 13)
 
-        print(4)
-        print(Diseases)
         testSummary = data.frame(as.vector(t(matrix(rep(1:max(Data_case_target$cluster),
                                                         length(Diseases)),
                                                     ncol =length(Diseases)))))
@@ -472,9 +470,6 @@ custering_analysis_logic <- function() {
         colnames(Data_cluster) = c("Tumor_Sample_Barcode", "cluster")
         Data_MAF_target = left_join(Data_MAF_target, Data_cluster, by = "Tumor_Sample_Barcode")
         Mutations = sort(unique(Data_MAF_target$Hugo_Symbol))
-        print(5)
-        print(max(Data_MAF_target$cluster))
-        print(length(Mutations))
         testSummary = data.frame(as.vector(t(matrix(rep(1:max(Data_MAF_target$cluster),
                                                         length(Mutations)),
                                                     ncol =length(Mutations)))))
@@ -629,8 +624,6 @@ custering_analysis_logic <- function() {
         Total_pts_cluster = as.vector(table((Data_case_target %>%
                                                dplyr::distinct(C.CAT調査結果.基本項目.ハッシュID, .keep_all = T))$cluster))
 
-        print(6)
-        print(All_cluster)
         levels <- c("A", "B", "C", "D", "E")
         level_counts_cluster <- lapply(levels, function(lvl) {
           get_level_counts_cluster(data_figure_cluster, lvl, All_cluster, Total_pts_cluster)
