@@ -37,7 +37,7 @@ For survival analyses, Monte Carlo simulation is performed using Stan. A CPU wit
 RAM: 4+ GB  
 CPU: 4+ cores  
 
-As a reference, when performing survival analysis for 3,000 cases and 30 genes on a Mac Studio (M1 Max) with 64 GB RAM, it takes approximately 1 hour.
+On a Mac Studio (M4 Max, 128 GB RAM), the initial ingestion and preprocessing of ~110,000 cases and 20 genes takes ~1 hour; after preprocessing, loading the saved dataset typically takes ~20 seconds.
 
 #### Software Requirements
 
