@@ -50,7 +50,7 @@ custering_analysis_logic <- function() {
             Hugo_Symbol != "" &
             Evidence_level %in% c("","A","B","C","D","E","F") &
             Variant_Classification != "expression"
-        ) %>% 
+        ) %>%
         dplyr::arrange(desc(Evidence_level)) %>%
         dplyr::distinct(Tumor_Sample_Barcode,
                         Hugo_Symbol,
@@ -142,9 +142,9 @@ custering_analysis_logic <- function() {
         ) %>%
           dplyr::distinct(Tumor_Sample_Barcode, Evidence_level, Drug, .keep_all = T)
         incProgress(1 / 13)
-        
-        
-        
+
+
+
         Data_evidence_table_tmp = Data_report_tmp %>%
           dplyr::filter(Evidence_level %in% c("A","B","C")) %>%
           dplyr::select(Hugo_Symbol,
@@ -163,7 +163,7 @@ custering_analysis_logic <- function() {
           dplyr::left_join(Data_evidence_table_tmp2, by="tmp") %>%
           dplyr::arrange(desc(Frequency))
         OUTPUT_DATA$clustering_Data_evidence_table = Data_evidence_table
-        
+
         Data_report_tmp = Data_report_tmp %>%
           dplyr::arrange(Evidence_level) %>%
           dplyr::filter(Resistance != 1) %>%
@@ -171,7 +171,6 @@ custering_analysis_logic <- function() {
           dplyr::distinct(Tumor_Sample_Barcode, .keep_all = T)
         Data_report_tmp$Level = as.factor(Data_report_tmp$Evidence_level)
         data_figure = Data_report_tmp %>% dplyr::select(Cancers,Level,Tumor_Sample_Barcode) %>% dplyr::filter(!is.na(Cancers)&!is.na(Level))
-        
         # Levelごとの件数を Cancername に基づいて補正する関数
         get_level_counts <- function(data, level, cancer_names, total_pts) {
           counts <- table(data %>% filter(Level == level) %>% pull(Cancers))
@@ -179,7 +178,7 @@ custering_analysis_logic <- function() {
           result[names(counts)] <- counts
           fun_zero(result, total_pts)
         }
-        
+
         # 各レベルの集計
         levels <- c("A", "B", "C", "D", "E")
         level_counts <- lapply(levels, function(lvl) {
@@ -191,8 +190,8 @@ custering_analysis_logic <- function() {
         Num_C = level_counts$Num_C
         Num_D = level_counts$Num_D
         Num_E = level_counts$Num_E
-        
-        
+
+
         # OptionとTxの処理も関数化
         get_flag_counts <- function(data, flag_col, cancer_names, total_pts) {
           counts <- table(data %>% filter(.data[[flag_col]] == 1) %>% pull(Cancers))
@@ -200,17 +199,19 @@ custering_analysis_logic <- function() {
           result[names(counts)] <- counts
           fun_zero(result, total_pts)
         }
-        
+
         Num_Option <- get_flag_counts(Data_case_target, "EP_option", Cancername, Total_pts)
         Num_Receive_Tx <- get_flag_counts(Data_case_target, "EP_treat", Cancername, Total_pts)
         Num_Receive_Tx_per_Option <- fun_zero(Num_Receive_Tx, Num_Option)
-        
-        
+
+
+        print(1)
+        print(Cancername)
         Total_pts_short = rep(0, length(Cancername))
         Total_pts_long = rep(0, length(Cancername))
         Num_pre_CGP = rep(0, length(Cancername))
         Num_post_CGP = rep(0, length(Cancername))
-        
+
         Total_pts_Bone_no = rep(0, length(Cancername))
         Total_pts_Bone = rep(0, length(Cancername))
         Total_pts_Brain_no = rep(0, length(Cancername))
@@ -219,23 +220,27 @@ custering_analysis_logic <- function() {
         Total_pts_Lung = rep(0, length(Cancername))
         Total_pts_Liver_no = rep(0, length(Cancername))
         Total_pts_Liver = rep(0, length(Cancername))
-        
-        
+
+
+        print(2)
+        print(max(Data_case_target$cluster))
         Disease_cluster = data.frame(matrix(rep(0, length(Cancername) * max(Data_case_target$cluster)),
                                             ncol = max(Data_case_target$cluster)))
         colnames(Disease_cluster) = seq(1,max(Data_case_target$cluster))
         rownames(Disease_cluster) = Cancername
-        
+
         Data_case_target$diagnosis = Data_case_target$症例.基本情報.がん種.OncoTree.
         Data_survival = Data_case_target
-        
+
         for (i in seq_along(Cancername)) {
           Data_survival_tmp <- Data_survival %>%
             filter(Cancers == Cancername[i])
-          
+
           if (nrow(Data_survival_tmp) > 0) {
-            
+
             ## --- pre_CGP ---
+            print(3)
+            print(nrow(Data_survival_tmp))
             if (sum(Data_survival_tmp$time_palliative_enroll, na.rm = TRUE) > 0) {
               survival_simple <- survfit(
                 Surv(time_palliative_enroll, rep(1, nrow(Data_survival_tmp))) ~ 1,
@@ -245,7 +250,7 @@ custering_analysis_logic <- function() {
             } else {
               Num_pre_CGP[i] <- 0
             }
-            
+
             ## --- post_CGP ---
             if (sum(Data_survival_tmp$time_enroll_final, na.rm = TRUE) > 0) {
               survival_simple <- survfit(
@@ -256,7 +261,7 @@ custering_analysis_logic <- function() {
             } else {
               Num_post_CGP[i] <- 0
             }
-            
+
             ## --- Bone, Brain, Lung, Liver counts ---
             # ここで一度だけカウント
             counts <- Data_survival_tmp %>%
@@ -270,7 +275,7 @@ custering_analysis_logic <- function() {
                 Liver_yes = sum(Liver_met == "Yes", na.rm = TRUE),
                 Liver_no  = sum(Liver_met == "No",  na.rm = TRUE)
               )
-            
+
             Total_pts_Bone[i]     <- counts$Bone_yes
             Total_pts_Bone_no[i]  <- counts$Bone_no
             Total_pts_Brain[i]    <- counts$Brain_yes
@@ -294,13 +299,13 @@ custering_analysis_logic <- function() {
         Summary_Table <- Diseases %>%
           purrr::map_dfr(function(d) {
             df <- Data_case_target %>% filter(症例.基本情報.がん種.OncoTree. == d)
-            
+
             # 腫瘍部位のカウント
             site_counts <- table(df$症例.検体情報.検体採取部位.名称.)
             sample_is_primary_tumor   <- site_counts["原発巣"]   %||% 0
             sample_is_metastatic_tumor <- site_counts["転移巣"]   %||% 0
             sample_is_unknown_tumor   <- sum(site_counts[c("不明", "")], na.rm = TRUE)
-            
+
             # 腫瘍細胞含有割合
             purity <- df$症例.検体情報.腫瘍細胞含有割合
             tumor_purity_0_25   <- sum(!is.na(purity) & purity < 25)
@@ -308,7 +313,7 @@ custering_analysis_logic <- function() {
             tumor_purity_50_75  <- sum(!is.na(purity) & purity >= 50 & purity < 75)
             tumor_purity_75_100 <- sum(!is.na(purity) & purity >= 75 & purity <= 100)
             tumor_purity_NA     <- sum(is.na(purity))
-            
+
             # 年齢統計
             age <- df$症例.基本情報.年齢
             age_quant <- quantile(age, na.rm = TRUE)
@@ -317,16 +322,16 @@ custering_analysis_logic <- function() {
             age_highest <- age_quant[5]
             age_range_25 <- age_quant[2]
             age_range_75 <- age_quant[4]
-            
+
             # 性別
             male         <- sum(df$症例.基本情報.性別.名称. == "Male", na.rm = TRUE)
             female       <- sum(df$症例.基本情報.性別.名称. == "Female", na.rm = TRUE)
             sex_unknown  <- sum(df$症例.基本情報.性別.名称. == "Unknown", na.rm = TRUE)
-            
+
             # driver mutations
             oncogenic_driver_plus  <- sum(df$driver_mutations > 0, na.rm = TRUE)
             oncogenic_driver_minus <- sum(df$driver_mutations == 0, na.rm = TRUE)
-            
+
             # TMB統計
             tmb <- df$TMB
             tmb_quant <- quantile(tmb, na.rm = TRUE)
@@ -335,16 +340,16 @@ custering_analysis_logic <- function() {
             TMB_highest <- tmb_quant[5]
             TMB_range_25 <- tmb_quant[2]
             TMB_range_75 <- tmb_quant[4]
-            
+
             # cluster集計
             tmp_cluster <- table(df$cluster)
             entropy_val <- shannon.entropy(as.numeric(tmp_cluster), max(Data_case_target$cluster))
-            
+
             # Disease_cluster更新（別途処理が必要）
             for (j in seq_along(tmp_cluster)) {
               Disease_cluster[d, as.numeric(names(tmp_cluster)[j])] <<- tmp_cluster[j]
             }
-            
+
             tibble(
               Diseases = d,
               sample_is_primary_tumor   = sample_is_primary_tumor,
@@ -381,13 +386,15 @@ custering_analysis_logic <- function() {
         Summary_Table$lung_no = Total_pts_Lung_no
         Summary_Table$liver = Total_pts_Liver
         Summary_Table$liver_no = Total_pts_Liver_no
-        
+
         Summary_Table$option = Num_Option * 100
         Summary_Table$treat = Num_Receive_Tx * 100
         Summary_Table$time_before_CGP = Num_pre_CGP
         Summary_Table$time_after_CGP = Num_post_CGP
         incProgress(1 / 13)
-        
+
+        print(4)
+        print(Diseases)
         testSummary = data.frame(as.vector(t(matrix(rep(1:max(Data_case_target$cluster),
                                                         length(Diseases)),
                                                     ncol =length(Diseases)))))
@@ -397,7 +404,7 @@ custering_analysis_logic <- function() {
         testSummary$Positive_patients = rep(rep(0, length(Diseases)), max(Data_case_target$cluster))
         testSummary$OddsRatio = rep(rep(1, length(Diseases)), max(Data_case_target$cluster))
         testSummary$Pvalue = rep(rep(1, length(Diseases)), max(Data_case_target$cluster))
-        
+
         selected_genes = rep("", max(Data_survival$cluster))
         cluster_set = sort(unique(Data_survival$cluster))
         for(i in 1:length(cluster_set)){
@@ -448,7 +455,7 @@ custering_analysis_logic <- function() {
           }
           top_genes = testSummary[((1+(i-1)*length(Diseases)):(i*length(Diseases))),] %>%
             dplyr::arrange(desc(OddsRatio)) %>%
-            dplyr::filter(OddsRatio > 1 & Pvalue < 0.05) 
+            dplyr::filter(OddsRatio > 1 & Pvalue < 0.05)
           if(length(top_genes$OddsRatio) >= 1){
             top_genes = top_genes[1:min(3, length(top_genes$OddsRatio)),]$Histology
           } else{
@@ -458,13 +465,16 @@ custering_analysis_logic <- function() {
         }
         testSummary[,"OddsRatio"] = ifelse(is.infinite(testSummary[,"OddsRatio"]), 99999, testSummary[,"OddsRatio"])
         OUTPUT_DATA$clustering_testSummary_disease = testSummary
-        
+
         incProgress(1 / 13)
-        
+
         Data_cluster = Data_case_target %>% dplyr::select(C.CAT調査結果.基本項目.ハッシュID, cluster)
         colnames(Data_cluster) = c("Tumor_Sample_Barcode", "cluster")
         Data_MAF_target = left_join(Data_MAF_target, Data_cluster, by = "Tumor_Sample_Barcode")
         Mutations = sort(unique(Data_MAF_target$Hugo_Symbol))
+        print(5)
+        print(max(Data_MAF_target$cluster))
+        print(length(Mutations))
         testSummary = data.frame(as.vector(t(matrix(rep(1:max(Data_MAF_target$cluster),
                                                         length(Mutations)),
                                                     ncol =length(Mutations)))))
@@ -474,7 +484,7 @@ custering_analysis_logic <- function() {
         testSummary$Positive_patients = rep(rep(0, length(Mutations)), max(Data_MAF_target$cluster))
         testSummary$OddsRatio = rep(rep(1, length(Mutations)), max(Data_MAF_target$cluster))
         testSummary$Pvalue = rep(rep(1, length(Mutations)), max(Data_MAF_target$cluster))
-        
+
         cluster_set = sort(unique(Data_MAF_target$cluster))
         for(i in 1:length(cluster_set)){
           pos_num = data.frame(Mutations)
@@ -531,7 +541,7 @@ custering_analysis_logic <- function() {
           }
           top_genes = testSummary[((1+(i-1)*length(Mutations)):(i*length(Mutations))),] %>%
             dplyr::arrange(desc(OddsRatio)) %>%
-            dplyr::filter(OddsRatio > 1 & Pvalue < 0.05) 
+            dplyr::filter(OddsRatio > 1 & Pvalue < 0.05)
           if(length(top_genes$OddsRatio) >= 1){
             top_genes = top_genes[1:min(3, length(top_genes$OddsRatio)),]$mutation
           } else{
@@ -543,7 +553,7 @@ custering_analysis_logic <- function() {
         OUTPUT_DATA$clustering_selected_genes = selected_genes
         testSummary[,"OddsRatio"] = ifelse(is.infinite(testSummary[,"OddsRatio"]), 99999, testSummary[,"OddsRatio"])
         OUTPUT_DATA$clustering_testSummary_mutation = testSummary
-        
+
         Disease_cluster$Disease = rownames(Disease_cluster)
         Disease_cluster <- transform(Disease_cluster, Disease= factor(Disease, levels = sort(unique(Disease_cluster$Disease), decreasing = TRUE)))
         colnames(Disease_cluster) = c(seq(1,max(Data_survival$cluster)), "Disease")
@@ -562,7 +572,7 @@ custering_analysis_logic <- function() {
         )
         OUTPUT_DATA$clustering_Summary_Table = Summary_Table
         OUTPUT_DATA$clustering_Data_entropy = Data_entropy
-        
+
         x <- data.frame(
           Cancers   = Diseases,
           Patients = Total_pts,
@@ -578,7 +588,7 @@ custering_analysis_logic <- function() {
         )
         x$Cancers = factor(x$Cancers)
         x_max_patients = max(x$Patients)
-        
+
         y <- data.frame(
           Cancers   = rep(Diseases,5),
           Patients   = rep(Total_pts,5),
@@ -607,7 +617,7 @@ custering_analysis_logic <- function() {
           "Percent: ", percent(y$percent, accuracy = 0.1)
         )
         incProgress(1 / 13)
-        
+
         get_level_counts_cluster <- function(data, level, clusters, total_pts) {
           counts <- table(data %>% filter(Level == level) %>% pull(cluster))
           result <- setNames(rep(0, length(clusters)), clusters)
@@ -618,7 +628,9 @@ custering_analysis_logic <- function() {
         All_cluster = sort(unique(Data_case_target$cluster))
         Total_pts_cluster = as.vector(table((Data_case_target %>%
                                                dplyr::distinct(C.CAT調査結果.基本項目.ハッシュID, .keep_all = T))$cluster))
-        
+
+        print(6)
+        print(All_cluster)
         levels <- c("A", "B", "C", "D", "E")
         level_counts_cluster <- lapply(levels, function(lvl) {
           get_level_counts_cluster(data_figure_cluster, lvl, All_cluster, Total_pts_cluster)
@@ -651,8 +663,8 @@ custering_analysis_logic <- function() {
         )
         OUTPUT_DATA$clustering_y = y
         OUTPUT_DATA$clustering_z = z
-        
-        
+
+
         Data_case_target$cluster = as.factor(Data_case_target$cluster)
         OUTPUT_DATA$clustering_Data_case_target = Data_case_target
         Data_mutation_cord$cluster = Data_case_target$cluster
@@ -705,7 +717,7 @@ output$figure_entropy = renderGirafe({
     coord_flip() +
     theme_classic() +
     theme(legend.position = "none")
-  
+
   g3 = ggplot(OUTPUT_DATA$clustering_Data_entropy, aes(x=Disease, y=samples,tooltip = tooltip_text, fill=cluster)) +
     geom_bar_interactive(stat = "identity", position = "fill") +
     scale_fill_gradientn_interactive(colours = c("green", "black", "magenta", "darkred", "orange", "blue", "yellow")) +
@@ -721,10 +733,10 @@ output$figure_entropy = renderGirafe({
     )
   combined <- cowplot::plot_grid(g1, g3, rel_widths = c(1, 2), nrow = 1)
   height_svg = 1.2 + length(unique(OUTPUT_DATA$clustering_Data_entropy$Disease))*0.15
-  
+
   girafe(ggobj = combined, width_svg = 12, height_svg = height_svg)
 })
-  
+
 output$figure_base = renderPlot({
   req(OUTPUT_DATA$clustering_Data_case_target,
       OUTPUT_DATA$clustering_Summary_Table)
@@ -734,11 +746,11 @@ output$figure_base = renderPlot({
     Summary_Table = OUTPUT_DATA$clustering_Summary_Table
     Data_tmp$Age = Data_tmp$症例.基本情報.年齢
     Data_tmp <- transform(Data_tmp, diagnosis= factor(diagnosis, levels = sort(unique(Data_tmp$diagnosis), decreasing = TRUE)))
-    
+
     chart_3 = ggplot(data = Data_tmp, aes(x = diagnosis, y = Age)) +
       geom_boxplot(outlier.colour = NA) +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(legend.position = "none",
             axis.ticks.y =  element_blank(),
             #axis.text.y = element_blank(),
@@ -760,11 +772,11 @@ output$figure_base = renderPlot({
     cancer_freq_order = c("Unknown", "Female", "Male")
     Data_tmp <- transform(Data_tmp, Sex= factor(Sex, levels = cancer_freq_order))
     Data_tmp <- transform(Data_tmp, Diseases= factor(Diseases, levels = sort(unique(Diseases), decreasing = TRUE)))
-    
+
     chart_4 = ggplot(data = Data_tmp, aes(x = Diseases, y = sex, fill=Sex)) +
       geom_col(position="fill") +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(#legend.position = "none",
         axis.ticks.y =  element_blank(),
         axis.text.y = element_blank(),
@@ -774,7 +786,7 @@ output$figure_base = renderPlot({
       scale_fill_manual(values = rev(brewer.pal(5, "Paired")[1:length(unique(Data_tmp$Sex))])) +
       ylab("Sex") +
       guides(fill = guide_legend(reverse = TRUE))
-    
+
     Data_tmp_1 =data.frame(Summary_Table$Diseases)
     Data_tmp_1$driver = Summary_Table$oncogenic_driver_plus
     Data_tmp_1$Driver = "Yes"
@@ -787,11 +799,11 @@ output$figure_base = renderPlot({
     cancer_freq_order = c("Unknown", "No", "Yes")
     Data_tmp <- transform(Data_tmp, Driver= factor(Driver, levels = cancer_freq_order))
     Data_tmp <- transform(Data_tmp, Diseases= factor(Diseases, levels = sort(unique(Diseases), decreasing = TRUE)))
-    
+
     chart_5 = ggplot(data = Data_tmp, aes(x = Diseases, y = driver, fill=Driver)) +
       geom_col(position="fill") +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(#legend.position = "none",
         axis.ticks.y =  element_blank(),
         axis.text.y = element_blank(),
@@ -801,20 +813,20 @@ output$figure_base = renderPlot({
       scale_fill_manual(values = rev(brewer.pal(5, "Paired")[1:length(unique(Data_tmp$Driver))])) +
       ylab("Oncogenic muts detected") +
       guides(fill = guide_legend(reverse = TRUE))
-    
+
     Data_tmp = Data_case_target
     Data_tmp <- transform(Data_tmp, diagnosis= factor(diagnosis, levels = sort(unique(Diseases), decreasing = TRUE)))
     chart_6 = ggplot(data = Data_tmp, aes(x = diagnosis, y = TMB)) +
       geom_boxplot(outlier.colour = NA) +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(legend.position = "none",
             axis.ticks.y =  element_blank(),
             axis.text.y = element_blank(),
             axis.title.y = element_blank(),
             axis.line.y = element_blank()) +
       scale_y_continuous(limits = c(0, NA))
-    
+
     Data_tmp_1 =data.frame(Summary_Table$Diseases)
     Data_tmp_1$brain_meta = Summary_Table$brain
     Data_tmp_1$Brain_meta = "(+)"
@@ -827,11 +839,11 @@ output$figure_base = renderPlot({
     cancer_freq_order = c("(-)", "(+)")
     Data_tmp <- transform(Data_tmp, Brain_meta= factor(Brain_meta, levels = cancer_freq_order))
     Data_tmp <- transform(Data_tmp, Diseases= factor(Diseases, levels = sort(unique(Data_case_target$diagnosis), decreasing = TRUE)))
-    
+
     chart_7 = ggplot(data = Data_tmp, aes(x = Diseases, y = brain_meta, fill=Brain_meta)) +
       geom_col(position="fill") +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(legend.position = "none",
             axis.ticks.y =  element_blank(),
             #axis.text.y = element_blank(),
@@ -841,7 +853,7 @@ output$figure_base = renderPlot({
       scale_fill_manual(values = rev(brewer.pal(5, "Paired")[1:length(unique(Data_tmp$Brain_meta))])) +
       ylab("Brain metastasis") +
       guides(fill = guide_legend(reverse = TRUE))
-    
+
     Data_tmp_1 =data.frame(Summary_Table$Diseases)
     Data_tmp_1$bone_meta = Summary_Table$bone
     Data_tmp_1$Bone_meta = "(+)"
@@ -854,11 +866,11 @@ output$figure_base = renderPlot({
     cancer_freq_order = c("(-)", "(+)")
     Data_tmp <- transform(Data_tmp, Bone_meta= factor(Bone_meta, levels = cancer_freq_order))
     Data_tmp <- transform(Data_tmp, Diseases= factor(Diseases, levels = sort(unique(Data_case_target$diagnosis), decreasing = TRUE)))
-    
+
     chart_8 = ggplot(data = Data_tmp, aes(x = Diseases, y = bone_meta, fill=Bone_meta)) +
       geom_col(position="fill") +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(legend.position = "none",
             axis.ticks.y =  element_blank(),
             axis.text.y = element_blank(),
@@ -868,7 +880,7 @@ output$figure_base = renderPlot({
       scale_fill_manual(values = rev(brewer.pal(5, "Paired")[1:length(unique(Data_tmp$Bone_meta))])) +
       ylab("Bone metastasis") +
       guides(fill = guide_legend(reverse = TRUE))
-    
+
     Data_tmp_1 =data.frame(Summary_Table$Diseases)
     Data_tmp_1$lung_meta = Summary_Table$lung
     Data_tmp_1$Lung_meta = "(+)"
@@ -881,11 +893,11 @@ output$figure_base = renderPlot({
     cancer_freq_order = c("(-)", "(+)")
     Data_tmp <- transform(Data_tmp, Lung_meta= factor(Lung_meta, levels = cancer_freq_order))
     Data_tmp <- transform(Data_tmp, Diseases= factor(Diseases, levels = sort(unique(Data_case_target$diagnosis), decreasing = TRUE)))
-    
+
     chart_9 = ggplot(data = Data_tmp, aes(x = Diseases, y = lung_meta, fill=Lung_meta)) +
       geom_col(position="fill") +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(legend.position = "none",
             axis.ticks.y =  element_blank(),
             axis.text.y = element_blank(),
@@ -895,7 +907,7 @@ output$figure_base = renderPlot({
       scale_fill_manual(values = rev(brewer.pal(5, "Paired")[1:length(unique(Data_tmp$Lung_meta))])) +
       ylab("Lung metastasis") +
       guides(fill = guide_legend(reverse = TRUE))
-    
+
     Data_tmp_1 =data.frame(Summary_Table$Diseases)
     Data_tmp_1$liver_meta = Summary_Table$liver
     Data_tmp_1$Liver_meta = "(+)"
@@ -908,91 +920,91 @@ output$figure_base = renderPlot({
     cancer_freq_order = c("(-)", "(+)")
     Data_tmp <- transform(Data_tmp, Liver_meta= factor(Liver_meta, levels = cancer_freq_order))
     Data_tmp <- transform(Data_tmp, Diseases= factor(Diseases, levels = sort(unique(Data_case_target$diagnosis), decreasing = TRUE)))
-    
+
     chart_10 = ggplot(data = Data_tmp, aes(x = Diseases, y = liver_meta, fill=Liver_meta)) +
       geom_col(position="fill") +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(# legend.position = "none",
         axis.ticks.y =  element_blank(),
         axis.text.y = element_blank(),
         axis.title.y = element_blank(),
         axis.line.y = element_blank()) +
       scale_y_continuous(lim = c(0,1), labels = percent) +
-      ylab("Liver metastasis") + 
+      ylab("Liver metastasis") +
       scale_fill_manual(values = rev(brewer.pal(5, "Paired")[1:length(unique(Data_tmp$Liver_meta))]), name = "Metastasis") +
       guides(fill = guide_legend(reverse = TRUE))
-    
+
     Data_tmp =data.frame(Summary_Table$Diseases)
     Data_tmp$option = Summary_Table$option / 100
     Data_tmp$Option = "(+)"
     Data_tmp <- transform(Data_tmp, Option= factor(Option))
     Data_tmp <- transform(Data_tmp, Diseases= factor(Diseases, levels = sort(unique(Data_case_target$diagnosis), decreasing = TRUE)))
-    
+
     chart_11 = ggplot(data = Data_tmp, aes(x = Diseases, y = option, fill=Option)) +
       geom_point() +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(legend.position = "none",
             axis.ticks.y =  element_blank(),
             #axis.text.y = element_blank(),
             axis.title.y = element_blank(),
             axis.line.y = element_blank()) +
       scale_y_continuous(lim = c(0,NA), labels = percent, name = "Pts with CTx recommendation")
-    
+
     Data_tmp =data.frame(Summary_Table$Diseases)
     Data_tmp$treat = Summary_Table$treat / 100
     Data_tmp$Treat = "(+)"
     Data_tmp <- transform(Data_tmp, Treat= factor(Treat))
     Data_tmp <- transform(Data_tmp, Diseases= factor(Diseases, levels = sort(unique(Data_case_target$diagnosis), decreasing = TRUE)))
-    
+
     chart_12 = ggplot(data = Data_tmp, aes(x = Diseases, y = treat, fill=Treat)) +
       geom_point() +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(legend.position = "none",
             axis.ticks.y =  element_blank(),
             axis.text.y = element_blank(),
             axis.title.y = element_blank(),
             axis.line.y = element_blank()) +
       scale_y_continuous(lim = c(0,NA), labels = percent, name = "Pts received recommended CTx")
-    
+
     Data_tmp =data.frame(Summary_Table$Diseases)
     Data_tmp$time_before_CGP = Summary_Table$time_before_CGP
     Data_tmp$Time_before_CGP = "(+)"
     Data_tmp <- transform(Data_tmp, Time_before_CGP= factor(Time_before_CGP))
     Data_tmp <- transform(Data_tmp, Diseases= factor(Diseases, levels = sort(unique(Data_case_target$diagnosis), decreasing = TRUE)))
-    
+
     chart_13 = ggplot(data = Data_tmp, aes(x = Diseases, y = time_before_CGP, fill=Time_before_CGP)) +
       geom_col() +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(legend.position = "none",
             axis.ticks.y =  element_blank(),
             axis.text.y = element_blank(),
             axis.title.y = element_blank(),
             axis.line.y = element_blank()) +
       scale_y_continuous(limits = c(0, NA)) +
-      ylab("Median time from CTx to CGP (days)") + 
+      ylab("Median time from CTx to CGP (days)") +
       scale_fill_manual(values = brewer.pal(3, "Paired")[1])
-    
+
     Data_tmp =data.frame(Summary_Table$Diseases)
     Data_tmp$time_after_CGP = Summary_Table$time_after_CGP
     Data_tmp$Time_after_CGP = "(+)"
     Data_tmp <- transform(Data_tmp, Time_after_CGP= factor(Time_after_CGP))
     Data_tmp <- transform(Data_tmp, Diseases= factor(Diseases, levels = sort(unique(Data_case_target$diagnosis), decreasing = TRUE)))
-    
+
     chart_14 = ggplot(data = Data_tmp, aes(x = Diseases, y = time_after_CGP, fill=Time_after_CGP)) +
       geom_col() +
       coord_flip() +
-      theme_classic() + 
+      theme_classic() +
       theme(legend.position = "none",
             axis.ticks.y =  element_blank(),
             axis.text.y = element_blank(),
             axis.title.y = element_blank(),
             axis.line.y = element_blank()) +
       scale_y_continuous(limits = c(0, NA)) +
-      ylab("Median time from CGP to death (days)") + 
+      ylab("Median time from CGP to death (days)") +
       scale_fill_manual(values = brewer.pal(3, "Paired")[1])
   })
   grid.arrange(chart_3, chart_4, chart_5, chart_6, chart_7, chart_8, chart_9, chart_10, chart_11, chart_12, chart_13, chart_14, ncol = 4)
@@ -1098,7 +1110,7 @@ output$figure_cluster_subtype = renderGirafe({
   Data_case_target$EP_treat = as.factor(Data_case_target$EP_treat)
   g = ggplot(OUTPUT_DATA$clustering_Data_mutation_cord,
              aes(V1,V2,tooltip = tooltip_text,color = Data_case_target[[input$color_var_cluster]])) +
-    geom_point_interactive(aes(tooltip = tooltip_text), size = 1) + 
+    geom_point_interactive(aes(tooltip = tooltip_text), size = 1) +
     labs(x = "UMAP 1", y = "UMAP 2",
          title = "Unsupervised clustering of oncogenic alterations") +
     theme_classic() +
