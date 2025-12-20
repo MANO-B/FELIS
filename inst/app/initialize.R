@@ -1,5 +1,5 @@
 SOFT_VERSION = "4.2.5"
-DATA_VERSION = "20250626"
+DATA_VERSION = "20251024"
 bucket <- "3e040086-data-production-felisanalysisportal"
 key    <- "ic_withdrawn_list.txt"
 Sys.setenv(AWS_EC2_METADATA_DISABLED = "true")
