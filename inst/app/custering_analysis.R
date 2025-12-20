@@ -223,7 +223,8 @@ custering_analysis_logic <- function() {
 
 
         print(2)
-        print(max(Data_case_target$cluster))
+        print(Data_case_target[1:10,])
+        print(Data_cluster_ID()[1:10,])
         Disease_cluster = data.frame(matrix(rep(0, length(Cancername) * max(Data_case_target$cluster)),
                                             ncol = max(Data_case_target$cluster)))
         colnames(Disease_cluster) = seq(1,max(Data_case_target$cluster))
