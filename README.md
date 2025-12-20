@@ -43,7 +43,7 @@ On a Mac Studio (M4 Max, 128 GB RAM), the initial ingestion and preprocessing of
 
 #### Software Requirements
 
-#### Docker file
+## Docker (recommended)
 If you can use Docker, you can start using FELIS immediately without complicated installation steps.  
 For how to use Docker, please refer to guides for [Windows](https://qiita.com/hoshimado/items/51c99ccaee3d4222d99d) or [macOS](https://www.kagoya.jp/howto/cloud/container/dockerformac/).  
 When using Docker Desktop, please set CPU to 4+ cores and memory as large as possible (see [this tip](https://dojo.docker.jp/t/topic/52)).  
@@ -73,11 +73,16 @@ docker run -it --rm -p 3838:3838 ikegamitky/felis:latest R
   
 Run the following line in R to start FELIS:
 ```r
-> FELIS::run_app()
+Sys.setenv(FELIS_DATA_ROOT = getwd())
+APP_DIR <- system.file("app", package = "FELIS")
+setwd(APP_DIR)
+source("app.R", local = TRUE, chdir = TRUE)
+# Run the application
+shinyApp(ui = ui, server = server)
 ```
 
 When launching FELIS on a server, after entering the following command from the terminal, you no longer need to keep the SSH session open.  
-If the server IP address is 172.25.100.1, access **http://172.25.100.1:3838** in your browser.
+If the server IP address is 172.25.100.1, access **http://172.25.100.1:3838/felis-cs** in your browser.
 
 ```bash
 # ssh username@servername
@@ -100,22 +105,22 @@ Please refer to [RStan Getting Started (Japanese)](https://github.com/stan-dev/r
 - For Windows, install [Rtools](https://github.com/stan-dev/rstan/wiki/Configuring-C---Toolchain-for-Windows) matching your R version.  
 - For Linux, follow the instructions [as appropriate](https://github.com/stan-dev/rstan/wiki/Configuring-C-Toolchain-for-Linux).
 
-```r
-## For macOS
-## In Terminal, install Command Line Tools for Xcode:
+### For macOS
+#### Install Command Line Tools for Xcode:
+```bash
 xcode-select --install
+```
 
-## In Terminal, install Homebrew:
- /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-## In Terminal, install libomp:
+#### In Terminal, install Homebrew, libomp:
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 brew install libomp
-
-# Commands to tell R the OpenMP library path
 export PKG_LIBS="-fopenmp"
 export PKG_CPPFLAGS="-I/usr/local/opt/libomp/include -Xpreprocessor -fopenmp"
+```
 
-## In the R console, run:
+#### In the R console, run:
+```r
 install.packages("remotes")
 remotes::install_github("coatless-mac/macrtools")
 options(timeout=1000)
@@ -128,31 +133,35 @@ arch <- ifelse(R.version$arch == "aarch64", "arm64", "x86_64")
 cat(paste("\nCXX17FLAGS += -O3 -mtune=native -arch", arch, "-ftemplate-depth-256"),
     file = M, sep = "\n", append = FALSE)
 install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+```
 
-
-## For Windows
-## Install Rtools:
-https://k-metrics.github.io/cabinet/env_install_tls.html
-https://cran.r-project.org/bin/windows/Rtools/
-
-## Install Visual Studio
-## During installation, be sure to select the workload: **Desktop development with C++**
-https://visualstudio.microsoft.com/ja/vs/community/
-
-## In the R console, run:
+### For Windows
+#### Install Rtools:
+https://k-metrics.github.io/cabinet/env_install_tls.html  
+https://cran.r-project.org/bin/windows/Rtools/  
+  
+#### Install Visual Studio
+#### During installation, be sure to select the workload: **Desktop development with C++**
+https://visualstudio.microsoft.com/ja/vs/community/  
+  
+#### In the R console, run:
+```r
 install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
+```
 
-
-## For Linux
-## For Ubuntu/Debian:
-Bash
+### For Linux
+#### For Ubuntu/Debian:
+```bash
 sudo apt-get install -y build-essential cmake git
+```
 
-## For CentOS/RHEL:
-Bash
+#### For CentOS/RHEL:
+```bash
 sudo yum install -y gcc-c++ cmake git
+```
 
-## In the R console, run:
+##### In the R console, run:
+```r
 install.packages("rstan", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))
 ```
 
@@ -221,20 +230,17 @@ remotes::install_github('brennanpincardiff/drawProteins')
 # https://cran.r-project.org/src/contrib/Archive/rms/
 remotes::install_version(package = "rms", version = "6.7.0", dependencies = FALSE)
 ```
-
-##### R settings
-We recommend using [RStudio](https://posit.co/download/rstudio-desktop/).  
-If Japanese characters are not displayed properly in figures, please refer to [this post](https://ill-identified.hatenablog.com/entry/2021/09/10/231230).
-
-### Launching FELIS
-- Installing FELIS  
-```bash
-remotes::install_github('MANO-B/FELIS')
-```
-  
+## Launching FELIS
+ 
 - Starting FELIS  
 ```r
-> FELIS::run_app()
+remotes::install_github('MANO-B/FELIS')
+Sys.setenv(FELIS_DATA_ROOT = getwd())
+APP_DIR <- system.file("app", package = "FELIS")
+setwd(APP_DIR)
+source("app.R", local = TRUE, chdir = TRUE)
+# Run the application
+shinyApp(ui = ui, server = server)
 ```
 
 <img src="source/appli_GUI.png"  height=500>  
