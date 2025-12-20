@@ -74,7 +74,7 @@ APP_DIR <- system.file("app", package = "FELIS")
 setwd(APP_DIR)
 source("app.R", local = TRUE, chdir = TRUE)
 # Run the application
-shinyApp(ui = ui, server = server, launch.browser=F)
+shinyApp(ui = ui, server = server)
 ```
 
 When launching FELIS on a server, after entering the following command from the terminal, you no longer need to keep the SSH session open.  
