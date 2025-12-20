@@ -48,12 +48,12 @@ if(file.exists(file.path(tempdir(), "Lines_data.rda"))){
 }
 
 stan_model_factor_code_path <- "source/Stan_code_loglog_weibull_factor.stan"
-stan_model_factor_save_path_rstan <- file.path(app_dir(), "compiled_model_factor_rstan.rds")
-stan_model_factor_save_path_cmdstan <- file.path(app_dir(), "compiled_model_factor_cmdstan.rds")
+stan_model_factor_save_path_rstan <- file.path(app_dir, "compiled_model_factor_rstan.rds")
+stan_model_factor_save_path_cmdstan <- file.path(app_dir, "compiled_model_factor_cmdstan.rds")
 
 stan_model_simple_code_path <- "source/Stan_code_loglog_weibull.stan"
-stan_model_simple_save_path_rstan <- file.path(app_dir(), "compiled_model_rstan.rds")
-stan_model_simple_save_path_cmdstan <- file.path(app_dir(), "compiled_model_cmdstan.rds")
+stan_model_simple_save_path_rstan <- file.path(app_dir, "compiled_model_rstan.rds")
+stan_model_simple_save_path_cmdstan <- file.path(app_dir, "compiled_model_cmdstan.rds")
 
 if(Sys.getenv("SHINY_SERVER_VERSION") != ""){
   DOCKER = FALSE
