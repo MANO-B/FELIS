@@ -60,39 +60,46 @@ library(furrr)
 library(parallel)
 library(aws.s3)
 
-source("initialize.R")
-source("RECIST.R")
-source("survival_function.R")
-source("ui.R")
+APP_DIR <- system.file("app", package = "FELIS")
+source_app <- function(fname) {
+  f <- file.path(APP_DIR, fname)
+  if (!file.exists(f)) stop("Missing file: ", f)
+  source(f, local = parent.frame(), chdir = TRUE)
+}
+
+source_app("initialize.R")
+source_app("RECIST.R")
+source_app("survival_function.R")
+source_app("ui.R")
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
   tmp_post <- reactiveValues()
-  analysis_env <- Null
+  analysis_env <- NULL
   OUTPUT_DATA = reactiveValues()
-  source("case_load.R", local = TRUE)
-  source("drug_load.R", local = TRUE)
-  source("report_load.R", local = TRUE)
-  source("ui_helpers.R", local = TRUE)
-  source("cluster_load.R", local = TRUE)
-  source("reload.R", local = TRUE)
-  source("summary_base.R", local = TRUE)
-  source("oncoprint.R", local = TRUE)
-  source("mutually_exclusive.R", local = TRUE)
-  source("mut_subtype.R", local = TRUE)
-  source("custering_analysis.R", local = TRUE)
-  source("CGP_benefit_analysis.R", local = TRUE)
-  source("survival_simuration.R", local = TRUE)
-  source("survival_CGP_analysis.R", local = TRUE)
-  source("survival_CTx_analysis2.R", local = TRUE)
-  source("MCMC_function.R", local = TRUE)
-  source("survival_CTx_analysis.R", local = TRUE)
-  source("drug_table.R", local = TRUE)
-  source("volcano_function.R", local = TRUE)
-  source("drug_analysis.R", local = TRUE)
-  source("predict_nomogram.R", local = TRUE)
-  source("exit.R", local = TRUE)
-  source("memory.R", local = TRUE)
+  source_app("case_load.R")
+  source_app("drug_load.R")
+  source_app("report_load.R")
+  source_app("ui_helpers.R")
+  source_app("cluster_load.R")
+  source_app("reload.R")
+  source_app("summary_base.R")
+  source_app("oncoprint.R")
+  source_app("mutually_exclusive.R")
+  source_app("mut_subtype.R")
+  source_app("custering_analysis.R")
+  source_app("CGP_benefit_analysis.R")
+  source_app("survival_simuration.R")
+  source_app("survival_CGP_analysis.R")
+  source_app("survival_CTx_analysis2.R")
+  source_app("MCMC_function.R")
+  source_app("survival_CTx_analysis.R")
+  source_app("drug_table.R")
+  source_app("volcano_function.R")
+  source_app("drug_analysis.R")
+  source_app("predict_nomogram.R")
+  source_app("exit.R")
+  source_app("memory.R")
   observeEvent(input$tabs, {
     if (input$tabs == "Settings") {
       analysis_env <- new.env()
@@ -221,5 +228,4 @@ server <- function(input, output, session) {
     }
   })
 }
-# Run the application
-shinyApp(ui = ui, server = server)
+

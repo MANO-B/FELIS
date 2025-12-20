@@ -8,8 +8,8 @@ Data_cluster_ID = reactive({
         Data_mutation_cord = QS_READ(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE),file=file.path(app_dir, "source", "Data_mutation_cord_whole.qs")) %>%
           dplyr::filter(!C.CAT調査結果.基本項目.ハッシュID %in% ID_exclude)
       } else if(input$clustering == "Fixed to the whole C-CAT cohort" &
-                file.exists("source/Data_mutation_cord_whole.qs")){
-        Data_mutation_cord = QS_READ(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE),file="source/Data_mutation_cord_whole.qs") %>%
+                file.exists(app_path("source/Data_mutation_cord_whole.qs"))){
+        Data_mutation_cord = QS_READ(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE),file=app_path("source/Data_mutation_cord_whole.qs")) %>%
           dplyr::filter(!C.CAT調査結果.基本項目.ハッシュID %in% ID_exclude)
       } else if(input$clustering == "Fixed to the 1st analysis" &
                 file.exists(file.path(tempdir(), "Data_mutation_cord.qs"))){

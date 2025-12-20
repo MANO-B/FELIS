@@ -17,12 +17,12 @@ ui <- dashboardPage(
             style = "height: 30px; padding: 10px;",
             div(id = "memory-widget",
                 style = "height: 28px; line-height: 28px; color: black; padding: 0px 10px;
-                       padding: 0px 10px; 
+                       padding: 0px 10px;
                        display: flex; align-items: center;",
                 span(id = "memory-text", "Loading...")
             )
     ),
-    tags$li(class = "dropdown", 
+    tags$li(class = "dropdown",
             style = "height: 28px; padding: 0px;",
             actionButton(
               inputId = "logout_button",
@@ -154,14 +154,14 @@ ui <- dashboardPage(
           line-height: 30px;
           z-index: 1000;
         }
-        .main-header .logo { 
-          height: 30px; 
-          line-height: 30px; 
+        .main-header .logo {
+          height: 30px;
+          line-height: 30px;
         }
-        .navbar { 
-          min-height: 30px; 
+        .navbar {
+          min-height: 30px;
         }
-    
+
         #logout_button {
           transition: background-color 0.3s;
           margin: 0;
@@ -187,7 +187,7 @@ ui <- dashboardPage(
             padding: 6px 8px !important;
           }
         }
-        
+
         .sidebar-toggle {
           height: 30px;
           padding-top: 1px !important;
@@ -240,7 +240,7 @@ ui <- dashboardPage(
           left: 0px !important;
           width: calc(100% - 0px) !important;
         }
-        
+
         .sidebar-collapse .main-sidebar {
           width: 0px !important;
         }
@@ -270,28 +270,28 @@ ui <- dashboardPage(
       "))
     ),
     # JavaScript
-    tags$script(src = "source/jszip.min.js"),
+    tags$script(src = "felis-src/jszip.min.js"),
     tags$script(HTML("
     Shiny.addCustomMessageHandler('updateMemoryWidget', function(data) {
       $('#memory-text').text(data.text);
     });
     function confirmDownload(elementId, fileLabel) {
       var message = 'Please manage according to the personal information handling rules\\n=================================\\nPlease comply with the contents of the Agreement on Utilization of C-CAT Data and the service specification conformity disclosure of/for C-CAT Research-Use Portal site, and handle it properly.\\n=================================\\nBe careful not to leave the downloaded file on your computer';
-      
+
       if (confirm(message)) {
-        
+
         // [追加] 通知を /@@/api/writwlog に送る
         fetch(window.location.origin + '/@@/api/writwlog', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             // メッセージ内容が 'csv file' のため 'csv' を指定
-            type: 'csv', 
+            type: 'csv',
             time: new Date().toISOString(),
             file: fileLabel
           })
         }).catch(err => console.error('Download log fetch error:', err));
-        
+
         // 本来のクリック（ダウンロード）動作
         document.getElementById(elementId).click();
       }
@@ -308,13 +308,13 @@ ui <- dashboardPage(
               fluidRow(
                 column(6,
                        fluidRow(box(
-                         title = "How to use", 
-                         status = "primary", 
+                         title = "How to use",
+                         status = "primary",
                          solidHeader = TRUE,
                          collapsible = TRUE,
                          collapsed = TRUE,
                          width = 6,
-                         
+
                          tags$h5("解析対象の症例・遺伝子を選択します"),
                          tags$ul(
                            tags$li("Analyze with new dataset をNoにすると全症例または前回解析症例が取り込まれます"),
@@ -328,12 +328,12 @@ ui <- dashboardPage(
                          condition = "input.new_analysis == 'Yes, input new csv files'",
                           div(
                            strong("Required: C-CAT data files (zipped files are acceptable)"),
-                           actionButton("help_ccat", "", 
-                                        icon = icon("question-circle"), 
+                           actionButton("help_ccat", "",
+                                        icon = icon("question-circle"),
                                         class = "help-icon",
                                         style = "border: none; background: transparent;"),
-                           bsPopover("help_ccat", 
-                                     title = "C-CAT データファイルについて", 
+                           bsPopover("help_ccat",
+                                     title = "C-CAT データファイルについて",
                                      content = "C-CAT（がんゲノム情報管理センター）から提供されるデータファイルをアップロードしてください。ZIPファイル形式でも対応しています。",
                                      placement = "top",
                                      trigger = "hover")
@@ -341,30 +341,30 @@ ui <- dashboardPage(
                          fileInput(
                            inputId = "clinical_files",
                            label = div("Choose case CSV Files",
-                                       actionButton("help_clinical_files", "", 
-                                                    icon = icon("question-circle"), 
+                                       actionButton("help_clinical_files", "",
+                                                    icon = icon("question-circle"),
                                                     class = "help-icon",
                                                     style = "border: none; background: transparent;")
                            ),
                            multiple = TRUE
                          ),
-                         bsPopover("help_clinical_files", 
-                                   title = "症例CSVファイル", 
+                         bsPopover("help_clinical_files",
+                                   title = "症例CSVファイル",
                                    content = "患者の臨床情報が含まれるCSVファイルを選択してください。複数ファイルの選択が可能です。ファイル形式：CSV、文字エンコーディング：UTF-8推奨",
                                    placement = "top",
                                    trigger = "hover"),
                          fileInput(
                            inputId = "report_files",
                            label = div("Choose report CSV Files",
-                                       actionButton("help_report_files", "", 
-                                                    icon = icon("question-circle"), 
+                                       actionButton("help_report_files", "",
+                                                    icon = icon("question-circle"),
                                                     class = "help-icon",
                                                     style = "border: none; background: transparent;")
                            ),
                            multiple = TRUE
                          ),
-                         bsPopover("help_report_files", 
-                                   title = "レポートCSVファイル", 
+                         bsPopover("help_report_files",
+                                   title = "レポートCSVファイル",
                                    content = "解析レポートデータが含まれるCSVファイルを選択してください。症例データと対応するレポートファイルをアップロードしてください。",
                                    placement = "top",
                                    trigger = "hover"),
@@ -496,7 +496,7 @@ ui <- dashboardPage(
                          "CGP benefit analysisにおける治療到達に関係すると考えるエビデンスレベル",
                          "A&BあるいはA&B&Cが通常と思います"
                        )
-                       
+
                 ),
               ),
               hr(),
@@ -508,13 +508,13 @@ ui <- dashboardPage(
               br(),
               h4(""),
               fluidRow(box(
-                title = "The following settings are for advanced analysis only", 
-                status = "primary", 
+                title = "The following settings are for advanced analysis only",
+                status = "primary",
                 solidHeader = TRUE,
                 collapsible = TRUE,
                 collapsed = TRUE,
                 width = 6,
-                
+
                 tags$h5(""),
                 tags$ul(
                   tags$li("動作はしますが、とくに変更は不要です")
@@ -784,7 +784,7 @@ ui <- dashboardPage(
                 )
               ),
               hr(),
-              plotOutput('figure_oncoprint', 
+              plotOutput('figure_oncoprint',
                          height = "1000px",
                          width = "1000px"),
               hr(),
@@ -796,7 +796,7 @@ ui <- dashboardPage(
               htmlOutput("select_lolliplot_gene"),
               htmlOutput("select_lolliplot_no"),
               hr(),
-              girafeOutput('figure_lolliplot2', 
+              girafeOutput('figure_lolliplot2',
                            height = "500px",
                            width = "1500px"),
               hr(),
@@ -812,7 +812,7 @@ ui <- dashboardPage(
                            icon = icon("download"),
                            onclick = "confirmDownload('download_mutation_data', 'FELIS downloaded raw data in Table of clinical and mutation information per patient tab')",
                            class = "btn-primary"),
-              
+
               # 非表示のダウンロードボタン
               div(style = "visibility:hidden; position:absolute;",
                   downloadButton('download_mutation_data', 'Hidden Download')
@@ -820,12 +820,12 @@ ui <- dashboardPage(
       ),
       tabItem(tabName = "Mutualexclusivity",
               strong("Figure for probability"),
-              girafeOutput('figure_mutually_exclusive_1', 
+              girafeOutput('figure_mutually_exclusive_1',
                            height = "1500px",
                            width = "1500px"),
               hr(),
               strong("Figure for odds ratio"),
-              girafeOutput('figure_mutually_exclusive_2', 
+              girafeOutput('figure_mutually_exclusive_2',
                            height = "1500px",
                            width = "1500px"),
               hr(),
@@ -849,7 +849,7 @@ ui <- dashboardPage(
               girafeOutput('figure_mut_subtype_plot')
       ),
       tabItem("Basicdata",
-              plotOutput('figure_base', 
+              plotOutput('figure_base',
                          height = "1500px",
                          width = "1000px"),
               hr(),
@@ -858,7 +858,7 @@ ui <- dashboardPage(
       ),
       tabItem("Clusterandhistologyrelationship",
               htmlOutput("select_color_var_cluster"),
-              girafeOutput('figure_cluster_subtype', 
+              girafeOutput('figure_cluster_subtype',
                            height = "800px",
                            width = "1600px"),
               hr(),
@@ -879,7 +879,7 @@ ui <- dashboardPage(
       ),
       tabItem("Frequencyofpatientswithtargetedtherapy",
               htmlOutput("select_figure_drug_evidence_var"),
-              girafeOutput('figure_drug_evidence', 
+              girafeOutput('figure_drug_evidence',
                            height = "1000px",
                            width = "1000px"),
               hr(),
@@ -893,7 +893,7 @@ ui <- dashboardPage(
               h6("Figure. Survival analysis after CGP test using the conventional Kaplan–Meier estimator, log–rank test were undertaken with survival package for R. EP: expert panel. RMST, restricted mean survival time."),
               htmlOutput("select_color_var_surv_CGP"),
               hr(),
-              plotOutput('figure_surv_CGP', 
+              plotOutput('figure_surv_CGP',
                          height = "800px",
                          width = "800px"),
               hr(),
@@ -902,7 +902,7 @@ ui <- dashboardPage(
       ),
       tabItem("SurvivalandtreatmentafterCGP",
               h6("Figure. Survival analysis after CGP test using the conventional Kaplan–Meier estimator, log–rank test were undertaken with survival package for R. EP: expert panel. RMST, restricted mean survival time."),
-              plotOutput('figure_survival_CGP_1', 
+              plotOutput('figure_survival_CGP_1',
                          height = "800px",
                          width = "800px"),
               hr(),
@@ -973,11 +973,11 @@ ui <- dashboardPage(
       tabItem("SurvivalafterCGPandmutationsforestplot",
               h5("Survival difference is evaluated with restricted mean survival time in this section. Analysis with hazard ratio will be also provided in 'Overall survival with risk-set adjustment' section (Survival analysis start date = CGP test date)."),
               h6("Figure. Suvival periods after CGP and gene mutations estimated with conventional Kaplan-Meier estimator. Restricted mean survival time in two years (days) were estimated with survRM2 package in R."),
-              plotOutput('figure_survival_CGP_3', 
+              plotOutput('figure_survival_CGP_3',
                          height = "1000px",
                          width = "1200px"),
               hr(),
-              plotOutput('figure_survival_CGP_4', 
+              plotOutput('figure_survival_CGP_4',
                          height = "3600px",
                          width = "2000px"),
               hr(),
@@ -1062,7 +1062,7 @@ ui <- dashboardPage(
                        actionButton("CGP_benefit_analysis_reload", "Reload"))
               ),
               hr(),
-              plotOutput('figure_nomogram_treat_pre_CGP', 
+              plotOutput('figure_nomogram_treat_pre_CGP',
                          height = "2000px",
                          width = "1000px"),
               hr(),
@@ -1087,7 +1087,7 @@ ui <- dashboardPage(
                 placement = "bottom"
               ))),
               hr(),
-              plotOutput('figure_DCA_pre_CGP_1', 
+              plotOutput('figure_DCA_pre_CGP_1',
                          height = "1000px",
                          width = "1300px"),
               hr(),
@@ -1098,7 +1098,7 @@ ui <- dashboardPage(
               hr(),
               htmlOutput("select_nomogram_type_4"),
               hr(),
-              plotOutput('figure_DCA_pre_CGP_ROC', 
+              plotOutput('figure_DCA_pre_CGP_ROC',
                          height = "3000px",
                          width = "1000px"),
               hr(),
@@ -1106,7 +1106,7 @@ ui <- dashboardPage(
               DT::dataTableOutput("table_prediction"),
               hr(),
               p("Not shown when machine learning is not performed"),
-              plotOutput('figure_DCA_pre_CGP_Machine_learning', 
+              plotOutput('figure_DCA_pre_CGP_Machine_learning',
                          height = "2000px",
                          width = "1500px"),
               hr()
@@ -1185,7 +1185,7 @@ ui <- dashboardPage(
                        )
               ),
               hr(),
-              plotOutput('figure_survival_CTx_1_2', 
+              plotOutput('figure_survival_CTx_1_2',
                          height = "800px",
                          width = "800px"),
               hr(),
@@ -1195,7 +1195,7 @@ ui <- dashboardPage(
       tabItem("SurvivalandtreatmentafterCTx2",
               h6("Figure. Overall survival after the first survival-prolonging chemotherapy after adjusting for left-truncation bias. To evaluate the association between prognostic factors and survival, a risk-set (number at risk) adjustment model was applied to adjust for left-truncation bias with survival package. Note that the analysis assumes quasi-independent left-truncation (conditional Kendall tau = 0)."),
               h6("  Take care of left-truncation bias."),
-              plotOutput('figure_survival_CTx_interactive_1', 
+              plotOutput('figure_survival_CTx_interactive_1',
                          height = "800px",
                          width = "800px"),
               hr(),
@@ -1246,25 +1246,25 @@ ui <- dashboardPage(
       tabItem("Geneticvariantsandsurvivalforestplot2",
               h6("Figure. Overall survival after the first survival-prolonging chemotherapy after adjusting for left-truncation bias. To evaluate the association between oncogenic mutations and survival, a risk-set adjustment model was performed to adjust for left-truncation bias with survival package."),
               h6("  Take care of left-truncation bias."),
-              plotOutput('figure_survival_CTx_2_2', 
+              plotOutput('figure_survival_CTx_2_2',
                          height = "1000px",
                          width = "1250px"),
               hr(),
-              plotOutput('figure_survival_CTx_3_2', 
+              plotOutput('figure_survival_CTx_3_2',
                          height = "3600px",
                          width = "2000px"),
               hr(),
               DT::dataTableOutput("figure_survival_CTx_2_data_2")
       ),
       tabItem("Diagnosisandsurvivalforestplot2",
-              plotOutput('figure_survival_CTx_4_2', 
+              plotOutput('figure_survival_CTx_4_2',
                          height = "1200px",
                          width = "1000px"),
               hr()
       ),
       tabItem("DiagnosisandsurvivalKM-curve2",
               h6("  Take care of left-truncation bias."),
-              plotOutput('figure_survival_CTx_5_2', 
+              plotOutput('figure_survival_CTx_5_2',
                          height = "1200px",
                          width = "1000px"),
               hr(),
@@ -1273,7 +1273,7 @@ ui <- dashboardPage(
       tabItem("HazardratioforsurvivalafterCTx_1",
               h6("  It takes minutes."),
               h6("  Take care of left-truncation bias."),
-              plotOutput('figure_survival_CTx_5_1_2', 
+              plotOutput('figure_survival_CTx_5_1_2',
                          height = "1200px",
                          width = "1000px"),
               hr(),
@@ -1295,13 +1295,13 @@ ui <- dashboardPage(
                 )
               ),
               hr(),
-              plotOutput('figure_survival_CTx_1', 
+              plotOutput('figure_survival_CTx_1',
                          height = "2500px",
                          width = "1000px"),
               hr(),
       ),
       tabItem("BayesCustom",
-              plotOutput('figure_survival_CTx_compare', 
+              plotOutput('figure_survival_CTx_compare',
                          height = "800px",
                          width = "800px"),
               hr(),
@@ -1366,11 +1366,11 @@ ui <- dashboardPage(
                 )
               ),
               hr(),
-              plotOutput('figure_survival_CTx_3', 
+              plotOutput('figure_survival_CTx_3',
                          height = "3600px",
                          width = "1500px"),
               hr(),
-              plotOutput('figure_survival_CTx_2', 
+              plotOutput('figure_survival_CTx_2',
                          height = "1000px",
                          width = "1250px"),
               hr(),
@@ -1394,11 +1394,11 @@ ui <- dashboardPage(
                 )
               ),
               hr(),
-              plotOutput('figure_survival_CTx_5', 
+              plotOutput('figure_survival_CTx_5',
                          height = "3200px",
                          width = "3000px"),
               hr(),
-              plotOutput('figure_survival_CTx_4', 
+              plotOutput('figure_survival_CTx_4',
                          height = "600px",
                          width = "1250px"),
               hr(),
@@ -1443,7 +1443,7 @@ ui <- dashboardPage(
               actionButton("survival_simuration", "Left-truncation bias adjustment simulation"),
               br(),
               hr(),
-              plotOutput('figure_bias_correction_simulation', 
+              plotOutput('figure_bias_correction_simulation',
                          height = "1000px",
                          width = "1000px"),
               hr(),
@@ -1455,7 +1455,7 @@ ui <- dashboardPage(
               br(),
               hr()
       ),
-      
+
       tabItem("Drugperpatient",
               DT::dataTableOutput("table_drug_all_summary"),
               hr(),
@@ -1463,7 +1463,7 @@ ui <- dashboardPage(
                            icon = icon("download"),
                            onclick = "confirmDownload('download_drug_data', 'FELIS downloaded raw data in Drug usage data tab')",
                            class = "btn-primary"),
-              
+
               # 非表示のダウンロードボタン
               div(style = "visibility:hidden; position:absolute;",
                   downloadButton('download_drug_data', 'Hidden Download')
@@ -1535,18 +1535,18 @@ ui <- dashboardPage(
               ),
               hr(),
               htmlOutput("select_gene_survival_interactive_1_P_1"),
-              
+
               hr(),
               gt_output("table_drug_ToT_1")
       ),
       tabItem("Timeontreatmentandpre-treatmentforthespecifiedtreatmentscatterplot",
               htmlOutput("select_ToT_var_1"),
               hr(),
-              plotOutput('figure_drug_1', 
+              plotOutput('figure_drug_1',
                          height = "800px",
                          width = "800px"),
               hr(),
-              plotOutput('figure_drug_3_forest', 
+              plotOutput('figure_drug_3_forest',
                          height = "600px",
                          width = "1000px"),
               hr(),
@@ -1560,7 +1560,7 @@ ui <- dashboardPage(
       tabItem("ToT_interactive",
               h6("Figure. Treatment time."),
               hr(),
-              plotOutput('figure_survival_drug_interactive_1', 
+              plotOutput('figure_survival_drug_interactive_1',
                          height = "800px",
                          width = "800px"
               ),
@@ -1618,27 +1618,27 @@ ui <- dashboardPage(
               hr()
       ),
       tabItem("TimeontreatmentbygenemutationclusterKM-curve",
-              plotOutput('figure_drug_cluster_2', 
+              plotOutput('figure_drug_cluster_2',
                          height = "700px",
                          width = "1100px"),
               hr(),
-              plotOutput('figure_drug_cluster', 
+              plotOutput('figure_drug_cluster',
                          height = "3500px",
                          width = "2000px"),
               DT::dataTableOutput("figure_drug_cluster_table")
       ),
       tabItem("Timeontreatmentbymutatedgenesforestplot",
-              plotOutput('figure_drug_4', 
+              plotOutput('figure_drug_4',
                          height = "700px",
                          width = "1100px"),
               hr(),
-              plotOutput('figure_drug_5', 
+              plotOutput('figure_drug_5',
                          height = "3500px",
                          width = "2000px"),
               DT::dataTableOutput("figure_drug_4_table")
       ),
       tabItem("TimeontreatmentandmutationsofinterestKM-curve",
-              plotOutput('figure_drug_pattern', 
+              plotOutput('figure_drug_pattern',
                          height = "3500px",
                          width = "2000px")
       ),
@@ -1655,7 +1655,7 @@ ui <- dashboardPage(
       tabItem("VolcanoPlot_ToT_1",
               h6("Volcano plots for frequent regimens"),
               hr(),
-              plotOutput('figure_volcano_ToT_1', 
+              plotOutput('figure_volcano_ToT_1',
                          height = "600px",
                          width = "800px"),
               hr(),
@@ -1670,7 +1670,7 @@ ui <- dashboardPage(
       tabItem("VolcanoPlotORR_1",
               h6("Volcano plots for frequent regimens"),
               hr(),
-              plotOutput('figure_volcano_1', 
+              plotOutput('figure_volcano_1',
                          height = "600px",
                          width = "800px"),
               hr(),
@@ -1715,7 +1715,7 @@ ui <- dashboardPage(
       tabItem("VolcanoPlotORR_1_AE",
               h6("Volcano plots for frequent regimens"),
               hr(),
-              plotOutput('figure_volcano_1_AE', 
+              plotOutput('figure_volcano_1_AE',
                          height = "600px",
                          width = "800px"),
               hr(),
@@ -1747,7 +1747,7 @@ ui <- dashboardPage(
               htmlOutput("select_figure_CI_AE_var"),
               htmlOutput("select_AE_max_samples"),
               hr(),
-              plotOutput('figure_CI_AE', 
+              plotOutput('figure_CI_AE',
                          height = "800px",
                          width = "800px"),
               hr(),
@@ -1768,7 +1768,7 @@ ui <- dashboardPage(
                        actionButton("figure_survival_drug_reload", "Analyze")
                 )
               ),
-              plotOutput('figure_survival_drug', 
+              plotOutput('figure_survival_drug',
                          height = "800px",
                          width = "800px")
       ),

@@ -594,7 +594,7 @@ Data_case_raw_pre =  reactive({
         )
       )
     }
-    RenList = read.csv(file("source/drug_rename.csv",
+    RenList = read.csv(file(app_path("source/drug_rename.csv"),
                             encoding='UTF-8-BOM'), header = T)
     # for(i in 1:length(RenList$P1)){
     #   clin_tmp$症例.EP前レジメン情報.薬剤名.YJ一般名.EN. = str_replace_all(clin_tmp$症例.EP前レジメン情報.薬剤名.YJ一般名.EN., RenList$P1[i], RenList$P2[i])

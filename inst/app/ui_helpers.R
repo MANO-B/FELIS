@@ -516,7 +516,7 @@ output$select_T_N = renderUI({
 output$download_ID_histology = downloadHandler(
   filename = "ID_histology.csv",
   content = function(file) {
-    csv_file = read.csv(header = TRUE, file("source/ID_histology.csv",
+    csv_file = read.csv(header = TRUE, file(app_path("source/ID_histology.csv"),
                                             encoding='UTF-8-BOM'))
     write_excel_csv(csv_file, file)
   }
@@ -524,7 +524,7 @@ output$download_ID_histology = downloadHandler(
 output$download_test_clinical_data = downloadHandler(
   filename = "sample_clinical.csv",
   content = function(file) {
-    csv_file = read.csv(header = TRUE, file("source/sample_clinical.csv",
+    csv_file = read.csv(header = TRUE, file(app_path("source/sample_clinical.csv"),
                                             encoding='UTF-8-BOM'))
     write_excel_csv(csv_file, file)
   }
@@ -532,7 +532,7 @@ output$download_test_clinical_data = downloadHandler(
 # output$download_treatment_reach_data = downloadHandler(
 #   filename = "treatment_reach_summary.csv",
 #   content = function(file) {
-#     csv_file = read.csv(header = TRUE, file("source/treatment_reach_summary.csv",
+#     csv_file = read.csv(header = TRUE, file(app_path("source/treatment_reach_summary.csv"),
 #                                             encoding='UTF-8-BOM'))
 #     write_excel_csv(csv_file, file)
 #   }
@@ -540,7 +540,7 @@ output$download_test_clinical_data = downloadHandler(
 output$download_test_report_data = downloadHandler(
   filename = "sample_report.csv",
   content = function(file) {
-    csv_file = read.csv(header = TRUE, file("source/sample_report.csv",
+    csv_file = read.csv(header = TRUE, file(app_path("source/sample_report.csv"),
                                             encoding='UTF-8-BOM'))
     write_excel_csv(csv_file, file)
   }
@@ -548,7 +548,7 @@ output$download_test_report_data = downloadHandler(
 output$download_ID_drug_pre_CGP = downloadHandler(
   filename = "ID_drug_pre_CGP.csv",
   content = function(file) {
-    csv_file = read.csv(header = TRUE, file("source/ID_drug_pre_CGP.csv",
+    csv_file = read.csv(header = TRUE, file(app_path("source/ID_drug_pre_CGP.csv"),
                                             encoding='UTF-8-BOM'))
     write_excel_csv(csv_file, file)
   }
@@ -556,7 +556,7 @@ output$download_ID_drug_pre_CGP = downloadHandler(
 output$download_ID_drug_post_CGP = downloadHandler(
   filename = "ID_drug_post_CGP.csv",
   content = function(file) {
-    csv_file = read.csv(header = TRUE, file("source/ID_drug_post_CGP.csv",
+    csv_file = read.csv(header = TRUE, file(app_path("source/ID_drug_post_CGP.csv"),
                                             encoding='UTF-8-BOM'))
     write_excel_csv(csv_file, file)
   }
@@ -564,7 +564,7 @@ output$download_ID_drug_post_CGP = downloadHandler(
 output$download_drug_rename = downloadHandler(
   filename = "table_drug_rename.csv",
   content = function(file) {
-    csv_file = read.csv(header = TRUE, file("source/table_drug_rename.csv",
+    csv_file = read.csv(header = TRUE, file(app_path("source/table_drug_rename.csv"),
                                             encoding='UTF-8-BOM'))
     write_excel_csv(csv_file, file)
   }
@@ -572,7 +572,7 @@ output$download_drug_rename = downloadHandler(
 output$download_drug_combination_rename = downloadHandler(
   filename = "table_drug_combination_rename.csv",
   content = function(file) {
-    csv_file = read.csv(header = TRUE, file("source/table_drug_rename.csv",
+    csv_file = read.csv(header = TRUE, file(app_path("source/table_drug_rename.csv"),
                                             encoding='UTF-8-BOM'))
     write_excel_csv(csv_file, file)
   }
@@ -580,7 +580,7 @@ output$download_drug_combination_rename = downloadHandler(
 output$download_regimen_rename = downloadHandler(
   filename = "table_regimen_rename.csv",
   content = function(file) {
-    csv_file = read.csv(header = TRUE, file("source/table_regimen_rename.csv",
+    csv_file = read.csv(header = TRUE, file(app_path("source/table_regimen_rename.csv"),
                                             encoding='UTF-8-BOM'))
     write_excel_csv(csv_file, file)
   }
@@ -588,7 +588,7 @@ output$download_regimen_rename = downloadHandler(
 output$download_histology_rename = downloadHandler(
   filename = "table_histology_rename.csv",
   content = function(file) {
-    csv_file = read.csv(header = TRUE, file("source/table_histology_rename.csv",
+    csv_file = read.csv(header = TRUE, file(app_path("source/table_histology_rename.csv"),
                                             encoding='UTF-8-BOM'))
     write_excel_csv(csv_file, file)
   }
@@ -596,7 +596,7 @@ output$download_histology_rename = downloadHandler(
 output$download_mutation_rename = downloadHandler(
   filename = "table_mutation_rename.csv",
   content = function(file) {
-    csv_file = read.csv(header = TRUE, file("source/table_mutation_rename.csv",
+    csv_file = read.csv(header = TRUE, file(app_path("source/table_mutation_rename.csv"),
                                             encoding='UTF-8-BOM'))
     write_excel_csv(csv_file, file)
   }
@@ -604,7 +604,7 @@ output$download_mutation_rename = downloadHandler(
 output$download_reannotation = downloadHandler(
   filename = "table_reannotation.csv",
   content = function(file) {
-    csv_file = read.csv(header = TRUE, file("source/table_reannotation.csv",
+    csv_file = read.csv(header = TRUE, file(app_path("source/table_reannotation.csv"),
                                             encoding='UTF-8-BOM'))
     write_excel_csv(csv_file, file)
   }

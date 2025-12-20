@@ -329,7 +329,7 @@ output$figure_lolliplot2 = renderGirafe({
         labs(y="Mutation frequency in our dataset",
              title=paste(nrow(data_lolliplot), " small scale variants of ",lolliplot_gene," in the dataset",sep="")) +
         scale_y_continuous(breaks=seq(0,max(var.plot$freq),max(floor(max(var.plot$freq)/100)*10,5)),name="Frequency")
-      proteins_acc<-read.table(file("source/UniProt.txt",
+      proteins_acc<-read.table(file(app_path("source/UniProt.txt"),
                                     encoding='UTF-8-BOM'),header=T)
       if(!lolliplot_gene %in% c("NKX2_1", "NKX3_1","H1_2", "H3_4","H3_5","H3_3A","H3_3B")){
         lolliplot_gene_raw = str_split(lolliplot_gene, "_",simplify = T)[[1]]
@@ -343,11 +343,11 @@ output$figure_lolliplot2 = renderGirafe({
         URL<-paste0(baseurl,proteins_acc_url)
         incProgress(1 / 6)
         flag_lolliplot = 0
-        if(file.exists(paste0("source/lolliplot/", lolliplot_gene_raw, ".rda"))){
-          load(paste0("source/lolliplot/", lolliplot_gene_raw, ".rda"))
+        if(file.exists(paste0(app_path("source/lolliplot/", lolliplot_gene_raw, ".rda")))){
+          load(paste0(app_path("source/lolliplot/", lolliplot_gene_raw, ".rda")))
           flag_lolliplot = 1
         } else if(file.exists(paste0(tempdir(), "/", lolliplot_gene_raw, ".rda"))){
-          load(paste0("source/lolliplot/", lolliplot_gene_raw, ".rda"))
+          load(paste0(tempdir(), "/", lolliplot_gene_raw, ".rda"))
           flag_lolliplot = 1
         } else {
           prots_feat<-try(GET(URL,accept_json()), silent = FALSE)

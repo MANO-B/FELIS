@@ -7,6 +7,12 @@ app_dir <- Sys.getenv("FELIS_DATA_ROOT", unset = getOption("felis_data_root", te
 CCAT_FLAG <- TRUE
 # CCAT_FLAG <- file.exists("ccat")
 
+app_path <- function(...) {
+  file.path(APP_DIR, ...)
+}
+
+shiny::addResourcePath("felis-src", file.path(APP_DIR, "source"))
+
 if(file.exists(file.path(tempdir(), "Data_mutation_cord.qs"))){
   file.remove(file.path(tempdir(), "Data_mutation_cord.qs"))
 }
