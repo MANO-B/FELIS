@@ -3,9 +3,9 @@ DATA_VERSION = "20250626"
 bucket <- "3e040086-data-production-felisanalysisportal"
 key    <- "ic_withdrawn_list.txt"
 Sys.setenv(AWS_EC2_METADATA_DISABLED = "true")
-app_dir <- getOption("felis_app_dir", default = getwd())
-
-CCAT_FLAG <- file.exists("ccat")
+app_dir <- Sys.getenv("FELIS_DATA_ROOT", unset = getOption("felis_data_root", getwd()))
+CCAT_FLAG <- TRUE
+# CCAT_FLAG <- file.exists("ccat")
 
 if(file.exists(file.path(tempdir(), "Data_mutation_cord.qs"))){
   file.remove(file.path(tempdir(), "Data_mutation_cord.qs"))
