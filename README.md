@@ -69,7 +69,8 @@ docker run -it --rm -p 3838:3838 ikegamitky/felis:latest R
   
 Run the following line in R to start FELIS:
 ```r
-Sys.setenv(FELIS_DATA_ROOT = getwd())
+Sys.setenv(FELIS_DATA_ROOT = "/srv/shiny-server/felis-cs")
+# Sys.setenv(FELIS_DATA_ROOT = "/srv/shiny-server/felis-ccat") # with dummy data
 APP_DIR <- system.file("app", package = "FELIS")
 setwd(APP_DIR)
 source("app.R", local = TRUE, chdir = TRUE)
@@ -78,7 +79,7 @@ shinyApp(ui = ui, server = server)
 ```
 
 When launching FELIS on a server, after entering the following command from the terminal, you no longer need to keep the SSH session open.  
-If the server IP address is 172.25.100.1, access **http://172.25.100.1:3838/felis-cs** in your browser.
+If the server IP address is 172.25.100.1, access **http://172.25.100.1:3838/felis-cs**, or **http://172.25.100.1:3838/felis-ccat** with dummy data in your browser.
 
 ```bash
 # ssh username@servername
