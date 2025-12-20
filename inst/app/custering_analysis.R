@@ -204,9 +204,6 @@ custering_analysis_logic <- function() {
         Num_Receive_Tx <- get_flag_counts(Data_case_target, "EP_treat", Cancername, Total_pts)
         Num_Receive_Tx_per_Option <- fun_zero(Num_Receive_Tx, Num_Option)
 
-
-        print(1)
-        print(Cancername)
         Total_pts_short = rep(0, length(Cancername))
         Total_pts_long = rep(0, length(Cancername))
         Num_pre_CGP = rep(0, length(Cancername))
@@ -221,13 +218,10 @@ custering_analysis_logic <- function() {
         Total_pts_Liver_no = rep(0, length(Cancername))
         Total_pts_Liver = rep(0, length(Cancername))
 
-
-        print(2)
-        print(Data_case_target[1:10,])
-        print(Data_cluster_ID()[1:10,])
-        Disease_cluster = data.frame(matrix(rep(0, length(Cancername) * max(Data_case_target$cluster)),
-                                            ncol = max(Data_case_target$cluster)))
-        colnames(Disease_cluster) = seq(1,max(Data_case_target$cluster))
+        print(Data_case_target$cluster)
+        Disease_cluster = data.frame(matrix(rep(0, length(Cancername) * max(Data_case_target$cluster,na.rm = T)),
+                                            ncol = max(Data_case_target$cluster,na.rm = T)))
+        colnames(Disease_cluster) = seq(1,max(Data_case_target$cluster,na.rm = T))
         rownames(Disease_cluster) = Cancername
 
         Data_case_target$diagnosis = Data_case_target$症例.基本情報.がん種.OncoTree.
@@ -344,7 +338,7 @@ custering_analysis_logic <- function() {
 
             # cluster集計
             tmp_cluster <- table(df$cluster)
-            entropy_val <- shannon.entropy(as.numeric(tmp_cluster), max(Data_case_target$cluster))
+            entropy_val <- shannon.entropy(as.numeric(tmp_cluster), max(Data_case_target$cluster,na.rm = T))
 
             # Disease_cluster更新（別途処理が必要）
             for (j in seq_along(tmp_cluster)) {
@@ -394,17 +388,17 @@ custering_analysis_logic <- function() {
         Summary_Table$time_after_CGP = Num_post_CGP
         incProgress(1 / 13)
 
-        testSummary = data.frame(as.vector(t(matrix(rep(1:max(Data_case_target$cluster),
+        testSummary = data.frame(as.vector(t(matrix(rep(1:max(Data_case_target$cluster,na.rm = T),
                                                         length(Diseases)),
                                                     ncol =length(Diseases)))))
         colnames(testSummary) = "Cluster"
-        testSummary$Histology = rep(Diseases, max(Data_case_target$cluster))
-        testSummary$All_patients = rep(rep(0, length(Diseases)), max(Data_case_target$cluster))
-        testSummary$Positive_patients = rep(rep(0, length(Diseases)), max(Data_case_target$cluster))
-        testSummary$OddsRatio = rep(rep(1, length(Diseases)), max(Data_case_target$cluster))
-        testSummary$Pvalue = rep(rep(1, length(Diseases)), max(Data_case_target$cluster))
+        testSummary$Histology = rep(Diseases, max(Data_case_target$cluster,na.rm = T))
+        testSummary$All_patients = rep(rep(0, length(Diseases)), max(Data_case_target$cluster,na.rm = T))
+        testSummary$Positive_patients = rep(rep(0, length(Diseases)), max(Data_case_target$cluster,na.rm = T))
+        testSummary$OddsRatio = rep(rep(1, length(Diseases)), max(Data_case_target$cluster,na.rm = T))
+        testSummary$Pvalue = rep(rep(1, length(Diseases)), max(Data_case_target$cluster,na.rm = T))
 
-        selected_genes = rep("", max(Data_survival$cluster))
+        selected_genes = rep("", max(Data_survival$cluster,na.rm = T))
         cluster_set = sort(unique(Data_survival$cluster))
         for(i in 1:length(cluster_set)){
           pos_num = data.frame(Diseases)
@@ -471,15 +465,15 @@ custering_analysis_logic <- function() {
         colnames(Data_cluster) = c("Tumor_Sample_Barcode", "cluster")
         Data_MAF_target = left_join(Data_MAF_target, Data_cluster, by = "Tumor_Sample_Barcode")
         Mutations = sort(unique(Data_MAF_target$Hugo_Symbol))
-        testSummary = data.frame(as.vector(t(matrix(rep(1:max(Data_MAF_target$cluster),
+        testSummary = data.frame(as.vector(t(matrix(rep(1:max(Data_MAF_target$cluster,na.rm = T),
                                                         length(Mutations)),
                                                     ncol =length(Mutations)))))
         colnames(testSummary) = "Cluster"
-        testSummary$mutation = rep(Mutations, max(Data_MAF_target$cluster))
-        testSummary$All_patients = rep(rep(0, length(Mutations)), max(Data_MAF_target$cluster))
-        testSummary$Positive_patients = rep(rep(0, length(Mutations)), max(Data_MAF_target$cluster))
-        testSummary$OddsRatio = rep(rep(1, length(Mutations)), max(Data_MAF_target$cluster))
-        testSummary$Pvalue = rep(rep(1, length(Mutations)), max(Data_MAF_target$cluster))
+        testSummary$mutation = rep(Mutations, max(Data_MAF_target$cluster,na.rm = T))
+        testSummary$All_patients = rep(rep(0, length(Mutations)), max(Data_MAF_target$cluster,na.rm = T))
+        testSummary$Positive_patients = rep(rep(0, length(Mutations)), max(Data_MAF_target$cluster,na.rm = T))
+        testSummary$OddsRatio = rep(rep(1, length(Mutations)), max(Data_MAF_target$cluster,na.rm = T))
+        testSummary$Pvalue = rep(rep(1, length(Mutations)), max(Data_MAF_target$cluster,na.rm = T))
 
         cluster_set = sort(unique(Data_MAF_target$cluster))
         for(i in 1:length(cluster_set)){
@@ -552,7 +546,7 @@ custering_analysis_logic <- function() {
 
         Disease_cluster$Disease = rownames(Disease_cluster)
         Disease_cluster <- transform(Disease_cluster, Disease= factor(Disease, levels = sort(unique(Disease_cluster$Disease), decreasing = TRUE)))
-        colnames(Disease_cluster) = c(seq(1,max(Data_survival$cluster)), "Disease")
+        colnames(Disease_cluster) = c(seq(1,max(Data_survival$cluster,na.rm = T)), "Disease")
         Data_entropy = gather(Disease_cluster, key = cluster, value = samples, -Disease)
         Data_entropy$cluster = as.numeric(Data_entropy$cluster)
         Summary_Table = transform(Summary_Table, Diseases= factor(Diseases, levels = sort(unique(Disease_cluster$Disease), decreasing = FALSE)))
