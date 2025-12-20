@@ -32,10 +32,12 @@ If you are unsure how to use it, please contact: maikegam [at] ncc.go.jp
 ### System Requirements
 
 #### Hardware Requirements
-Analyses of several thousand cases should be fine, but analyses of tens of thousands of cases require at least 32 GB of memory.  
-For survival analyses, Monte Carlo simulation is performed using Stan. A CPU with 4 or more cores, and as fast as possible, is recommended.  
+Minimum requirement  
 RAM: 4+ GB  
 CPU: 4+ cores  
+  
+Analyses of several thousand cases should be fine, but analyses of tens of thousands of cases require at least 8 GB of memory.  
+For survival analyses, Monte Carlo simulation is performed using Stan. A CPU with 4 or more cores, and as fast as possible, is recommended.  
 
 On a Mac Studio (M4 Max, 128 GB RAM), the initial ingestion and preprocessing of ~110,000 cases and 20 genes takes ~1 hour; after preprocessing, loading the saved dataset typically takes ~20 seconds.
 
