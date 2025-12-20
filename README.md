@@ -64,10 +64,6 @@ docker rm [container id]
 
 To run FELIS, execute the following command and then access **http://localhost:3838** in your browser.
 ```bash
-docker run -d --rm -p 3838:3838 ikegamitky/felis:latest R --no-echo -e 'library(shiny);runApp("/srv/shiny-server/felis-cs", launch.browser=F)'
-
-## If the above does not work, try the following:
-# Start a Docker container interactively
 docker run -it --rm -p 3838:3838 ikegamitky/felis:latest R
 ```
   
@@ -78,7 +74,7 @@ APP_DIR <- system.file("app", package = "FELIS")
 setwd(APP_DIR)
 source("app.R", local = TRUE, chdir = TRUE)
 # Run the application
-shinyApp(ui = ui, server = server)
+shinyApp(ui = ui, server = server, launch.browser=F)
 ```
 
 When launching FELIS on a server, after entering the following command from the terminal, you no longer need to keep the SSH session open.  
