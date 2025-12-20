@@ -3,7 +3,7 @@ DATA_VERSION = "20250626"
 bucket <- "3e040086-data-production-felisanalysisportal"
 key    <- "ic_withdrawn_list.txt"
 Sys.setenv(AWS_EC2_METADATA_DISABLED = "true")
-app_dir <- Sys.getenv("FELIS_DATA_ROOT", unset = getOption("felis_data_root", getwd()))
+app_dir <- Sys.getenv("FELIS_DATA_ROOT", unset = getOption("felis_data_root", tempdir()))
 CCAT_FLAG <- TRUE
 # CCAT_FLAG <- file.exists("ccat")
 
@@ -48,12 +48,12 @@ if(file.exists(file.path(tempdir(), "Lines_data.rda"))){
 }
 
 stan_model_factor_code_path <- "source/Stan_code_loglog_weibull_factor.stan"
-stan_model_factor_save_path_rstan <- file.path(tempdir(), "compiled_model_factor_rstan.rds")
-stan_model_factor_save_path_cmdstan <- file.path(tempdir(), "compiled_model_factor_cmdstan.rds")
+stan_model_factor_save_path_rstan <- file.path(app_dir(), "compiled_model_factor_rstan.rds")
+stan_model_factor_save_path_cmdstan <- file.path(app_dir(), "compiled_model_factor_cmdstan.rds")
 
 stan_model_simple_code_path <- "source/Stan_code_loglog_weibull.stan"
-stan_model_simple_save_path_rstan <- file.path(tempdir(), "compiled_model_rstan.rds")
-stan_model_simple_save_path_cmdstan <- file.path(tempdir(), "compiled_model_cmdstan.rds")
+stan_model_simple_save_path_rstan <- file.path(app_dir(), "compiled_model_rstan.rds")
+stan_model_simple_save_path_cmdstan <- file.path(app_dir(), "compiled_model_cmdstan.rds")
 
 if(Sys.getenv("SHINY_SERVER_VERSION") != ""){
   DOCKER = FALSE
