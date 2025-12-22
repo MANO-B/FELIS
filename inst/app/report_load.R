@@ -1,6 +1,6 @@
 if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "variant_data_whole.qs"))) {
   initial_data_report <- QS_READ(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), file=file.path(app_dir, "source", "variant_data_whole.qs")) %>%
-    dplyr::filter(!Tumor_Sample_Barcode %in% ID_exclude)
+    dplyr::filter(!C.CAT調査結果.基本項目.ハッシュID %in% ID_exclude)
   Data_report_raw_original <- reactive({ initial_data_report })
 } else {
   Data_report_raw_original =  reactive({
@@ -8,7 +8,7 @@ if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "variant_data_whole.qs"
       if(!is.null(input$new_analysis) && input$new_analysis =="No, use the previous dataset" &&
          file.exists(file.path(tempdir(), "variant_data.qs"))){
         Data_MAF = QS_READ(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), file=file.path(tempdir(), "variant_data.qs")) %>%
-          dplyr::filter(!Tumor_Sample_Barcode %in% ID_exclude)
+          dplyr::filter(!C.CAT調査結果.基本項目.ハッシュID %in% ID_exclude)
       } else {
         req(input$report_files)
         Encode = guess_encoding(input$report_files[[1, 'datapath']])[[1]][[1]]
@@ -90,14 +90,17 @@ if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "variant_data_whole.qs"
               C.CAT調査結果.変異情報.変異種類 == "other_biomarker" ~ "TMB_MSI_high",
               TRUE ~ C.CAT調査結果.変異情報.変異種類
             ))
-        print(tempdir())
-        QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), Data_MAF, file=file.path(tempdir(), "variant_data.qs"))
+        QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), clin_tmp, file=file.path(tempdir(), "variant_data.qs"))
       }
     })
   })
 }
 Data_report_raw =  reactive({
+  req(Data_report_raw_original())
+  req(input$fusion)
+  req(input$T_N)
   withProgress(message = "Mutation data loading.", {
+    clin_tmp = Data_report_raw_original()
     if(!is.null(input$reaanotation)){
       reaanotation_list = data.frame(NULL)
       for(i in 1:length(input$reaanotation[,1])){
@@ -192,6 +195,7 @@ Data_report_raw =  reactive({
         C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3XXXX4", "H3_4"),
         C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3XXXX5", "H3_5"),
         C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3XXXX3B", "H3_3B"),
+        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "HLAXXXXA", "HLA_A"),
         C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "HLAXXXXDRB1", "HLA_DRB1"),
         C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3XXXX3A", "H3_3A")
       )
@@ -305,22 +309,23 @@ Data_report_raw =  reactive({
     if(nrow(Data_MAF[is.na(Data_MAF$Evidence_level),]) > 0){
       Data_MAF[is.na(Data_MAF$Evidence_level),]$Evidence_level = ""
     }
+    if(!is.null(input$T_N)){
+      if(input$T_N == "Only somatic for T/N panel"){
+        Data_MAF = Data_MAF %>%
+          dplyr::filter(Somatic_germline != "Germline")
+      } else if(input$T_N == "Only germline"){
+        Data_MAF = Data_MAF %>%
+          dplyr::filter(Somatic_germline == "Germline")
+      }
+    }
     incProgress(1 / 4)
   })
   return(Data_MAF)
 })
 
-Data_report =  reactive({
+Data_report = reactive({
+  req(input$special_gene_annotation)
   Data_MAF = Data_report_raw()
-  if(!is.null(input$T_N)){
-    if(input$T_N == "Only somatic for T/N panel"){
-      Data_MAF = Data_MAF %>%
-        dplyr::filter(Somatic_germline != "Germline")
-    } else if(input$T_N == "Only germline"){
-      Data_MAF = Data_MAF %>%
-        dplyr::filter(Somatic_germline == "Germline")
-    }
-  }
   if(!is.null(input$special_gene_annotation)){
     if(input$special_gene_annotation == "This gene is also analyzed for VUS and Benign" &
        !is.null(input$special_gene)){
