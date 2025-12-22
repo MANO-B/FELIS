@@ -62,6 +62,18 @@ stan_model_simple_save_path_rstan <- file.path(app_dir, "compiled_model_rstan.rd
 stan_model_simple_save_path_cmdstan <- file.path(app_dir, "compiled_model_cmdstan.rds")
 
 if(Sys.getenv("SHINY_SERVER_VERSION") != ""){
+  if(file.exists(file.path(tempdir(), "Data_mutation_cord.qs"))){
+    file.remove(file.path(tempdir(), "Data_mutation_cord.qs"))
+  }
+  if(file.exists(file.path(tempdir(), "clinical_data.qs"))){
+    file.remove(file.path(tempdir(), "clinical_data.qs"))
+  }
+  if(file.exists(file.path(tempdir(), "variant_data.qs"))){
+    file.remove(file.path(tempdir(), "variant_data.qs"))
+  }
+  if(file.exists(file.path(tempdir(), "drug_data.qs"))){
+    file.remove(file.path(tempdir(), "drug_data.qs"))
+  }
   DOCKER = FALSE
   PARALLEL = min(6, max(1, parallel::detectCores(), na.rm = TRUE))
   MAX_CORE = 1
