@@ -90,7 +90,8 @@ if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "variant_data_whole.qs"
               C.CAT調査結果.変異情報.変異種類 == "other_biomarker" ~ "TMB_MSI_high",
               TRUE ~ C.CAT調査結果.変異情報.変異種類
             ))
-        QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), clin_tmp, file=file.path(tempdir(), "variant_data.qs"))
+        if(ENV_ != "server")
+          QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), clin_tmp, file=file.path(tempdir(), "variant_data.qs"))
       }
     })
   })

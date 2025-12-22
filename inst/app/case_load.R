@@ -942,7 +942,8 @@ if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "clinical_data_whole.qs
           ) %>%
           dplyr::distinct()
         print(tempdir())
-        QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), clin_tmp, file=file.path(tempdir(), "clinical_data.qs"))
+        if(ENV_ != "server")
+          QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), clin_tmp, file=file.path(tempdir(), "clinical_data.qs"))
       }
     })
     return(clin_tmp)

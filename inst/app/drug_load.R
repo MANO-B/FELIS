@@ -612,7 +612,8 @@ if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "drug_data_whole.qs")))
         ) %>%
           dplyr::select(-副作用名称, -CTCAE)
         incProgress(1 / 4)
-        QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), Data_drug, file=file.path(tempdir(), "drug_data.qs"))
+        if(ENV_ != "server")
+          QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), Data_drug, file=file.path(tempdir(), "drug_data.qs"))
       }
     })
     return(Data_drug)
