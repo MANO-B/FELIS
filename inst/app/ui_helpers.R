@@ -510,7 +510,7 @@ output$select_amplification = renderUI({
 output$select_T_N = renderUI({
   radioButtons(
     "T_N", "Analysis for germline/somatic origin",
-    choices = c("Only somatic for T/N panel", "All muts"),
+    choices = c("Only somatic for T/N panel", "All muts", "Only germline"),
     selected = "All muts")
 })
 output$download_ID_histology = downloadHandler(

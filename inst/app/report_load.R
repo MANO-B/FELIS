@@ -178,6 +178,9 @@ if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "variant_data_whole.qs"
         if(input$T_N == "Only somatic for T/N panel"){
           clin_tmp = clin_tmp %>%
             dplyr::filter(C.CAT調査結果.変異情報.変異由来 != "Germline")
+        } else if(input$T_N == "Only germline"){
+          clin_tmp = clin_tmp %>%
+            dplyr::filter(C.CAT調査結果.変異情報.変異由来 == "Germline")
         }
         clin_tmp = clin_tmp %>%
           dplyr::mutate(

@@ -1,4 +1,4 @@
-SOFT_VERSION = "4.2.5"
+SOFT_VERSION = "4.2.6"
 DATA_VERSION = "20251024"
 bucket <- "3e040086-data-production-felisanalysisportal"
 key    <- "ic_withdrawn_list.txt"
