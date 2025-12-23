@@ -951,10 +951,33 @@ ui <- dashboardPage(
                 )
               ),
               br(),
-              htmlOutputWithPopover(
-                "select_propensity_survival_CGP",
-                "指定した因子で傾向スコアマッチングを行います",
-                "ロジットPSでのマッチ、caliper=0.2 * sd_logit,ペア単位の2000回のブートストラップでRMSTの差の信頼区間を推定 "
+              hr(),
+              h5("Propensity score-based adjustment"),
+              fluidRow(
+                column(3,
+                       h6("Propensity score matching"),
+                       htmlOutputWithPopover(
+                         "select_propensity_survival_CGP",
+                         "指定した因子で傾向スコアマッチングを行います",
+                         "ロジットPSでのマッチ、caliper=0.2 * sd_logit,ペア単位の2000回のブートストラップでRMSTの差の信頼区間を推定"
+                       ),
+                ),
+                column(3,
+                       h6("Inverse probability weighting"),
+                       htmlOutputWithPopover(
+                         "select_IPW_survival_CGP",
+                         "指定した因子でIPW重み付けを行います",
+                         "重み付きKMのstep関数を厳密に積分してRMSTを算出。抽出確率をweightsに比例させて再標本化、2000回のブートストラップでRMSTの差の信頼区間を推定"
+                       ),
+                ),
+                column(3,
+                       h6("Threshold for IPW"),
+                       htmlOutputWithPopover(
+                         "select_IPW_threshold",
+                         "指定した値より重みが大きい患者を除外します",
+                         "傾向スコアの外れ値が過剰な重み付けにならないように除外"
+                       ),
+                )
               ),
               br(),
               downloadButton("dl_love_plot_PSM", "Download love plot of PS-matching"),
@@ -962,6 +985,15 @@ ui <- dashboardPage(
               h6("To reduce confounding between the two groups, we performed propensity score matching. The propensity score was estimated using a logistic regression model including prespecified clinically relevant covariates (CGP platform, sex, age, PS, histology, treatment lines before CGP, and the best treatment effect before CGP). Patients were matched 1:1 using nearest‐neighbor matching without replacement on the logit of the propensity score (MatchIt package, method = “nearest”, distance = “logit”). A caliper width of 0.2 on the logit scale was applied to restrict matches to comparable individuals. Matched sets were identified using the MatchIt subclass variable, and each subclass was treated as a matched pair for following analyses."),
               h6("Covariate balance before and after matching was evaluated using standardized mean differences (SMDs) with the cobalt package. Adequate balance was defined a priori as an absolute SMD < 0.1 for all covariates. Balance diagnostics were visualized using Love plots. The maximum absolute SMD after matching was additionally reported to provide a single summary measure of balance."),
               h6("Because propensity score matching induces dependence within matched pairs, confidence intervals for the RMST difference were obtained using nonparametric bootstrap resampling at the matched‐pair level. Specifically, matched pairs were resampled with 2000-time replacement, RMST differences were recalculated for each bootstrap replicate, and the 2.5th and 97.5th percentiles of the bootstrap distribution were used to derive a two‐sided 95% confidence interval."),
+              br(),
+              br(),
+              h6("To account for baseline imbalances between treatment groups, we applied inverse probability of treatment weighting (IPTW) based on the propensity score (PS). The PS was estimated using a logistic regression model including prespecified baseline covariates. Stabilized weights were constructed to estimate the average treatment effect (ATE)."),
+              h6("Weighted Kaplan–Meier (KM) survival curves were estimated using case weights corresponding to the IPTW. This approach yields survival functions representing a pseudo-population in which the distribution of measured baseline covariates is balanced between treatment groups. All survival times were analyzed on the original time scale (days)."),
+              h6("Under IPTW, group-specific survival functions were estimated using weighted KM estimators. Because the KM estimator is a right-continuous step function, RMST was computed by exact integration of the step function, without numerical approximation. Specifically, RMST was calculated as the sum over successive time intervals of the interval length multiplied by the survival probability at the beginning of the interval. This yields an exact estimate of the area under the weighted KM curve up to the defined time."),
+              h6("Confidence intervals (CIs) for the IPTW-adjusted RMST difference were obtained using a nonparametric bootstrap procedure. When matched pairs were available, resampling was performed at the pair level. Otherwise, bootstrap samples were generated using probability-proportional-to-size resampling, with sampling probabilities proportional to the IPTW weights, reflecting each individual’s contribution to the weighted pseudo-population. Within each bootstrap sample, RMST was recalculated using the same weighting scheme, and the RMST difference was re-estimated."),
+              h6("The 95% CI was derived from the empirical 2.5th and 97.5th percentiles of the bootstrap distribution. This approach captures sampling variability of the weighted survival process while preserving the time scale and interpretation of RMST in days."),
+              h6("Between-group differences in survival distributions were assessed using weighted log-rank–type tests. Test statistics were constructed as weighted score statistics accumulated over observed event times, with weights derived from the IPTW and, for Wilcoxon-type tests, additional weighting based on the pooled weighted survival function. P-values were obtained from chi-square distributions with one degree of freedom. Additionally, weighted Cox proportional hazards models with robust variance estimation were fitted to estimate hazard ratios, with stratification applied when matched pairs were present."),
+              h6("All analyses were conducted using the survival, MatchIt, and cobalt packages."),
               hr(),
               br(),
               br(),

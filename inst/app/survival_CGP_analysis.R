@@ -955,6 +955,106 @@ output$figure_survival_CGP_1 = renderPlot({
         plot_title = "Survival analisys based on variants and drugs"
       )
     }
+  } else if(!all(is.null(input$IPW_survival_CGP))) {
+    Data_survival$Group_0_1 = Data_survival$Group - 1
+    formula_PS = formula(
+      paste0("Group_0_1 ~", paste(input$IPW_survival_CGP, collapse = "+"))
+    )
+    Data_iptw <- Data_survival
+    subtitle_balance <- NA
+
+    # 2群が混在しているときだけ実行
+    if (!all(Data_iptw$Group_0_1 == Data_iptw$Group_0_1[1])) {
+
+      # 1) PS推定（ロジスティック回帰）
+      fit_ps <- glm(formula_PS, data = Data_iptw, family = binomial())
+
+      ps <- predict(fit_ps, type = "response")
+
+      # PSが0/1に張り付くと重みが発散するので最低限のクリップ（任意）
+      eps <- 1e-6
+      ps <- pmin(pmax(ps, eps), 1 - eps)
+
+      # 2) IPTW（安定化重み：stabilized weights）
+      trt <- Data_iptw$Group_0_1
+      p_trt <- mean(trt == 1, na.rm = TRUE)
+
+      w <- ifelse(trt == 1, p_trt / ps, (1 - p_trt) / (1 - ps))
+
+      # 3) 外れ値（巨大重み）除外：input$IPW_threshold を上限として除外
+      #    例：threshold=10 なら w > 10 を落とす
+      thr <- suppressWarnings(as.numeric(input$IPW_threshold))
+      if (is.na(thr) || thr <= 0) thr <- Inf
+
+      keep <- is.finite(w) & (w <= thr)
+      Data_iptw <- Data_iptw[keep, , drop = FALSE]
+      w <- w[keep]
+
+      # 重みを列として保持（後段の関数に渡す用）
+      Data_iptw$iptw <- w
+      Data_iptw$.ps <- ps[keep]
+
+      # 4) バランス評価（cobalt）
+      # MatchItオブジェクト無しでも、処置/共変量/重み を渡せば bal.tab できます
+      covs <- Data_iptw %>% select(input$IPW_survival_CGP)
+
+      bal <- cobalt::bal.tab(
+        x = covs,
+        treat = Data_iptw$Group_0_1,
+        weights = Data_iptw$iptw,
+        method = "weighting",
+        estimand = "ATE",
+        un = TRUE
+      )
+
+      bal_df <- bal$Balance
+      max_smd <- max(abs(bal_df$Diff.Adj), na.rm = TRUE)
+      subtitle_balance <- paste0(
+        "IPTW balance: max |SMD| = ",
+        format(max_smd, digits = 2, nsmall = 2),
+        ", threshold(w) <= ", thr
+      )
+
+      p <- cobalt::love.plot(
+        bal,
+        stats = "mean.diffs",
+        abs = TRUE,
+        thresholds = c(m = .1),
+        var.order = "unadjusted",
+        drop.distance = TRUE
+      )
+
+      out_path <- file.path(tempdir(), "love_plot_PSM.pdf")
+      ggsave(
+        filename = out_path,
+        plot = p,
+        width = 7,
+        height = min(nrow(bal$Balance) / 9 + 2, 45)
+      )
+
+      # 5) 生存解析（重み付き）
+      survival_compare_and_plot_match(
+        data = Data_iptw,
+        time_var = "time_enroll_final",
+        status_var = "censor",
+        group_var = "Group",
+        input_rmst_cgp = input$RMST_CGP,
+        plot_title = paste0("IPW-weighted survival, ", subtitle_balance),
+        n_boot = 2000,
+        seed = 123,
+        weight_var = "iptw"
+      )
+    } else {
+      # CGPサバイバル解析実行
+      survival_compare_and_plot(
+        data = Data_survival,
+        time_var = "time_enroll_final",
+        status_var = "censor",
+        group_var = "Group",
+        input_rmst_cgp = input$RMST_CGP,
+        plot_title = "Survival analisys based on variants and drugs"
+      )
+    }
   } else {
     # CGPサバイバル解析実行
     survival_compare_and_plot(

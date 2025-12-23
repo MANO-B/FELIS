@@ -935,6 +935,31 @@ output$select_propensity_survival_CGP = renderUI({
     selected = NULL,
     multiple = TRUE)
 })
+output$select_IPW_survival_CGP = renderUI({
+  pickerInput(
+    inputId = "IPW_survival_CGP",
+    label = "Inverse probability weighting with clinical factors (if any)",
+    choices = c("Panel" = "Panel",
+                "ECOG Performance status" = "PS",
+                "Diagnosis" = "Cancers",
+                "Mutational clustering" = "cluster",
+                "Treatment option" = "EP_option",
+                "Sex" = "Sex",
+                "Age" = "YoungOld",
+                "Treatment lines before CGP" = "CTx_lines_before_CGP",
+                "Best treatment effect before CGP" = "pre_CGP_best_RECIST"
+    ),
+    selected = NULL,
+    multiple = TRUE)
+})
+output$select_IPW_threshold = renderUI({
+  numericInput("IPW_threshold",
+               label = "Exclusion threshold for very heavy weight",
+               value = 10,
+               min = 1,
+               max = 100,
+               step = 1)
+})
 
 
 output$select_gene_survival_reach_1_M = renderUI({

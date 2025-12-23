@@ -1,6 +1,6 @@
 Package: FELIS
 Title: Web application for integrated analysis of C-CAT clinicogenomic database
-Version: 4.2.5
+Version: 4.2.6
 Maintainer: Masachika Ikegami <ikegamitky@gmail.com>
 Authors@R: 
     person(given = "Masachika",
