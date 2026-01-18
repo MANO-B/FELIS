@@ -25,14 +25,14 @@ bibliography: paper.bib
 
 Japan’s national cancer genomic medicine program aggregates comprehensive genomic profiling (CGP) results and linked clinical information at the Center for Cancer Genomics and Advanced Therapeutics (C-CAT) [@kohno2022ccat]. These data create unique opportunities for large-scale, real-world clinicogenomic studies; however, their effective use depends on clinically meaningful questions formulated by domain experts, while the need to design and implement bespoke analytical pipelines remains a substantial barrier to analysis.
 
-FELIS (Flexible Exploration for LIquid and Solid tumor clinical sequencing data) is an open-source, locally deployable web application (R/Shiny) designed for no-code interactive analysis of secondary-use C-CAT datasets. It provides a point-and-click interface for cohort construction, clinicogenomic summarization, visualization, and bias-aware outcome analyses. By lowering technical barriers while remaining compatible with secured/offline environments, FELIS helps clinicians and translational researchers iterate rapidly from a clinical question to a reproducible analysis output.
+`FELIS` (Flexible Exploration for LIquid and Solid tumor clinical sequencing data) is an open-source, locally deployable web application (R/Shiny) designed for no-code interactive analysis of secondary-use C-CAT datasets. It provides a point-and-click interface for cohort construction, clinicogenomic summarization, visualization, and bias-aware outcome analyses. By lowering technical barriers while remaining compatible with secured/offline environments, `FELIS` helps clinicians and translational researchers iterate rapidly from a clinical question to a reproducible analysis output.
 
-Several analytical components implemented in FELIS are based on methods previously described in peer-reviewed publications, including variant-based clustering analysis and survival modeling accounting for delayed entry and left truncation. The scientific contribution of FELIS lies in the robust software implementation, integration, and practical accessibility of these methods rather than the introduction of new statistical methodology.
+Several analytical components implemented in `FELIS` are based on methods previously described in peer-reviewed publications, including variant-based clustering analysis and survival modeling accounting for delayed entry and left truncation. The scientific contribution of `FELIS` lies in the robust software implementation, integration, and practical accessibility of these methods rather than the introduction of new statistical methodology.
 
 # Statement of need
 
 Large clinicogenomic resources have accelerated discovery by enabling standardized exploration of molecular and clinical features (e.g., cBioPortal [@cerami2012cbioportal; @gao2013cbioportal] and AACR Project GENIE [@genie2017]). However, C-CAT secondary-use data are typically analyzed in controlled environments under data use agreements, limiting the utility of hosted public portals. Moreover, clinically relevant real-world evidence (RWE) questions in CGP practice often require analysis features that are uncommon in general-purpose genomics portals—for example, survival modeling that accounts for delayed testing and left truncation, which can meaningfully bias CGP-based outcome analyses [@tamura2023lengthbias; @ikegami2023jjcoletter].
-FELIS addresses these gaps by offering:
+`FELIS` addresses these gaps by offering:
 
 - **No-code cohort building** from de-identified, preprocessed tables derived from secondary-use C-CAT datasets.
 - **Bias-aware survival analysis** suitable for CGP settings with delayed entry/left truncation.
@@ -41,35 +41,35 @@ FELIS addresses these gaps by offering:
 
 # Software Design
 
-FELIS was designed with three primary constraints in mind: governance-aware deployment, accessibility for non-programming users, and analytical rigor for real-world clinicogenomic research.
+`FELIS` was designed with three primary constraints in mind: governance-aware deployment, accessibility for non-programming users, and analytical rigor for real-world clinicogenomic research.
 
-The software is implemented as a Shiny application. This architecture allows FELIS to leverage the extensive statistical ecosystem of R while providing a browser-based interface suitable for clinicians and translational researchers. A modular design was chosen to separate cohort definition, genomic summarization, and outcome analysis, enabling incremental extension without entangling analytical logic.
+The software is implemented as a Shiny application. This architecture allows `FELIS` to leverage the extensive statistical ecosystem of R while providing a browser-based interface suitable for clinicians and translational researchers. A modular design was chosen to separate cohort definition, genomic summarization, and outcome analysis, enabling incremental extension without entangling analytical logic.
 
 A key design trade-off was prioritizing local deployment over hosted scalability. While this limits immediate multi-user web access, it ensures compatibility with secured and offline environments required for secondary-use clinical data. Containerized deployment options further support reproducibility across heterogeneous computing systems.
 
-Analytically, FELIS integrates established methods—such as variant-based clustering and survival models with delayed entry—into a unified workflow. The design emphasizes transparency and reproducibility over black-box automation, allowing users to understand and validate each analytical step.  
+Analytically, `FELIS` integrates established methods—such as variant-based clustering and survival models with delayed entry—into a unified workflow. The design emphasizes transparency and reproducibility over black-box automation, allowing users to understand and validate each analytical step.  
 
 # Research Impact Statement
 
-FELIS has been developed and applied in the context of Japan’s national cancer genomic medicine program and has supported multiple clinicogenomic research projects using secondary-use C-CAT data. Analytical components implemented in FELIS have contributed to peer-reviewed publications, including studies on variant-based clustering in cancer genomics and outcome analyses accounting for delayed entry and left truncation.
+`FELIS` has been developed and applied in the context of Japan’s national cancer genomic medicine program and has supported multiple clinicogenomic research projects using secondary-use C-CAT data. Analytical components implemented in `FELIS` have contributed to peer-reviewed publications, including studies on variant-based clustering in cancer genomics and outcome analyses accounting for delayed entry and left truncation.
 
-The software is actively used by clinicians and researchers within secured institutional environments to perform exploratory analyses, generate publication-ready figures, and support hypothesis generation for translational studies. By lowering technical barriers while maintaining analytical rigor, FELIS enables broader participation of domain experts in clinicogenomic research.
+The software is actively used by clinicians and researchers within secured institutional environments to perform exploratory analyses, generate publication-ready figures, and support hypothesis generation for translational studies. By lowering technical barriers while maintaining analytical rigor, `FELIS` enables broader participation of domain experts in clinicogenomic research.
 
-The open-source release of FELIS, together with containerized deployment options and example workflows, provides a foundation for future extensions and adoption by other groups working with governance-restricted clinicogenomic datasets.  
+The open-source release of `FELIS`, together with containerized deployment options and example workflows, provides a foundation for future extensions and adoption by other groups working with governance-restricted clinicogenomic datasets.  
 
 # Software description
 
 ## Architecture and deployment
 
-FELIS is distributed as an R package that launches an interactive Shiny application. It supports (i) direct installation from source and (ii) container-based deployment to promote reproducibility across heterogeneous computing environments. The application is designed to be usable in restricted networks commonly required for secondary-use clinical data.
+`FELIS` is distributed as an R package that launches an interactive Shiny application. It supports (i) direct installation from source and (ii) container-based deployment to promote reproducibility across heterogeneous computing environments. The application is designed to be usable in restricted networks commonly required for secondary-use clinical data.
 
 ## Data inputs
 
-FELIS operates on research-use datasets prepared from C-CAT secondary-use programs. Users load standardized, de-identified tables (e.g., patient-level clinical variables, tumor metadata, treatments, and variant-level calls) generated by local preprocessing within their authorized environment. This design keeps FELIS open source while accommodating access control and governance constraints of national clinicogenomic data.
+`FELIS` operates on research-use datasets prepared from C-CAT secondary-use programs. Users load standardized, de-identified tables (e.g., patient-level clinical variables, tumor metadata, treatments, and variant-level calls) generated by local preprocessing within their authorized environment. This design keeps `FELIS` open source while accommodating access control and governance constraints of national clinicogenomic data.
 
 ## Core functionality
 
-FELIS provides interactive modules that cover common clinicogenomic workflows:
+`FELIS` provides interactive modules that cover common clinicogenomic workflows:
 
 - **Cohort definition and stratification**: filter and intersect clinical variables (e.g., age, sex, tumor type, stage, lines of therapy) and genomic alterations (genes, variant classes, panels).
 - **Genomic summaries and visualization**: alteration frequency summaries, oncoprint-style views, co-alteration exploration, and subgroup comparisons.
@@ -81,13 +81,13 @@ FELIS provides interactive modules that cover common clinicogenomic workflows:
 (A) OncoPrint summarizing frequently mutated genes across the selected cohort.
 (B) Forest plot showing the estimated effects of gene alterations on survival outcomes.
 (C) Volcano plot illustrating gene-level associations with drug response, highlighting effect sizes and statistical significance.
-(D) Kaplan–Meier survival curves comparing two groups stratified by a user-defined factor within the FELIS interface.](FELIS_ui.png)
+(D) Kaplan–Meier survival curves comparing two groups stratified by a user-defined factor within the `FELIS` interface.](FELIS_ui.png)
 
-Some of the analytical methods implemented in FELIS have been previously reported in the literature. In particular, the variant-based clustering analysis follows the approach described by Mochizuki[@mochizuki2024cluster], and the bias-aware survival analysis with correction for delayed entry and left truncation is based on Tamura[@tamura2023lengthbias]. FELIS provides a unified and reproducible software implementation of these methods tailored to the data structure and governance constraints of Japan’s national clinicogenomic database (C-CAT).  
+Some of the analytical methods implemented in `FELIS` have been previously reported in the literature. In particular, the variant-based clustering analysis follows the approach described by Mochizuki[@mochizuki2024cluster], and the bias-aware survival analysis with correction for delayed entry and left truncation is based on Tamura[@tamura2023lengthbias]. `FELIS` provides a unified and reproducible software implementation of these methods tailored to the data structure and governance constraints of Japan’s national clinicogenomic database (C-CAT).  
 
 # AI usage disclosure
 
-No generative AI tools were used in the development of the FELIS software or in the analysis performed by the software. Generative AI was not used to generate scientific results or figures.  
+No generative AI tools were used in the development of the `FELIS` software or in the analysis performed by the software. Generative AI was not used to generate scientific results or figures.  
 
 # Acknowledgements
 
