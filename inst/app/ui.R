@@ -318,8 +318,6 @@ ui <- dashboardPage(
 
                          tags$h5("解析対象の症例・遺伝子を選択します"),
                          tags$ul(
-                           tags$li("Analyze with new dataset をNoにすると全症例または前回解析症例が取り込まれます"),
-                           tags$li("Yesにすると、アップロードしたCSVファイルが取り込まれます"),
                            tags$li("必要があれば設定をデフォルトから変更します"),
                            tags$li("フィルタリング後にResultsのタブを選択し、解析結果を閲覧します")
                          )
@@ -327,8 +325,7 @@ ui <- dashboardPage(
                        br(),
                        conditionalPanel(
                          condition = sprintf("input.new_analysis == 'Yes, input new csv files' && %s", tolower(!CCAT_FLAG)),
-                         # condition = "input.new_analysis == 'Yes, input new csv files'",
-                          div(
+                           div(
                            strong("Required: C-CAT data files (zipped files are acceptable)"),
                            actionButton("help_ccat", "",
                                         icon = icon("question-circle"),
@@ -407,6 +404,20 @@ ui <- dashboardPage(
                        hr(),
                        conditionalPanel(
                          condition = sprintf(tolower(!CCAT_FLAG)),
+                         box(
+                           title = "File import",
+                           status = "primary",
+                           solidHeader = TRUE,
+                           collapsible = TRUE,
+                           collapsed = TRUE,
+                           width = 6,
+
+                           tags$h5("解析対象の症例・遺伝子変異リストをインポートします"),
+                           tags$ul(
+                             tags$li("Analyze with new dataset をNoにすると全症例、または前回解析症例があれば取り込まれます"),
+                             tags$li("Yesにすると、アップロードしたCSVファイルをインポートします")
+                           )
+                         ),
                          htmlOutputWithPopover(
                            "select_new_analysis",
                            "既存のデータか新規データかを選択して解析",
