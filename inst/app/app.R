@@ -75,7 +75,9 @@ source_app("ui.R")
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
   tmp_post <- reactiveValues()
+  tmp_post$CCAT_FLAG = CCAT_FLAG
   analysis_env <- NULL
+
   OUTPUT_DATA = reactiveValues()
   source_app("case_load.R")
   source_app("drug_load.R")

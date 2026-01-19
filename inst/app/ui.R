@@ -7,7 +7,7 @@ ui <- dashboardPage(
       paste0(
         "<div style='display: flex; align-items: center; background-color: #FFFFFF;'>
            <a href='https://github.com/MANO-B/FELIS'>
-             <img src='FELIS.png' height='30px' style='margin-right: 10px;'>
+             <img src='/APP_DIR/www/FELIS.png' height='30px' style='margin-right: 10px;'>
            </a>
            <h6 style='margin: 0;'>Data v", DATA_VERSION, ", ", ENV_, "</h6>
          </div>"
@@ -280,8 +280,8 @@ ui <- dashboardPage(
 
       if (confirm(message)) {
 
-        // [追加] 通知を /@@/api/writwlog に送る
-        fetch(window.location.origin + '/@@/api/writwlog', {
+        // [追加] 通知を /@@/api/writelog に送る
+        fetch(window.location.origin + '/@@/api/writelog', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -305,6 +305,7 @@ ui <- dashboardPage(
     ")),
     tabItems(
       tabItem(tabName = "Setting",
+              h6(paste0(EXCLUDED_TEXT_1, ",", EXCLUDED_TEXT_2)),
               fluidRow(
                 column(6,
                        fluidRow(box(
@@ -325,7 +326,8 @@ ui <- dashboardPage(
                        )),
                        br(),
                        conditionalPanel(
-                         condition = "input.new_analysis == 'Yes, input new csv files'",
+                         condition = sprintf("input.new_analysis == 'Yes, input new csv files' && %s", tolower(!CCAT_FLAG)),
+                         # condition = "input.new_analysis == 'Yes, input new csv files'",
                           div(
                            strong("Required: C-CAT data files (zipped files are acceptable)"),
                            actionButton("help_ccat", "",
@@ -335,7 +337,7 @@ ui <- dashboardPage(
                            bsPopover("help_ccat",
                                      title = "C-CAT データファイルについて",
                                      content = "C-CAT（がんゲノム情報管理センター）から提供されるデータファイルをアップロードしてください。ZIPファイル形式でも対応しています。",
-                                     placement = "top",
+                                     placement = "bottom",
                                      trigger = "hover")
                          ),
                          fileInput(
@@ -351,7 +353,7 @@ ui <- dashboardPage(
                          bsPopover("help_clinical_files",
                                    title = "症例CSVファイル",
                                    content = "患者の臨床情報が含まれるCSVファイルを選択してください。複数ファイルの選択が可能です。ファイル形式：CSV、文字エンコーディング：UTF-8推奨",
-                                   placement = "top",
+                                   placement = "bottom",
                                    trigger = "hover"),
                          fileInput(
                            inputId = "report_files",
@@ -369,7 +371,10 @@ ui <- dashboardPage(
                                    placement = "top",
                                    trigger = "hover"),
                          br(),
+                         downloadButton('download_test_clinical_data', 'Download sample clinical data'),
                          br(),
+                         br(),
+                         downloadButton('download_test_report_data', 'Download sample report data'),
                          br(),
                          hr()
                        )
@@ -400,10 +405,13 @@ ui <- dashboardPage(
                        ),
                        br(),
                        hr(),
-                       htmlOutputWithPopover(
-                         "select_new_analysis",
-                         "既存のデータか新規データかを選択して解析",
-                         "Yesの場合、ファイルをアップロードして解析します"
+                       conditionalPanel(
+                         condition = sprintf(tolower(!CCAT_FLAG)),
+                         htmlOutputWithPopover(
+                           "select_new_analysis",
+                           "既存のデータか新規データかを選択して解析",
+                           "Yesの場合、ファイルをアップロードして解析します"
+                         )
                        ),
                        br()
                 ),
@@ -537,14 +545,11 @@ ui <- dashboardPage(
                        htmlOutput("select_histology_group_3_name"),
                        htmlOutput("select_histology_group_4"),
                        htmlOutput("select_histology_group_4_name"),
-                       br(),
-                       downloadButton('download_test_clinical_data', 'Download sample clinical data'),
-                       br(),
-                       br(),
-                       downloadButton('download_test_report_data', 'Download sample report data'),
                        br()
                 ),
-                column(3,
+                conditionalPanel(
+                  condition = sprintf(tolower(!CCAT_FLAG)),
+                  column(3,
                        strong("Option files"),
                        hr(),
                        fileInput(inputId = "ID_histology",
@@ -616,8 +621,11 @@ ui <- dashboardPage(
                        downloadButton('download_drug_combination_rename', 'Download CSV template'),
                        br(),
                        br()
+                  )
                 ),
-                column(3,
+                conditionalPanel(
+                  condition = sprintf(tolower(!CCAT_FLAG)),
+                  column(3,
                        strong("Option files"),
                        hr(),
                        fileInput(inputId = "mutation_rename",
@@ -689,6 +697,7 @@ ui <- dashboardPage(
                        downloadButton('download_regimen_rename', 'Download CSV template'),
                        br(),
                        br()
+                  )
                 ),
                 column(3,
                        strong("Analysis setting"),

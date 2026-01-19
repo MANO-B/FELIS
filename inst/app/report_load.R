@@ -92,253 +92,257 @@ if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "variant_data_whole.qs"
             ))
         if(ENV_ != "server")
           QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), clin_tmp, file=file.path(tempdir(), "variant_data.qs"))
+        return(clin_tmp)
       }
     })
   })
 }
-Data_report_raw =  reactive({
+Data_report_raw = reactive({
   req(Data_report_raw_original())
   req(input$fusion)
   req(input$T_N)
   withProgress(message = "Mutation data loading.", {
+
     clin_tmp = Data_report_raw_original()
+
+    # --- 1. Re-annotation (高速化: forループ廃止とleft_join利用) ---
     if(!is.null(input$reaanotation)){
-      reaanotation_list = data.frame(NULL)
-      for(i in 1:length(input$reaanotation[,1])){
-        reaanotation_list <- rbind(reaanotation_list,
-                                   read.csv(header = TRUE,
-                                            file(input$reaanotation[[i, 'datapath']],
-                                                 encoding='UTF-8-BOM')))
-      }
-      clin_tmp$Gene_alt = paste0(clin_tmp$C.CAT調査結果.変異情報.マーカー, "_", clin_tmp$C.CAT調査結果.変異情報.変異内容)
-      clin_tmp$C.CAT調査結果.エビデンス.エビデンスレベル_tmp = unlist(lapply(list(clin_tmp$Gene_alt), function(x) {
-        as.vector(reaanotation_list$Level[match(x, reaanotation_list$Gene_alt)])}))
-      clin_tmp = clin_tmp %>% dplyr::mutate(
-        C.CAT調査結果.エビデンス.エビデンスレベル = case_when(
-          !is.na(C.CAT調査結果.エビデンス.エビデンスレベル_tmp) ~ C.CAT調査結果.エビデンス.エビデンスレベル_tmp,
-          TRUE ~ C.CAT調査結果.エビデンス.エビデンスレベル
-        ))
-      clin_tmp = clin_tmp %>% dplyr::select(-Gene_alt, -C.CAT調査結果.エビデンス.エビデンスレベル_tmp)
+      # ファイルを一括読み込み
+      reaanotation_list <- lapply(input$reaanotation$datapath, function(x){
+        read.csv(x, header = TRUE, encoding = 'UTF-8-BOM')
+      }) %>% dplyr::bind_rows()
+
+      # キーを作成して結合 (match関数によるループ処理を排除)
+      clin_tmp <- clin_tmp %>%
+        dplyr::mutate(Gene_alt = paste0(C.CAT調査結果.変異情報.マーカー, "_", C.CAT調査結果.変異情報.変異内容)) %>%
+        dplyr::left_join(reaanotation_list %>% dplyr::select(Gene_alt, Level), by = "Gene_alt") %>%
+        dplyr::mutate(
+          C.CAT調査結果.エビデンス.エビデンスレベル = case_when(
+            !is.na(Level) ~ Level,
+            TRUE ~ C.CAT調査結果.エビデンス.エビデンスレベル
+          )
+        ) %>%
+        dplyr::select(-Gene_alt, -Level)
     }
-    clin_tmp = clin_tmp %>%
-      dplyr::mutate(
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "NKX2\\-1", "NKX2XXXX1"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "NKX3\\-1", "NKX3XXXX1"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H1\\-2", "H1XXXX2"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3\\-3A", "H3XXXX3A"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3\\-3B", "H3XXXX3B"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3\\-4", "H3XXXX4"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3\\-5", "H3XXXX5"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "HLA\\-A", "HLAXXXXA"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "HLA\\-DRB1", "HLAXXXXDRB1")
-      ) %>%
-      dplyr::mutate(
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "-", "_")
+
+    # --- 2. 文字列置換 (高速化: str_replace_allで一括処理) ---
+    # 置換リストの定義
+    rep_patterns <- c(
+      "NKX2\\-1" = "NKX2XXXX1", "NKX3\\-1" = "NKX3XXXX1",
+      "H1\\-2" = "H1XXXX2", "H3\\-3A" = "H3XXXX3A", "H3\\-3B" = "H3XXXX3B",
+      "H3\\-4" = "H3XXXX4", "H3\\-5" = "H3XXXX5",
+      "HLA\\-A" = "HLAXXXXA", "HLA\\-DRB1" = "HLAXXXXDRB1",
+      "-" = "_" # 最後にハイフンをアンダースコアに
+    )
+
+    clin_tmp$C.CAT調査結果.変異情報.マーカー <- stringr::str_replace_all(
+      clin_tmp$C.CAT調査結果.変異情報.マーカー, rep_patterns
+    )
+
+    incProgress(1 / 4)
+
+    # --- 3. Fusion Gene Handling (既存ロジックを維持しつつ整理) ---
+    # Fusion（"_"を含むもの）の有無を確認
+    has_fusion <- any(stringr::str_detect(clin_tmp$C.CAT調査結果.変異情報.マーカー, "_"))
+
+    if(has_fusion) {
+      if(input$fusion == "Split into two and treat as mutation in each gene"){
+        # Split logic
+        clin_base = clin_tmp %>% dplyr::filter(!str_detect(C.CAT調査結果.変異情報.マーカー, "_"))
+        clin_fusion = clin_tmp %>% dplyr::filter(str_detect(C.CAT調査結果.変異情報.マーカー, "_"))
+
+        # Split marker strings efficiently
+        splits <- stringr::str_split(clin_fusion$C.CAT調査結果.変異情報.マーカー, "_", simplify = TRUE)
+
+        clin_f1 <- clin_fusion %>% dplyr::mutate(C.CAT調査結果.変異情報.変異内容 = C.CAT調査結果.変異情報.マーカー, C.CAT調査結果.変異情報.マーカー = splits[,1])
+        clin_f2 <- clin_fusion %>% dplyr::mutate(C.CAT調査結果.変異情報.変異内容 = C.CAT調査結果.変異情報.マーカー, C.CAT調査結果.変異情報.マーカー = splits[,2])
+
+        clin_tmp <- dplyr::bind_rows(clin_base, clin_f1, clin_f2)
+
+      } else if(input$fusion == "Split into two and treat like EML-fusion, ALK-fusion"){
+        clin_base = clin_tmp %>% dplyr::filter(!str_detect(C.CAT調査結果.変異情報.マーカー, "_"))
+        clin_fusion = clin_tmp %>% dplyr::filter(str_detect(C.CAT調査結果.変異情報.マーカー, "_"))
+
+        splits <- stringr::str_split(clin_fusion$C.CAT調査結果.変異情報.マーカー, "_", simplify = TRUE)
+
+        clin_f1 <- clin_fusion %>% dplyr::mutate(C.CAT調査結果.変異情報.変異内容 = C.CAT調査結果.変異情報.マーカー, C.CAT調査結果.変異情報.マーカー = paste0(splits[,1], "_fusion"))
+        clin_f2 <- clin_fusion %>% dplyr::mutate(C.CAT調査結果.変異情報.変異内容 = C.CAT調査結果.変異情報.マーカー, C.CAT調査結果.変異情報.マーカー = paste0(splits[,2], "_fusion"))
+
+        clin_tmp <- dplyr::bind_rows(clin_base, clin_f1, clin_f2)
+
+      } else if(input$fusion == "All fusion genes are named as 'fusion_genes'"){
+        clin_tmp <- clin_tmp %>%
+          dplyr::mutate(
+            C.CAT調査結果.変異情報.変異内容 = ifelse(str_detect(C.CAT調査結果.変異情報.マーカー, "_"), C.CAT調査結果.変異情報.マーカー, C.CAT調査結果.変異情報.変異内容),
+            C.CAT調査結果.変異情報.マーカー = ifelse(str_detect(C.CAT調査結果.変異情報.マーカー, "_"), "fusion_genes", C.CAT調査結果.変異情報.マーカー)
+          )
+      }
+    }
+
+    # --- 4. Amplification Handling ---
+    if(input$amplification == "Treat as indipendent gene"){
+      # mutateとcase_whenで一括処理（filter -> rbindよりも高速）
+      clin_tmp <- clin_tmp %>%
+        dplyr::mutate(C.CAT調査結果.変異情報.マーカー = case_when(
+          C.CAT調査結果.変異情報.変異内容 == "amplification" ~ paste0(C.CAT調査結果.変異情報.マーカー, "_amp"),
+          C.CAT調査結果.変異情報.変異内容 == "loss" ~ paste0(C.CAT調査結果.変異情報.マーカー, "_loss"),
+          TRUE ~ C.CAT調査結果.変異情報.マーカー
+        ))
+    }
+
+    # Restore special markers (vectorized replace)
+    restore_patterns <- c(
+      "NKX2XXXX1" = "NKX2_1", "NKX3XXXX1" = "NKX3_1", "H1XXXX2" = "H1_2",
+      "H3XXXX4" = "H3_4", "H3XXXX5" = "H3_5", "H3XXXX3B" = "H3_3B",
+      "HLAXXXXA" = "HLA_A", "HLAXXXXDRB1" = "HLA_DRB1", "H3XXXX3A" = "H3_3A"
+    )
+    clin_tmp$C.CAT調査結果.変異情報.マーカー <- stringr::str_replace_all(
+      clin_tmp$C.CAT調査結果.変異情報.マーカー, restore_patterns
+    )
+
+    incProgress(1 / 4)
+
+    # --- 5. Mutation Rename (高速化: forループ廃止とleft_join利用) ---
+    if(!is.null(input$mutation_rename)){
+      # ファイル一括読み込み
+      mutation_rename_list <- lapply(input$mutation_rename$datapath, function(x){
+        read.csv(x, header = TRUE, encoding = 'UTF-8-BOM')
+      }) %>% dplyr::bind_rows()
+
+      # ターゲットとなる遺伝子リスト
+      target_genes <- unique(mutation_rename_list$Gene)
+
+      # left_joinでリネーム情報を付与
+      # 結合キー: Gene(マーカー) と Mutation(変異内容)
+      clin_tmp <- clin_tmp %>%
+        dplyr::left_join(mutation_rename_list,
+                         by = c("C.CAT調査結果.変異情報.マーカー" = "Gene",
+                                "C.CAT調査結果.変異情報.変異内容" = "Mutation")) %>%
+        dplyr::mutate(
+          C.CAT調査結果.変異情報.変異内容 = case_when(
+            # リネーム定義が見つかればそれを適用
+            !is.na(Rename) ~ Rename,
+            # リネーム定義がないが、ターゲット遺伝子である場合は "Other" にする
+            C.CAT調査結果.変異情報.マーカー %in% target_genes ~ "Other",
+            # それ以外は元のまま
+            TRUE ~ C.CAT調査結果.変異情報.変異内容
+          )
+        ) %>%
+        dplyr::select(-Rename) # 結合した列を削除
+    }
+
+    Data_MAF = clin_tmp
+
+    # --- 6. 列名変更と整形 ---
+    # 物理位置の複製
+    Data_MAF$C.CAT調査結果.変異情報.物理位置2 = Data_MAF$C.CAT調査結果.変異情報.物理位置
+
+    # 列選択とリネーム (selectでリネームも同時に行うと効率的)
+    Data_MAF = Data_MAF %>%
+      dplyr::select(
+        Hugo_Symbol = C.CAT調査結果.変異情報.マーカー,
+        Chromosome = C.CAT調査結果.変異情報.クロモソーム番号,
+        Start_Position = C.CAT調査結果.変異情報.物理位置,
+        End_Position = C.CAT調査結果.変異情報.物理位置2, # 元コードに合わせて物理位置2を使用
+        Reference_Allele = C.CAT調査結果.変異情報.リファレンス塩基,
+        Tumor_Seq_Allele2 = C.CAT調査結果.変異情報.塩基変化,
+        Variant_Classification = C.CAT調査結果.変異情報.変異種類,
+        Evidence_level = C.CAT調査結果.エビデンス.エビデンスレベル,
+        Drug = C.CAT調査結果.エビデンス.薬剤,
+        Tumor_Sample_Barcode = C.CAT調査結果.基本項目.ハッシュID,
+        VAF = C.CAT調査結果.変異情報.変異アレル頻度,
+        amino.acid.change = C.CAT調査結果.変異情報.変異内容,
+        TMB = C.CAT調査結果.変異情報TMB.TMB,
+        Somatic_germline = C.CAT調査結果.変異情報.変異由来
       )
 
-    if(input$fusion == "Split into two and treat as mutation in each gene"){
-      if(any(str_detect(clin_tmp$C.CAT調査結果.変異情報.マーカー, "_"))){
-        clin_tmp_base = clin_tmp %>%
-          dplyr::filter(!str_detect(C.CAT調査結果.変異情報.マーカー, "_"))
-        clin_tmp_fusion = clin_tmp %>%
-          dplyr::filter(str_detect(C.CAT調査結果.変異情報.マーカー, "_"))
-        clin_tmp_fusion_1 = clin_tmp_fusion %>%
-          dplyr::mutate(C.CAT調査結果.変異情報.変異内容 = C.CAT調査結果.変異情報.マーカー,
-                        C.CAT調査結果.変異情報.マーカー = str_split(C.CAT調査結果.変異情報.マーカー, "_",simplify = T)[,1])
-        clin_tmp_fusion_2 = clin_tmp_fusion %>%
-          dplyr::mutate(C.CAT調査結果.変異情報.変異内容 = C.CAT調査結果.変異情報.マーカー,
-                        C.CAT調査結果.変異情報.マーカー = str_split(C.CAT調査結果.変異情報.マーカー, "_",simplify = T)[,2])
-        clin_tmp = rbind(clin_tmp_base, clin_tmp_fusion_1, clin_tmp_fusion_2)
-      }
-    } else if(input$fusion == "Split into two and treat like EML-fusion, ALK-fusion"){
-      if(any(str_detect(clin_tmp$C.CAT調査結果.変異情報.マーカー, "_"))){
-        clin_tmp_base = clin_tmp %>%
-          dplyr::filter(!str_detect(C.CAT調査結果.変異情報.マーカー, "_"))
-        clin_tmp_fusion = clin_tmp %>%
-          dplyr::filter(str_detect(C.CAT調査結果.変異情報.マーカー, "_"))
-        clin_tmp_fusion_1 = clin_tmp_fusion %>%
-          dplyr::mutate(C.CAT調査結果.変異情報.変異内容 = C.CAT調査結果.変異情報.マーカー,
-                        C.CAT調査結果.変異情報.マーカー = paste0(str_split(C.CAT調査結果.変異情報.マーカー, "_",simplify = T)[,1], "_fusion"))
-        clin_tmp_fusion_2 = clin_tmp_fusion %>%
-          dplyr::mutate(C.CAT調査結果.変異情報.変異内容 = C.CAT調査結果.変異情報.マーカー,
-                        C.CAT調査結果.変異情報.マーカー = paste0(str_split(C.CAT調査結果.変異情報.マーカー, "_",simplify = T)[,2], "_fusion"))
-        clin_tmp = rbind(clin_tmp_base, clin_tmp_fusion_1, clin_tmp_fusion_2)
-      }
-    } else if(input$fusion == "All fusion genes are named as 'fusion_genes'"){
-      if(any(str_detect(clin_tmp$C.CAT調査結果.変異情報.マーカー, "_"))){
-        clin_tmp_base = clin_tmp %>%
-          dplyr::filter(!str_detect(C.CAT調査結果.変異情報.マーカー, "_"))
-        clin_tmp_fusion = clin_tmp %>%
-          dplyr::filter(str_detect(C.CAT調査結果.変異情報.マーカー, "_"))
-        clin_tmp_fusion = clin_tmp_fusion %>%
-          dplyr::mutate(C.CAT調査結果.変異情報.変異内容 = C.CAT調査結果.変異情報.マーカー,
-                        C.CAT調査結果.変異情報.マーカー = "fusion_genes")
-        clin_tmp = rbind(clin_tmp_base, clin_tmp_fusion)
-      }
-    }
-    if(input$amplification == "Treat as indipendent gene"){
-      clin_tmp_base = clin_tmp %>%
-        dplyr::filter(C.CAT調査結果.変異情報.変異内容 != "amplification" &
-                        C.CAT調査結果.変異情報.変異内容 != "loss")
-      clin_tmp_amplification = clin_tmp %>%
-        dplyr::filter(C.CAT調査結果.変異情報.変異内容 == "amplification") %>%
-        dplyr::mutate(C.CAT調査結果.変異情報.マーカー = paste0(C.CAT調査結果.変異情報.マーカー, "_amp"))
-      clin_tmp_loss = clin_tmp %>%
-        dplyr::filter(C.CAT調査結果.変異情報.変異内容 == "loss") %>%
-        dplyr::mutate(C.CAT調査結果.変異情報.マーカー = paste0(C.CAT調査結果.変異情報.マーカー, "_loss"))
-      clin_tmp = rbind(clin_tmp_base, clin_tmp_amplification, clin_tmp_loss)
-    }
-    clin_tmp = clin_tmp %>%
-      dplyr::mutate(
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "NKX2XXXX1", "NKX2_1"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "NKX3XXXX1", "NKX3_1"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H1XXXX2", "H1_2"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3XXXX4", "H3_4"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3XXXX5", "H3_5"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3XXXX3B", "H3_3B"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "HLAXXXXA", "HLA_A"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "HLAXXXXDRB1", "HLA_DRB1"),
-        C.CAT調査結果.変異情報.マーカー = str_replace(C.CAT調査結果.変異情報.マーカー, "H3XXXX3A", "H3_3A")
-      )
-    incProgress(1 / 4)
-    if(!is.null(input$mutation_rename)){
-      mutation_rename_list = data.frame(NULL)
-      for(i in 1:length(input$mutation_rename[,1])){
-        mutation_rename_list <- rbind(mutation_rename_list,
-                                      read.csv(header = TRUE,
-                                               file(input$mutation_rename[[i, 'datapath']],
-                                                    encoding='UTF-8-BOM')))
-      }
-      Gene_list = sort(unique(mutation_rename_list$Gene))
-      clin = clin_tmp %>% dplyr::filter(!C.CAT調査結果.変異情報.マーカー %in% Gene_list)
-      for(i in 1:length(Gene_list)){
-        mutation_rename_list_tmp = mutation_rename_list[mutation_rename_list$Gene == Gene_list[i],]
-        clin_tmp2 = clin_tmp %>% dplyr::filter(C.CAT調査結果.変異情報.マーカー == Gene_list[i])
-        clin_tmp2$C.CAT調査結果.変異情報.変異内容_tmp = unlist(lapply(list(clin_tmp2$C.CAT調査結果.変異情報.変異内容), function(x) {
-          as.vector(mutation_rename_list_tmp$Rename[match(x, mutation_rename_list_tmp$Mutation)])}))
-        clin_tmp2 = clin_tmp2 %>% dplyr::mutate(
-          C.CAT調査結果.変異情報.変異内容 = case_when(
-            !is.na(C.CAT調査結果.変異情報.変異内容_tmp) ~ C.CAT調査結果.変異情報.変異内容_tmp,
-            TRUE ~ "Other"
-          )
-        )
-        clin_tmp2 = clin_tmp2 %>% dplyr::select(-C.CAT調査結果.変異情報.変異内容_tmp)
-        clin = rbind(clin, clin_tmp2)
-      }
-      clin_tmp = clin
-    }
-    Data_MAF = clin_tmp
-    Data_MAF$C.CAT調査結果.変異情報.物理位置2 =
-      Data_MAF$C.CAT調査結果.変異情報.物理位置
-    Data_MAF = Data_MAF %>%
-      dplyr::select(C.CAT調査結果.変異情報.マーカー,
-                    C.CAT調査結果.変異情報.クロモソーム番号,
-                    C.CAT調査結果.変異情報.物理位置,
-                    C.CAT調査結果.変異情報.物理位置2,
-                    C.CAT調査結果.変異情報.リファレンス塩基,
-                    C.CAT調査結果.変異情報.塩基変化,
-                    C.CAT調査結果.変異情報.変異種類,
-                    C.CAT調査結果.エビデンス.エビデンスレベル,
-                    C.CAT調査結果.エビデンス.薬剤,
-                    C.CAT調査結果.基本項目.ハッシュID,
-                    C.CAT調査結果.変異情報.変異アレル頻度,
-                    C.CAT調査結果.変異情報.変異内容,
-                    C.CAT調査結果.変異情報TMB.TMB,
-                    C.CAT調査結果.変異情報.変異由来)
-    colnames(Data_MAF) = c("Hugo_Symbol",
-                           "Chromosome",
-                           "Start_Position",
-                           "End_Position",
-                           "Reference_Allele",
-                           "Tumor_Seq_Allele2",
-                           "Variant_Classification",
-                           "Evidence_level",
-                           "Drug",
-                           "Tumor_Sample_Barcode",
-                           "VAF",
-                           "amino.acid.change",
-                           "TMB",
-                           "Somatic_germline")
+    # --- 7. Variant Type Determination ---
+    # 事前に文字数を計算しておくと少し速い
+    n_ref <- nchar(Data_MAF$Reference_Allele)
+    n_alt <- nchar(Data_MAF$Tumor_Seq_Allele2)
+
     Data_MAF = Data_MAF %>% dplyr::mutate(
       Variant_Type = case_when(
         Hugo_Symbol == "MSI" ~ "MSI",
         Hugo_Symbol == "TMB" ~ "TMB",
-        nchar(Reference_Allele) == 1 &
-          nchar(Tumor_Seq_Allele2) == 1 ~ "SNP",
-        nchar(Reference_Allele) == 2 &
-          nchar(Tumor_Seq_Allele2) == 2 ~ "DNP",
-        nchar(Reference_Allele) == 3 &
-          nchar(Tumor_Seq_Allele2) == 3 ~ "TNP",
-        nchar(Reference_Allele) == 1 &
-          Reference_Allele != "-" &
-          nchar(Tumor_Seq_Allele2) > 1 ~ "INS",
-        nchar(Reference_Allele) > 1 &
-          Tumor_Seq_Allele2 != "-" ~ Variant_Classification,
+        n_ref == 1 & n_alt == 1 ~ "SNP",
+        n_ref == 2 & n_alt == 2 ~ "DNP",
+        n_ref == 3 & n_alt == 3 ~ "TNP",
+        n_ref == 1 & Reference_Allele != "-" & n_alt > 1 ~ "INS",
+        n_ref > 1 & Tumor_Seq_Allele2 != "-" ~ Variant_Classification,
         TRUE ~ "Other"
-      ))
+      )
+    )
+
     incProgress(1 / 4)
-    TMB_tmp = str_split(Data_MAF$TMB, "Muts", simplify = TRUE)[,1]
-    TMB_tmp = str_split(TMB_tmp, "mutations", simplify = TRUE)[,1]
-    Data_MAF$TMB = as.numeric(TMB_tmp)
-    if(nrow(Data_MAF[is.na(Data_MAF$TMB),]) > 0){
-      Data_MAF[is.na(Data_MAF$TMB),]$TMB = 0
-    }
+
+    # --- 8. TMB Handling (高速化: readr::parse_number利用) ---
+    # 文字列操作を減らすため parse_number を使用（数値以外の文字を除去して変換）
+    # 元コード: "X Muts/Mb" -> "X" -> 数値化
+    # parse_numberは "10 Muts/Mb" -> 10 を直接返す
+    Data_MAF$TMB <- suppressWarnings(readr::parse_number(as.character(Data_MAF$TMB)))
+    Data_MAF$TMB[is.na(Data_MAF$TMB)] <- 0
+
+    # TMBレポート行の作成
     Data_report_TMB = Data_MAF %>%
       dplyr::filter(Hugo_Symbol == "TMB") %>%
-      dplyr::distinct(Tumor_Sample_Barcode, TMB, .keep_all = T) %>%
+      dplyr::distinct(Tumor_Sample_Barcode, .keep_all = TRUE) %>%
       dplyr::arrange(Tumor_Sample_Barcode) %>%
       dplyr::mutate(
-        Evidence_level = case_when(
-          TMB < input$TMB_threshold ~ "",
-          TMB >= input$TMB_threshold ~ "F",
-          TRUE ~ ""
-        ),
-        amino.acid.change = case_when(
-          TMB < input$TMB_threshold ~ "",
-          TMB >= input$TMB_threshold ~ "high",
-          TRUE ~ ""
-        )
+        Evidence_level = ifelse(TMB >= input$TMB_threshold, "F", ""),
+        amino.acid.change = ifelse(TMB >= input$TMB_threshold, "high", "")
       )
+
+    # TMB以外の行を整形して結合
     Data_MAF = Data_MAF %>%
-      dplyr::arrange(Tumor_Sample_Barcode) %>%
       dplyr::filter(Hugo_Symbol != "TMB") %>%
-      dplyr::mutate(Evidence_level = case_when(
-        Hugo_Symbol == "MSI" & amino.acid.change == "high" & Evidence_level == "" ~ "F",
-        TRUE ~ Evidence_level
-      ))
-    Data_MAF = rbind(Data_MAF, Data_report_TMB)
-    if(nrow(Data_MAF[is.na(Data_MAF$Evidence_level),]) > 0){
-      Data_MAF[is.na(Data_MAF$Evidence_level),]$Evidence_level = ""
-    }
+      dplyr::mutate(
+        Evidence_level = case_when(
+          Hugo_Symbol == "MSI" & amino.acid.change == "high" & Evidence_level == "" ~ "F",
+          TRUE ~ Evidence_level
+        )
+      ) %>%
+      dplyr::bind_rows(Data_report_TMB) %>%
+      dplyr::arrange(Tumor_Sample_Barcode)
+
+    # NAの処理
+    Data_MAF$Evidence_level[is.na(Data_MAF$Evidence_level)] <- ""
+
+    # --- 9. T/N Filtering ---
     if(!is.null(input$T_N)){
       if(input$T_N == "Only somatic for T/N panel"){
-        Data_MAF = Data_MAF %>%
-          dplyr::filter(Somatic_germline != "Germline")
+        Data_MAF = Data_MAF %>% dplyr::filter(Somatic_germline != "Germline")
       } else if(input$T_N == "Only germline"){
-        Data_MAF = Data_MAF %>%
-          dplyr::filter(Somatic_germline == "Germline")
+        Data_MAF = Data_MAF %>% dplyr::filter(Somatic_germline == "Germline")
       }
     }
+
     incProgress(1 / 4)
   })
+
   return(Data_MAF)
 })
 
 Data_report = reactive({
-  req(input$special_gene_annotation)
+  #req(input$special_gene_annotation)
+  browser()
+  # 生データの取得
   Data_MAF = Data_report_raw()
+
+  # --- 1. Evidence Level の書き換え処理 ---
   if(!is.null(input$special_gene_annotation)){
     if(input$special_gene_annotation == "This gene is also analyzed for VUS and Benign" &
        !is.null(input$special_gene)){
       Data_MAF = Data_MAF %>% dplyr::mutate(
         Evidence_level = case_when(
-          Hugo_Symbol == input$special_gene &
-            Evidence_level == "" ~ "F",
+          Hugo_Symbol == input$special_gene & Evidence_level == "" ~ "F",
           TRUE ~ Evidence_level
         )
       )
     }
   }
+
+  # --- 2. 遺伝子シンボルの書き換え処理 ---
   if(!is.null(input$special_gene_independent)){
     if(input$special_gene_independent == "Treat as independent genes in analyses" &
        !is.null(input$special_gene) &
@@ -355,58 +359,73 @@ Data_report = reactive({
       )
     }
   }
-  if(!is.null(input$gene_group_analysis)){
-    if(input$gene_group_analysis == "Only cases with mutations in the gene set are analyzed" &
-       !is.null(input$gene)){
-      if(input$patho == "Only pathogenic muts"){
-        ID_geneset = unique((Data_MAF %>% dplyr::filter(
-          Hugo_Symbol %in% input$gene & Evidence_level == "F"
-        ))$Tumor_Sample_Barcode)
-      } else if(input$patho == "All muts"){
-        ID_geneset = unique((Data_MAF %>% dplyr::filter(
-          Hugo_Symbol %in% input$gene
-        ))$Tumor_Sample_Barcode)
-      }
-      Data_MAF = Data_MAF %>%
-        dplyr::filter(Tumor_Sample_Barcode %in%
-                        ID_geneset)
+
+  # --- 3. 遺伝子グループ解析（フィルタリング処理） ---
+  if(!is.null(input$gene_group_analysis) && !is.null(input$gene)){
+
+    # 共通処理: ID_geneset の特定
+    # 条件に応じて対象となるTumor_Sample_Barcodeを抽出
+    target_maf <- Data_MAF %>% dplyr::filter(Hugo_Symbol %in% input$gene)
+
+    if(input$patho == "Only pathogenic muts"){
+      target_maf <- target_maf %>% dplyr::filter(Evidence_level == "F")
     }
-    if(input$gene_group_analysis == "Only cases without mutations in the gene set are analyzed" &
-       !is.null(input$gene)){
-      if(input$patho == "Only pathogenic muts"){
-        ID_geneset = unique((Data_MAF %>% dplyr::filter(
-          Hugo_Symbol %in% input$gene & Evidence_level == "F"
-        ))$Tumor_Sample_Barcode)
-      } else if(input$patho == "All muts"){
-        ID_geneset = unique((Data_MAF %>% dplyr::filter(
-          Hugo_Symbol %in% input$gene
-        ))$Tumor_Sample_Barcode)
-      }
+    ID_geneset <- unique(target_maf$Tumor_Sample_Barcode)
+
+
+    # A. 遺伝子セットに変異がある症例のみ残す場合
+    if(input$gene_group_analysis == "Only cases with mutations in the gene set are analyzed"){
+      Data_MAF = Data_MAF %>%
+        dplyr::filter(Tumor_Sample_Barcode %in% ID_geneset)
+
+      # B. 遺伝子セットに変異がある症例を除外する場合
+    } else if(input$gene_group_analysis == "Only cases without mutations in the gene set are analyzed"){
+
+      # まず除外を実行
       Data_MAF = Data_MAF %>%
         dplyr::filter(!Tumor_Sample_Barcode %in% ID_geneset)
-      ALL_ID =  (Data_case_raw() %>% dplyr::filter(
+
+      # 本来存在するはずの全症例IDを取得（除外対象以外）
+      ALL_ID_vector = (Data_case_raw() %>% dplyr::filter(
         !C.CAT調査結果.基本項目.ハッシュID %in% ID_geneset
       ))$C.CAT調査結果.基本項目.ハッシュID
-      DEFF_ID = ALL_ID[!ALL_ID %in% Data_MAF$Tumor_Sample_Barcode]
-      if(length(DEFF_ID)>0){
-        TEST_ALL = NULL
-        TEST = (Data_MAF %>% dplyr::filter(
-          Hugo_Symbol == "TMB"
-        ))[1,]
-        TEST$TMB=0
-        TEST$Evidence_level = ""
-        TEST$Drug = ""
-        for(i in 1:length(DEFF_ID)){
-          TEST$Tumor_Sample_Barcode = DEFF_ID[i]
-          TEST_ALL = rbind(TEST_ALL, TEST)
+
+      # Data_MAFに残っていないID（変異が全くないため消えてしまった症例など）を特定
+      # setdiff(A, B) は Aに含まれるがBに含まれない要素を返します
+      DEFF_ID = setdiff(ALL_ID_vector, Data_MAF$Tumor_Sample_Barcode)
+
+      # ★★★ 高速化の主要箇所 ★★★
+      if(length(DEFF_ID) > 0){
+        # テンプレートとなる行を抽出・作成
+        TEST_base = Data_MAF %>%
+          dplyr::filter(Hugo_Symbol == "TMB") %>%
+          dplyr::slice(1) %>%
+          dplyr::mutate(
+            TMB = 0,
+            Evidence_level = "",
+            Drug = ""
+          )
+
+        # テンプレートが見つかった場合のみ実行
+        if(nrow(TEST_base) > 0){
+          # 1. テンプレートを行数分コピー (repを使ったインデックス参照で高速複製)
+          TEST_ALL = TEST_base[rep(1, length(DEFF_ID)), ]
+
+          # 2. IDを一括代入
+          TEST_ALL$Tumor_Sample_Barcode = DEFF_ID
+
+          # 3. 結合
+          Data_MAF = dplyr::bind_rows(Data_MAF, TEST_ALL)
         }
-        Data_MAF = rbind(Data_MAF, TEST_ALL)
       }
     }
   }
+
+  # --- 最終整形 ---
   Data_MAF = Data_MAF %>%
     dplyr::distinct() %>%
     dplyr::arrange(Tumor_Sample_Barcode) %>%
     dplyr::select(-Somatic_germline)
+
   return(Data_MAF)
 })

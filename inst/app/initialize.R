@@ -1,12 +1,10 @@
-SOFT_VERSION = "4.2.6"
+SOFT_VERSION = "4.2.7"
 DATA_VERSION = "20251024"
 bucket <- "3e040086-data-production-felisanalysisportal"
 key    <- "ic_withdrawn_list.txt"
-Sys.setenv(AWS_EC2_METADATA_DISABLED = "true")
 app_dir <- Sys.getenv("FELIS_DATA_ROOT", unset = getOption("felis_data_root", tempdir()))
-CCAT_FLAG <- TRUE
-# CCAT_FLAG <- file.exists("ccat")
-
+CCAT_FLAG <- file.exists(file.path(app_dir, "ccat"))
+addResourcePath(prefix = "APP_DIR", directoryPath = APP_DIR)
 app_path <- function(...) {
   file.path(APP_DIR, ...)
 }
@@ -153,62 +151,95 @@ options(pillar.advice = FALSE, pillar.min_title_chars = Inf)
 nietzsche = read.csv(header = TRUE,
                      file("source/nietzsche.csv",
                           encoding='UTF-8-BOM'))$text
+
+EXCLUDED_TEXT_1 = "除外ファイルダウンロード失敗"
 download_withdrawn_list_safe <- function(local_path = file.path(tempdir(), "ic_withdrawn_list.txt"),
                                          bucket, key,
                                          quiet = TRUE,
-                                         connect_timeout_sec = 0.5,
-                                         total_timeout_sec   = 1) {
+                                         connect_timeout_sec = 5,
+                                         total_timeout_sec   = 10) {
+
+  # ディレクトリ作成
   dir.create(dirname(local_path), recursive = TRUE, showWarnings = FALSE)
+
+  # 空ファイル作成関数（エラー時のフォールバック用）
   ensure_empty <- function() {
     writeLines(character(0), con = local_path, useBytes = TRUE)
   }
 
-  cfg <- httr::config(connecttimeout = connect_timeout_sec)
-  to  <- httr::timeout(total_timeout_sec)
+  # httrの設定をまとめる（ここが修正点）
+  # aws.s3の関数は config 引数にリストを渡すと安定します
+  httr_opts <- list(
+    httr::config(connecttimeout = connect_timeout_sec),
+    httr::timeout(total_timeout_sec)
+  )
 
+  # 1. ファイルの存在確認 (head_object)
   exists <- tryCatch({
-    !is.null(head_object(object = key, bucket = bucket, config = cfg, to))
+    # check_region = FALSE はバケット探索エラーを防ぐためのおまじないとして有効な場合が多い
+    !is.null(aws.s3::head_object(object = key, bucket = bucket, config = httr_opts, check_region = FALSE))
   }, error = function(e) {
     if (!quiet) message("head_object failed; using empty withdrawn list: ", conditionMessage(e))
     FALSE
   })
 
   if (exists) {
+    # 2. ダウンロード実行 (save_object)
+    EXCLUDED_TEXT_1 = "除外ファイルの存在を確認,ダウンロード失敗"
     ok <- tryCatch({
-      save_object(object = key, bucket = bucket, file = local_path, config = cfg, to)
+      aws.s3::save_object(object = key, bucket = bucket, file = local_path, config = httr_opts, check_region = FALSE)
       TRUE
     }, error = function(e) {
       if (!quiet) message("save_object failed; using empty withdrawn list: ", conditionMessage(e))
       FALSE
     })
-    if (!ok) ensure_empty()
+
+    if (!ok) ensure_empty() else EXCLUDED_TEXT_1 = "除外ファイルダウンロード成功"
   } else {
     ensure_empty()
   }
 
   local_path
 }
-withdrawn_file <- download_withdrawn_list_safe()
+
+# --- 実行と読み込み ---
+withdrawn_file <- download_withdrawn_list_safe(bucket = bucket, key = key)
 
 ID_exclude <- tryCatch({
+  # ファイルサイズ0または存在しない場合は空文字を返す
   if (!file.exists(withdrawn_file) || is.na(file.info(withdrawn_file)$size) || file.info(withdrawn_file)$size == 0) {
     character(0)
   } else {
+    # エンコーディング判定
+    EXCLUDED_TEXT_1 = withdrawn_file
     Encode <- tryCatch(
       readr::guess_encoding(withdrawn_file, n_max = 1000)[[1]]$encoding,
       error = function(e) "UTF-8"
     )
-    if (identical(Encode, "Shift_JIS")) Encode <- "CP932"
+    # readr::guess_encoding は Shift_JIS を返すことがあるが、locale では CP932 推奨
+    if (!is.null(Encode) && identical(Encode, "Shift_JIS")) Encode <- "CP932"
+    if (is.null(Encode)) Encode <- "UTF-8" # 念のため
 
-    readr::read_csv(
+    # CSV読み込み (headerなし前提)
+    df <- readr::read_csv(
       file = withdrawn_file,
-      col_names = "X1",
+      col_names = "X1", # ヘッダーなしとして読み込み、列名をX1に固定
       locale = readr::locale(encoding = Encode),
       progress = FALSE,
       show_col_types = FALSE
-    )$X1
+    )
+
+    # データフレームが空でないか確認してベクトル化
+    if(nrow(df) > 0) as.character(df$X1) else character(0)
   }
-}, error = function(e) character(0))
+}, error = function(e) {
+  # 読み込みエラー時は安全に空ベクトルを返す
+  if(interactive()) message("Error reading csv: ", e$message)
+  character(0)
+})
+
+# 結果確認
+EXCLUDED_TEXT_2 = (paste("除外リスト:", withdrawn_file, ", 件数:", length(ID_exclude)))
 
 # Rstan options
 rstan_options(auto_write = TRUE)

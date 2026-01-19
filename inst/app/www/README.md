@@ -1,4 +1,4 @@
-## FELIS for C-CAT database <img src="source/FELIS.png" width=50>
+## FELIS for C-CAT database <img src="/APP_DIR/source/FELIS.png" width=50>
 Functions Especially for LIquid and Solid tumor clinical sequencing for C-CAT database.  
 [English version of this README file](https://github.com/MANO-B/FELIS/blob/main/README_ENG.md).  
 Copyright (c) 2024 Masachika Ikegami, Released under the [MIT license](https://opensource.org/license/mit).  
@@ -173,7 +173,7 @@ Platform: aarch64-apple-darwin20 (64-bit)
 > library(shiny)
 > runApp('/srv/shiny-server/felis-cs', launch.browser=T)
 ```
-<img src="source/appli_GUI.png"  height=500>  
+<img src="/APP_DIR/source/appli_GUI.png"  height=500>  
 
 ### 解析ファイルの読み込み
 - 解析ファイルの入手
@@ -183,7 +183,7 @@ Platform: aarch64-apple-darwin20 (64-bit)
 ・症例CSV（全データ出力）  
 の2つのファイルをダウンロードします。ZIPファイルは解凍せずそのまま使用可能です。
 お試し用のダミーデータをダウンロード可能です。  
-<img src="source/report.png"  height=300>　　<img src="source/case.png" height=300>
+<img src="/APP_DIR/source/report.png"  height=300>　　<img src="/APP_DIR/source/case.png" height=300>
 
 **Input C-CAT files**タブを開きます。  
 ダウンロードした症例CSVとレポートCSVを、画面左上のBrowse...ボタンから選択して読み込みます。  
@@ -194,7 +194,7 @@ Platform: aarch64-apple-darwin20 (64-bit)
 **Setting**タブを開きます。  
 **Start file loading/analysis settings**ボタンを押すと設定項目が表示されます。  
 多数の項目が設定可能です。  
-<img src="source/setting.png"  height=300>  
+<img src="/APP_DIR/source/setting.png"  height=300>  
 
 #### 組織型に関するフィルタ  
 - Filter by histology  
@@ -275,7 +275,7 @@ Analysisタブを開きます。
 多数の解析が可能です。説明文が適宜最下部に表示されます。  
 各ボタンに対応したタブに結果が表示されます。  
 表示された図は.pngの拡張子で保存可能です。  
-<img src="source/analysis.png"  height=300>  <img src="source/examples.png"  height=300> 
+<img src="/APP_DIR/source/analysis.png"  height=300>  <img src="/APP_DIR/source/examples.png"  height=300> 
   
 #### 症例のまとめを表示  
 選択した症例のまとめを**Case summary**タブに表示します。  
@@ -289,7 +289,7 @@ Analysisタブを開きます。
 #### Oncoprintを表示  
 - 選択した症例の遺伝子変異を**Oncoprint**タブに表示します。  
 - 選択した遺伝子のLolliplotを**Lolliplot for the selected gene**タブに表示します。Internet接続が必要です。
-    上手く表示されない場合はsource/UniProt.txtに[Uniprot ID](https://www.uniprot.org)を追記してください。  
+    上手く表示されない場合は/APP_DIR/source/UniProt.txtに[Uniprot ID](https://www.uniprot.org)を追記してください。  
 - 症例の表を**Table of clinical and mutation information per patient**タブに表示します。左上のボタンからダウンロードが可能です。  
     
 #### 相互排他・共変異を表示

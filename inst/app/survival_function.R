@@ -1479,7 +1479,7 @@ create_datatable_with_confirm <- function(data,
   # --- 共通で使う fetch の JavaScript ロジックを定義 ---
   # btnText 変数（'csv', 'excel', 'copy' のいずれか）を使って通知する
   fetch_logic <- paste0("
-    fetch(window.location.origin + '/@@/api/writwlog', {
+    fetch(window.location.origin + '/@@/api/writelog', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

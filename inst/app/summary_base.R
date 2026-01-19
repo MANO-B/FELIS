@@ -88,13 +88,13 @@ summary_base_logic <- function() {
           -症例.がん種情報.乳.PgR.名称.
         )
       }
-      if(length(unique(Data_summary$症例.基本情報.がん種.OncoTree.)) > 
+      if(length(unique(Data_summary$症例.基本情報.がん種.OncoTree.)) >
          ifelse(is.null(input$table_summary_no), 20,
                 input$table_summary_no)){
         Data_summary$症例.基本情報.がん種.OncoTree. = Data_summary$症例.基本情報.がん種.OncoTree.LEVEL1.
         Data_summary$症例.基本情報.がん種.OncoTree..名称. = Data_summary$症例.基本情報.がん種.OncoTree.LEVEL1.
       }
-      
+
       Data_summary = Data_summary %>% dplyr::select(
         -症例.基本情報.がん種.OncoTree.LEVEL1.,
       )
@@ -104,14 +104,14 @@ summary_base_logic <- function() {
             Hugo_Symbol != "" &
             Evidence_level %in% c("","A","B","C","D","E","F") &
             Variant_Classification != "expression"
-        ) %>% 
+        ) %>%
         dplyr::arrange(desc(Evidence_level)) %>%
         dplyr::distinct(Tumor_Sample_Barcode,
                         Hugo_Symbol,
                         Start_Position,
                         .keep_all = TRUE)
       incProgress(1 / 8)
-      
+
       Data_MAF_target = Data_MAF %>%
         dplyr::filter(Tumor_Sample_Barcode %in%
                         Data_case_target$C.CAT調査結果.基本項目.ハッシュID)
@@ -182,7 +182,7 @@ summary_base_logic <- function() {
       Data_summary_ID = Data_summary$C.CAT調査結果.基本項目.ハッシュID
       Data_summary = Data_summary %>% dplyr::select(
         -C.CAT調査結果.基本項目.ハッシュID)
-      
+
       Data_summary$Lymph_met = as.character(Data_summary$Lymph_met)
       Data_summary$Brain_met = as.character(Data_summary$Brain_met)
       Data_summary$Lung_met = as.character(Data_summary$Lung_met)
@@ -190,23 +190,23 @@ summary_base_logic <- function() {
       Data_summary$Liver_met = as.character(Data_summary$Liver_met)
       Data_summary$Other_met = as.character(Data_summary$Other_met)
       Data_summary$Not_brain_bone_liver_met = as.character(Data_summary$Not_brain_bone_liver_met)
-      
-      Data_summary$症例.基本情報.年齢.診断時 = 
-        Data_summary$症例.基本情報.年齢 - 
+
+      Data_summary$症例.基本情報.年齢.診断時 =
+        Data_summary$症例.基本情報.年齢 -
         ceiling(as.integer(as.Date(Data_summary$症例.管理情報.登録日) - as.Date(Data_summary$症例.背景情報.診断日))/365.25)
       Data_summary$症例.基本情報.年齢.診断時[Data_summary$症例.基本情報.年齢.診断時 < 0] = NA_integer_
       Data_summary = Data_summary %>% dplyr::select(
         -症例.背景情報.診断日,
         -症例.管理情報.登録日
       )
-      
+
       Data_summary = Data_summary %>%
         dplyr::mutate(
           YoungOld = case_when(
             YoungOld == "Younger" ~ paste0("Younger than ", input$mid_age + 1),
             TRUE ~ paste0(input$mid_age + 1, " and older")
           ))
-      
+
       translation_map <- list(
         "Family cancer history" = c("あり" = "Yes", "なし" = "No", "不明" = "Unknown"),
         "Double cancer in a different organ" = c("あり" = "Yes", "なし" = "No", "不明" = "Unknown"),
@@ -303,6 +303,7 @@ summary_base_logic <- function() {
         Data_summary[is.na(get(col)), (col) := "Unknown"]
       }
       OUTPUT_DATA$table_summary_1_Data_summary = Data_summary
+      browser()
       incProgress(1 / 8)
     })
   })
@@ -317,7 +318,6 @@ output$table_summary_1 <- render_gt({
   withProgress(message = "Drawing table...", {
     # データの前処理
     data <- OUTPUT_DATA$table_summary_1_Data_summary
-    
     # 表示形式に応じた除外カラムとgrouping変数の設定
     data <- switch(input$table_summary,
                    "all" = data %>% select(-Diagnosis),
@@ -325,14 +325,14 @@ output$table_summary_1 <- render_gt({
                    "panel" = data %>% select(-`Diagnosis (OncoTree)`),
                    "diagnosis" = data %>% select(-`Diagnosis (OncoTree)`)
     )
-    
+
     group_var <- switch(input$table_summary,
                         "all" = NULL,
                         "gene" = "separation_value",
                         "panel" = "Cancer gene panel",
                         "diagnosis" = "Diagnosis"
     )
-    
+
     caption <- switch(input$table_summary,
                       "all" = "**Patient Characteristics** (N = {N})",
                       "gene" = "**Patient Characteristics** (N = {N})",
@@ -386,7 +386,7 @@ output$table_summary_1 <- render_gt({
           statistic = list(
             all_continuous() ~ c("{N_nonmiss}",
                                  "{mean} ({sd})",
-                                 "{median} ({p25}, {p75})", 
+                                 "{median} ({p25}, {p75})",
                                  "{min}, {max}"),
             all_categorical() ~ "{n} ({p}%)"
           ),

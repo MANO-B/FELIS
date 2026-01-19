@@ -941,7 +941,6 @@ if (CCAT_FLAG & file.exists(file.path(app_dir, "source", "clinical_data_whole.qs
                         -症例.EP後副作用情報.CTCAEv5.0最悪Grade.名称.
           ) %>%
           dplyr::distinct()
-        print(tempdir())
         if(ENV_ != "server")
           QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), clin_tmp, file=file.path(tempdir(), "clinical_data.qs"))
       }
