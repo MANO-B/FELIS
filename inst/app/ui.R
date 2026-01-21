@@ -946,7 +946,9 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_CGP_1_H"),
                        htmlOutput("select_gene_survival_CGP_1_C"),
                        htmlOutput("select_gene_survival_CGP_1_M"),
-                       htmlOutput("select_gene_survival_CGP_1_P")
+                       htmlOutput("select_gene_survival_CGP_1_P"),
+                       htmlOutput("select_gene_survival_CGP_1_Panel"),
+                       htmlOutput("select_gene_survival_CGP_1_Best_Evidence_Level")
                 ),
                 column(3,
                        h6("Group 2"),
@@ -967,7 +969,9 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_CGP_2_H"),
                        htmlOutput("select_gene_survival_CGP_2_C"),
                        htmlOutput("select_gene_survival_CGP_2_M"),
-                       htmlOutput("select_gene_survival_CGP_2_P")
+                       htmlOutput("select_gene_survival_CGP_2_P"),
+                       htmlOutput("select_gene_survival_CGP_2_Panel"),
+                       htmlOutput("select_gene_survival_CGP_2_Best_Evidence_Level")
                 )
               ),
               br(),

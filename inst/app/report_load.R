@@ -325,7 +325,6 @@ Data_report_raw = reactive({
 
 Data_report = reactive({
   #req(input$special_gene_annotation)
-  browser()
   # 生データの取得
   Data_MAF = Data_report_raw()
 

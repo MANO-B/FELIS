@@ -107,6 +107,24 @@ survival_CGP_analysis_logic <- function() {
       Data_case_target = left_join(Data_case_target, Data_report_TMB,
                                    by = "C.CAT調査結果.基本項目.ハッシュID")
 
+      Data_Best_Evidence_Level = Data_report() %>%
+        dplyr::filter(
+          !str_detect(Hugo_Symbol, ",") &
+            Hugo_Symbol != "" &
+            Evidence_level %in% c("A","B","C","D","E") &
+            Variant_Classification != "expression"
+        ) %>%
+        dplyr::arrange(Evidence_level) %>%
+        dplyr::distinct(Tumor_Sample_Barcode,
+                        .keep_all = TRUE) %>%
+        dplyr::filter(Tumor_Sample_Barcode %in%
+                        Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
+        dplyr::select(Tumor_Sample_Barcode, Evidence_level)
+      colnames(Data_Best_Evidence_Level) = c("C.CAT調査結果.基本項目.ハッシュID", "Best_Evidence_Level")
+      Data_case_target = left_join(Data_case_target, Data_Best_Evidence_Level,
+                                   by = "C.CAT調査結果.基本項目.ハッシュID")
+      Data_case_target$Best_Evidence_Level[is.na(Data_case_target$Best_Evidence_Level)] = "None"
+
       Data_MAF_target = Data_MAF %>%
         dplyr::filter(Tumor_Sample_Barcode %in%
                         Data_case_target$C.CAT調査結果.基本項目.ハッシュID)
@@ -158,6 +176,7 @@ survival_CGP_analysis_logic <- function() {
       OUTPUT_DATA$figure_surv_CGP_candidate_cluster = sort(unique(Data_survival_interactive$cluster))
       OUTPUT_DATA$figure_surv_CGP_candidate_PS = sort(unique(Data_survival_interactive$症例.背景情報.ECOG.PS.名称.))
       OUTPUT_DATA$figure_surv_CGP_candidate_Panel = sort(unique(Data_survival_interactive$症例.検体情報.パネル.名称.))
+      OUTPUT_DATA$figure_surv_CGP_candidate_Best_Evidence_Level = sort(unique(Data_survival_interactive$Best_Evidence_Level))
       OUTPUT_DATA$figure_surv_CGP_candidate_meta = c('Lymph_met','Brain_met','Lung_met','Bone_met','Liver_met')
 
       incProgress(1 / 13)
@@ -840,7 +859,8 @@ output$figure_survival_CGP_1 = renderPlot({
       H = "Cancers",
       C = "cluster",
       P = "PS",
-      Panel = "Panel"
+      Panel = "Panel",
+      Best_Evidence_Level = "Best_Evidence_Level"
     )
 
     for(filter_key in names(clinical_filters)) {
@@ -1398,6 +1418,15 @@ output$figure_surv_CGP = renderPlot({
       group_var = "Panel",
       input_rmst_cgp = input$RMST_CGP,
       plot_title = "Panel"
+    )
+  } else if(input$color_var_surv_CGP == "treat_group_11"){
+    survival_compare_and_plot(
+      data = Data_survival_interactive,
+      time_var = "time_enroll_final",
+      status_var = "censor",
+      group_var = "Best_Evidence_Level",
+      input_rmst_cgp = input$RMST_CGP,
+      plot_title = "Best Evidence Level"
     )
   }
 })

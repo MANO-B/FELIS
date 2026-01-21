@@ -913,7 +913,8 @@ output$select_color_var_surv_CGP = renderUI({
                 "ECOG Performance status" = "treat_group_7",
                 "ECOG Performance status (unknown patients excluded)" = "treat_group_8",
                 "Diagnosis" = "treat_group_9",
-                "Panel" = "treat_group_10"
+                "Panel" = "treat_group_10",
+                "Best evidence level" = "treat_group_11"
     ),
     selected = "entire")
 })
@@ -929,6 +930,7 @@ output$select_propensity_survival_CGP = renderUI({
                 "Treatment option" = "EP_option",
                 "Sex" = "Sex",
                 "Age" = "YoungOld",
+                "Best evidence level" = "Best_Evidence_Level",
                 "Treatment lines before CGP" = "CTx_lines_before_CGP",
                 "Best treatment effect before CGP" = "pre_CGP_best_RECIST"
     ),
@@ -946,6 +948,7 @@ output$select_IPW_survival_CGP = renderUI({
                 "Treatment option" = "EP_option",
                 "Sex" = "Sex",
                 "Age" = "YoungOld",
+                "Best evidence level" = "Best_Evidence_Level",
                 "Treatment lines before CGP" = "CTx_lines_before_CGP",
                 "Best treatment effect before CGP" = "pre_CGP_best_RECIST"
     ),
@@ -1083,7 +1086,6 @@ output$select_gene_survival_reach_1_Panel = renderUI({
               multiple = TRUE)
 })
 
-
 output$select_gene_survival_CGP_1_M = renderUI({
   req(OUTPUT_DATA$figure_surv_CGP_candidate_meta)
   pickerInput("gene_survival_CGP_1_M", "Metastatic site",
@@ -1116,6 +1118,23 @@ output$select_gene_survival_CGP_2_Panel = renderUI({
               selected = NULL,
               multiple = TRUE)
 })
+output$select_gene_survival_CGP_1_Best_Evidence_Level = renderUI({
+  req(OUTPUT_DATA$figure_surv_CGP_candidate_Best_Evidence_Level)
+  pickerInput("gene_survival_CGP_1_Best_Evidence_Level", "Best Evidence Level",
+              OUTPUT_DATA$figure_surv_CGP_candidate_Best_Evidence_Level,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_CGP_2_Best_Evidence_Level = renderUI({
+  req(OUTPUT_DATA$figure_surv_CGP_candidate_Best_Evidence_Level)
+  pickerInput("gene_survival_CGP_2_Best_Evidence_Level", "Best Evidence Level",
+              OUTPUT_DATA$figure_surv_CGP_candidate_Best_Evidence_Level,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+
 output$select_gene_survival_CGP_1_P = renderUI({
   req(OUTPUT_DATA$figure_surv_CGP_candidate_PS)
   pickerInput("gene_survival_CGP_1_P", "Performance status at CGP",
