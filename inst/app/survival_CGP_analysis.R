@@ -738,7 +738,9 @@ ID_select_surv_CGP = reactive({
     C = "cluster",
     EP_option = "EP_option",
     Panel = "症例.検体情報.パネル.名称.",
-    P = "症例.背景情報.ECOG.PS.名称."
+    P = "症例.背景情報.ECOG.PS.名称.",
+    Best_Evidence_Level = "Best_Evidence_Level",
+    Year = "year"
   )
 
   for(filter_key in names(clinical_filters)) {

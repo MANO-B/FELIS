@@ -1100,7 +1100,9 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_reach_1_C"),
                        htmlOutput("select_gene_survival_reach_1_M"),
                        htmlOutput("select_gene_survival_reach_1_P"),
-                       htmlOutput("select_gene_survival_reach_1_Panel")
+                       htmlOutput("select_gene_survival_reach_1_Panel"),
+                       htmlOutput("select_gene_survival_reach_1_Best_Evidence_Level"),
+                       htmlOutput("select_gene_survival_reach_1_Year")
                 )
               ),
               br(),

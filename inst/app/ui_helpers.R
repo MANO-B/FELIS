@@ -966,6 +966,22 @@ output$select_IPW_threshold = renderUI({
 })
 
 
+output$select_gene_survival_reach_1_Best_Evidence_Level = renderUI({
+  req(OUTPUT_DATA$figure_surv_CGP_candidate_Best_Evidence_Level)
+  pickerInput("gene_survival_reach_1_Best_Evidence_Level", "Best Evidence Level",
+              OUTPUT_DATA$figure_surv_CGP_candidate_Best_Evidence_Level,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_reach_1_Year = renderUI({
+  req(OUTPUT_DATA$figure_surv_CGP_candidate_Year)
+  pickerInput("gene_survival_reach_1_Year", "Test year",
+              OUTPUT_DATA$figure_surv_CGP_candidate_Year,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
 output$select_gene_survival_reach_1_M = renderUI({
   req(OUTPUT_DATA$figure_surv_CGP_candidate_meta)
   pickerInput("gene_survival_reach_1_M", "Metastatic site",
