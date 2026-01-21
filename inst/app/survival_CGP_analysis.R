@@ -42,7 +42,8 @@ survival_CGP_analysis_logic <- function() {
                       HER2_IHC,
                       MSI_PCR,
                       MMR_IHC,
-                      time_enroll_treat
+                      time_enroll_treat,
+                      year
         )
       if(input$HER2 == "No"){
         Data_case_target = Data_case_target %>%
@@ -177,6 +178,7 @@ survival_CGP_analysis_logic <- function() {
       OUTPUT_DATA$figure_surv_CGP_candidate_PS = sort(unique(Data_survival_interactive$症例.背景情報.ECOG.PS.名称.))
       OUTPUT_DATA$figure_surv_CGP_candidate_Panel = sort(unique(Data_survival_interactive$症例.検体情報.パネル.名称.))
       OUTPUT_DATA$figure_surv_CGP_candidate_Best_Evidence_Level = sort(unique(Data_survival_interactive$Best_Evidence_Level))
+      OUTPUT_DATA$figure_surv_CGP_candidate_Year = sort(unique(Data_survival_interactive$year))
       OUTPUT_DATA$figure_surv_CGP_candidate_meta = c('Lymph_met','Brain_met','Lung_met','Bone_met','Liver_met')
 
       incProgress(1 / 13)
@@ -860,7 +862,8 @@ output$figure_survival_CGP_1 = renderPlot({
       C = "cluster",
       P = "PS",
       Panel = "Panel",
-      Best_Evidence_Level = "Best_Evidence_Level"
+      Best_Evidence_Level = "Best_Evidence_Level",
+      Year = "year"
     )
 
     for(filter_key in names(clinical_filters)) {
@@ -1427,6 +1430,15 @@ output$figure_surv_CGP = renderPlot({
       group_var = "Best_Evidence_Level",
       input_rmst_cgp = input$RMST_CGP,
       plot_title = "Best Evidence Level"
+    )
+  } else if(input$color_var_surv_CGP == "treat_group_12"){
+    survival_compare_and_plot(
+      data = Data_survival_interactive,
+      time_var = "time_enroll_final",
+      status_var = "censor",
+      group_var = "year",
+      input_rmst_cgp = input$RMST_CGP,
+      plot_title = "Test year"
     )
   }
 })

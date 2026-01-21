@@ -948,7 +948,8 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_CGP_1_M"),
                        htmlOutput("select_gene_survival_CGP_1_P"),
                        htmlOutput("select_gene_survival_CGP_1_Panel"),
-                       htmlOutput("select_gene_survival_CGP_1_Best_Evidence_Level")
+                       htmlOutput("select_gene_survival_CGP_1_Best_Evidence_Level"),
+                       htmlOutput("select_gene_survival_CGP_1_Year")
                 ),
                 column(3,
                        h6("Group 2"),
@@ -971,7 +972,8 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_CGP_2_M"),
                        htmlOutput("select_gene_survival_CGP_2_P"),
                        htmlOutput("select_gene_survival_CGP_2_Panel"),
-                       htmlOutput("select_gene_survival_CGP_2_Best_Evidence_Level")
+                       htmlOutput("select_gene_survival_CGP_2_Best_Evidence_Level"),
+                       htmlOutput("select_gene_survival_CGP_2_Year")
                 )
               ),
               br(),
@@ -1050,8 +1052,9 @@ ui <- dashboardPage(
                        actionButton("figure_survival_CGP_5_1_reload", "Reload")
                 )
               ),
-              htmlOutput(""),
               hr(),
+              h5(paste0("If there are too many histology subtypes, multivariable analysis may fail.\n",
+                        "Go to Settings and set: “Analyze without detailed histology” → “Yes, use OncoTree 1st level”.")),
               gt_output('figure_survival_CGP_5_1'),
               hr(),
               h6("Table. Univariable and multiple variable regression analysis were performed with gtsummary package for R. Factors in the multivariable analysis were selected by variable decreasing method based on the Akaike information criterion with stat package for R. Variables with variance inflation factor > 10 were excluded to eliminate multicollinearity.")

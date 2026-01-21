@@ -1303,6 +1303,30 @@ create_gt_table <- function(Data_forest_tmp, Factor_names, Factor_names_univaria
         EP_option == 1 ~ "Yes",
         TRUE ~ "No"
       ))
+    # --- Histology level reduction (top 30, others -> "OTHER") ---
+    if (("Histology" %in% Factor_names_univariant) || ("Histology" %in% Factor_names)) {
+      if ("Histology" %in% colnames(Data_forest_tmp_table)) {
+        n_uniq_hist <- dplyr::n_distinct(Data_forest_tmp_table$Histology, na.rm = TRUE)
+        if (n_uniq_hist >= 30) {
+          top_hist <- Data_forest_tmp_table %>%
+            dplyr::filter(!is.na(Histology)) %>%
+            dplyr::count(Histology, sort = TRUE) %>%
+            dplyr::slice_head(n = 30) %>%
+            dplyr::pull(Histology)
+
+          Data_forest_tmp_table <- Data_forest_tmp_table %>%
+            dplyr::mutate(
+              Histology = dplyr::if_else(
+                is.na(Histology) | Histology %in% top_hist,
+                as.character(Histology),
+                "OTHER"
+              )
+            )
+        }
+      }
+    }
+    # --- end Histology reduction ---
+    Data_forest_tmp_table$Histology <- factor(Data_forest_tmp_table$Histology)
     colnames(Data_forest_tmp_table) <- rename_factors_survival_CGP(colnames(Data_forest_tmp_table))
     Factor_names <- rename_factors_survival_CGP(Factor_names)
     Factor_names_univariant <- rename_factors_survival_CGP(Factor_names_univariant)

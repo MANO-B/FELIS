@@ -1063,6 +1063,6 @@ Data_case =  reactive({
       mutate(., YoungOld = if_else(症例.基本情報.年齢 <= input$mid_age, "Younger", "Older"))
       else .
     } %>% dplyr::distinct() %>% dplyr::arrange(C.CAT調査結果.基本項目.ハッシュID)
-  clin_tmp$症例.管理情報.登録日 = as.Date(clin_tmp$症例.管理情報.登録日)
+  clin_tmp$year = as.POSIXlt(as.Date(clin_tmp$症例.管理情報.登録日))$year + 1900
   return(clin_tmp)
 })

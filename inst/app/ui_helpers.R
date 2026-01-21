@@ -914,7 +914,8 @@ output$select_color_var_surv_CGP = renderUI({
                 "ECOG Performance status (unknown patients excluded)" = "treat_group_8",
                 "Diagnosis" = "treat_group_9",
                 "Panel" = "treat_group_10",
-                "Best evidence level" = "treat_group_11"
+                "Best evidence level" = "treat_group_11",
+                "Test year" = "treat_group_12"
     ),
     selected = "entire")
 })
@@ -1134,6 +1135,23 @@ output$select_gene_survival_CGP_2_Best_Evidence_Level = renderUI({
               selected = NULL,
               multiple = TRUE)
 })
+output$select_gene_survival_CGP_1_Year = renderUI({
+  req(OUTPUT_DATA$figure_surv_CGP_candidate_Year)
+  pickerInput("gene_survival_CGP_1_Year", "Test year",
+              OUTPUT_DATA$figure_surv_CGP_candidate_Year,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_CGP_2_Year = renderUI({
+  req(OUTPUT_DATA$figure_surv_CGP_candidate_Year)
+  pickerInput("gene_survival_CGP_2_Year", "Test year",
+              OUTPUT_DATA$figure_surv_CGP_candidate_Year,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+
 
 output$select_gene_survival_CGP_1_P = renderUI({
   req(OUTPUT_DATA$figure_surv_CGP_candidate_PS)
