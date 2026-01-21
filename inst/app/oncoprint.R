@@ -97,6 +97,24 @@ oncoprint_logic <- function() {
                       症例.転帰情報.死亡日,
                       症例.検体情報.検体採取日.腫瘍組織.
         )
+      Data_Best_Evidence_Level = Data_report() %>%
+        dplyr::filter(
+          !str_detect(Hugo_Symbol, ",") &
+            Hugo_Symbol != "" &
+            Evidence_level %in% c("A","B","C","D","E") &
+            Variant_Classification != "expression"
+        ) %>%
+        dplyr::arrange(Evidence_level) %>%
+        dplyr::distinct(Tumor_Sample_Barcode,
+                        .keep_all = TRUE) %>%
+        dplyr::filter(Tumor_Sample_Barcode %in%
+                        Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
+        dplyr::select(Tumor_Sample_Barcode, Evidence_level)
+      colnames(Data_Best_Evidence_Level) = c("C.CAT調査結果.基本項目.ハッシュID", "Best Evidence Level")
+      Data_case_target = left_join(Data_case_target, Data_Best_Evidence_Level,
+                               by = "C.CAT調査結果.基本項目.ハッシュID")
+      Data_case_target$`Best Evidence Level`[is.na(Data_case_target$`Best Evidence Level`)] = "None"
+
       Data_drug = Data_drug_raw()
       filtered_data <- Data_drug %>%
         dplyr::select(ID, 投与開始日, Drug)

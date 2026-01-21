@@ -98,6 +98,24 @@ summary_base_logic <- function() {
       Data_summary = Data_summary %>% dplyr::select(
         -症例.基本情報.がん種.OncoTree.LEVEL1.,
       )
+      Data_Best_Evidence_Level = Data_report() %>%
+        dplyr::filter(
+          !str_detect(Hugo_Symbol, ",") &
+            Hugo_Symbol != "" &
+            Evidence_level %in% c("A","B","C","D","E") &
+            Variant_Classification != "expression"
+        ) %>%
+        dplyr::arrange(Evidence_level) %>%
+        dplyr::distinct(Tumor_Sample_Barcode,
+                        .keep_all = TRUE) %>%
+        dplyr::filter(Tumor_Sample_Barcode %in%
+                        Data_summary$C.CAT調査結果.基本項目.ハッシュID) %>%
+        dplyr::select(Tumor_Sample_Barcode, Evidence_level)
+      colnames(Data_Best_Evidence_Level) = c("C.CAT調査結果.基本項目.ハッシュID", "Best Evidence Level")
+      Data_summary = left_join(Data_summary, Data_Best_Evidence_Level,
+                                   by = "C.CAT調査結果.基本項目.ハッシュID")
+      Data_summary$`Best Evidence Level`[is.na(Data_summary$`Best Evidence Level`)] = "None"
+
       Data_MAF = Data_report() %>%
         dplyr::filter(
           !str_detect(Hugo_Symbol, ",") &
