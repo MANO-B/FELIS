@@ -152,57 +152,99 @@ nietzsche = read.csv(header = TRUE,
                      file("source/nietzsche.csv",
                           encoding='UTF-8-BOM'))$text
 
-EXCLUDED_TEXT_1 = "除外ファイルダウンロード失敗"
-download_withdrawn_list_safe <- function(local_path = file.path(tempdir(), "ic_withdrawn_list.txt"),
-                                         bucket, key,
-                                         quiet = TRUE,
-                                         connect_timeout_sec = 5,
-                                         total_timeout_sec   = 10) {
+# ログ保存用変数の初期化
+EXCLUDED_TEXT_1 = ""
 
-  # ディレクトリ作成
-  dir.create(dirname(local_path), recursive = TRUE, showWarnings = FALSE)
+download_withdrawn_list_safe <- function(bucket, key,
+                                         local_path = file.path(tempdir(), "ic_withdrawn_list.txt")) {
 
-  # 空ファイル作成関数（エラー時のフォールバック用）
-  ensure_empty <- function() {
-    writeLines(character(0), con = local_path, useBytes = TRUE)
+  if(file.exists(local_path)){
+    file.remove(local_path)
   }
 
-  # httrの設定をまとめる（ここが修正点）
-  # aws.s3の関数は config 引数にリストを渡すと安定します
-  httr_opts <- list(
-    httr::config(connecttimeout = connect_timeout_sec),
-    httr::timeout(total_timeout_sec)
-  )
+  # ログバッファの準備
+  log_buffer <- character(0)
 
-  # 1. ファイルの存在確認 (head_object)
-  exists <- tryCatch({
-    # check_region = FALSE はバケット探索エラーを防ぐためのおまじないとして有効な場合が多い
-    !is.null(aws.s3::head_object(object = key, bucket = bucket, config = httr_opts, check_region = FALSE))
+  # ログ記録用関数
+  add_log <- function(...) {
+    msg <- paste0("[", format(Sys.time(), "%H:%M:%S"), "] ", paste0(...))
+    log_buffer <<- c(log_buffer, msg)
+  }
+
+  add_log("=== S3ダウンロード開始 (東京リージョン固定) ===")
+  add_log("Target Bucket: ", bucket)
+  add_log("Target Key:    ", key)
+  add_log("Target Region: ap-northeast-1")
+
+  success <- FALSE
+
+  connect_timeout_sec = 5
+  total_timeout_sec = 10
+
+  tryCatch({
+    # タイムアウト設定
+    httr_opts <- list(
+      httr::config(connecttimeout = connect_timeout_sec),
+      httr::timeout(total_timeout_sec)
+    )
+
+    # ダウンロード実行
+    aws.s3::save_object(
+      object = key,
+      bucket = bucket,
+      file   = local_path,
+      region = "ap-northeast-1",
+      check_region = FALSE,
+      config = httr_opts,
+      overwrite = TRUE
+    )
+
+    success <- TRUE
+    add_log("  -> ダウンロード成功！ (Success)")
+
+    if (file.exists(local_path)) {
+      f_size <- file.info(local_path)$size
+      add_log("  -> 保存先: ", local_path)
+      add_log("  -> サイズ: ", f_size, " bytes")
+    }
+
   }, error = function(e) {
-    if (!quiet) message("head_object failed; using empty withdrawn list: ", conditionMessage(e))
-    FALSE
+    err_msg <- conditionMessage(e)
+    add_log("  -> 失敗 (Error): ", err_msg)
+
+    # --- 追加: 詳細なオブジェクト構造をログに取り込む ---
+    add_log("  -> [詳細エラーオブジェクト構造]")
+    # str(e) の出力を文字列ベクトルとしてキャプチャ
+    detailed_structure <- capture.output(str(e))
+    for(line in detailed_structure) {
+      add_log("     ", line)
+    }
+    # -----------------------------------------------
+
+    # エラー内容に応じたヒント
+    if (grepl("403", err_msg)) {
+      add_log("     [ヒント] 403 Forbidden: 場所は合っていますが、アクセス権限がありません。")
+      add_log("     AWSアクセスキーまたはIAMロールの権限を確認してください。")
+    } else if (grepl("404", err_msg)) {
+      add_log("     [ヒント] 404 Not Found: バケットまたはファイル名が間違っています。")
+    }
   })
 
-  if (exists) {
-    # 2. ダウンロード実行 (save_object)
-    EXCLUDED_TEXT_1 = "除外ファイルの存在を確認,ダウンロード失敗"
-    ok <- tryCatch({
-      aws.s3::save_object(object = key, bucket = bucket, file = local_path, config = httr_opts, check_region = FALSE)
-      TRUE
-    }, error = function(e) {
-      if (!quiet) message("save_object failed; using empty withdrawn list: ", conditionMessage(e))
-      FALSE
-    })
+  add_log("=== 処理終了 ===")
 
-    if (!ok) ensure_empty() else EXCLUDED_TEXT_1 = "除外ファイルダウンロード成功"
-  } else {
-    ensure_empty()
+  # ログをグローバル変数に保存
+  EXCLUDED_TEXT_1 <<- paste(log_buffer, collapse = "\n")
+
+  # 失敗時は空ファイル作成
+  if (!success && !file.exists(local_path)) {
+    file.create(local_path)
+    add_log("  -> (安全策) 空ファイルを作成しました")
   }
 
-  local_path
+  return(local_path)
 }
 
-# --- 実行と読み込み ---
+# 実行
 withdrawn_file <- download_withdrawn_list_safe(bucket = bucket, key = key)
 
 ID_exclude <- tryCatch({
@@ -211,7 +253,6 @@ ID_exclude <- tryCatch({
     character(0)
   } else {
     # エンコーディング判定
-    EXCLUDED_TEXT_1 = withdrawn_file
     Encode <- tryCatch(
       readr::guess_encoding(withdrawn_file, n_max = 1000)[[1]]$encoding,
       error = function(e) "UTF-8"
@@ -230,7 +271,15 @@ ID_exclude <- tryCatch({
     )
 
     # データフレームが空でないか確認してベクトル化
-    if(nrow(df) > 0) as.character(df$X1) else character(0)
+    if(nrow(df) > 0){
+      if(stringr::str_detect(df$X1[1], "xml version")){
+        character(0)
+      } else if(nrow(df) > 1){
+        if(stringr::str_detect(df$X1[2], "<Error>")) character(0)
+      } else {
+        as.character(df$X1)
+      }
+    }else character(0)
   }
 }, error = function(e) {
   # 読み込みエラー時は安全に空ベクトルを返す

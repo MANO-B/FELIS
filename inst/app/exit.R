@@ -15,10 +15,10 @@ message('[R] Session initialized at: ', session$userData$session_start_time)
 # JavaScript
 shinyjs::runjs("
   console.log('[JS] Script initialized');
-  
+
   $(document).ready(function() {
     console.log('[JS] Document ready');
-    
+
     // navigation typeを送信（デバッグ用）
     var navType = 'unknown';
     if (performance.navigation) {
@@ -41,7 +41,7 @@ shinyjs::runjs("
 # ログアウトボタン
 observeEvent(input$logout_button, {
   message('[R] Logout button clicked')
-  
+
   shinyjs::runjs('
     console.log("[JS] Logout button event");
     if (confirm("Want to log out?")) {
@@ -60,15 +60,15 @@ observeEvent(input$confirm_logout, {
 do_logout <- function(session, reason = 'unknown') {
   message('[R] ========== do_logout() called ==========')
   message('[R] Reason: ', reason)
-  
+
   if (is.null(session) || isTRUE(session$userData$logged_out)) {
     message('[R] Already logged out - returning')
     return(invisible(NULL))
   }
-  
+
   session$userData$logged_out <- TRUE
   message('[R] logged_out set to TRUE')
-  
+
   # セッションが有効な場合のみJavaScriptを実行
   if (reason != 'session_ended') {
     tryCatch({
@@ -76,9 +76,9 @@ do_logout <- function(session, reason = 'unknown') {
       shinyjs::runjs('
       const logoutUrl = window.location.origin + "/@@/logout";
       console.log("[JS] Sending logout request to:", logoutUrl);
-      
+
       fetch(logoutUrl, {
-        method: "POST",
+        method: "GET",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({ reason: "logout" })
@@ -97,13 +97,13 @@ do_logout <- function(session, reason = 'unknown') {
       message("[R] Could not run JavaScript (session may be closed): ", e$message)
     })
   }
-  
+
   later::later(function() {
     message('[R] Closing session - Reason: ', reason)
     try(session$close(), silent = TRUE)
     if (interactive()) stopApp()
   }, delay = 1)
-  
+
   message('[R] ========== do_logout() finished ==========')
 }
 
@@ -111,26 +111,26 @@ do_logout <- function(session, reason = 'unknown') {
 session$onSessionEnded(function() {
   message('[R] ========== session$onSessionEnded() called ==========')
   message('[R] This session started at: ', session$userData$session_start_time)
-  
+
   if (is.null(session)) {
     return(NULL)
   }
-  
+
   message('[R] logged_out flag: ', session$userData$logged_out)
-  
+
   # 0.8秒待って、新しいセッションが開始されたかチェック
   later::later(function() {
     message('[R] --- Checking for new session (after 0.8s delay) ---')
-    
+
     is_reload <- FALSE
-    
+
     if (!is.null(.GlobalEnv$.last_session_start_time)) {
       message('[R] Global last session start: ', .GlobalEnv$.last_session_start_time)
       message('[R] This session started: ', session$userData$session_start_time)
-      
+
       # グローバルの最新セッション開始時刻が、このセッションより後なら、リロード
       if (.GlobalEnv$.last_session_start_time > session$userData$session_start_time) {
-        time_diff <- as.numeric(difftime(.GlobalEnv$.last_session_start_time, 
+        time_diff <- as.numeric(difftime(.GlobalEnv$.last_session_start_time,
                                          session$userData$session_start_time, units = "secs"))
         message('[R] New session started ', round(time_diff, 2), ' seconds after this session')
         is_reload <- TRUE
@@ -138,27 +138,27 @@ session$onSessionEnded(function() {
         message('[R] No new session detected - this is a window close')
       }
     }
-    
+
     # リロードの場合はログアウトをスキップ
     if (is_reload) {
       message('[R] Reload detected - skipping logout')
-      
+
       # クリーンアップのみ実行
       message('[R] Cleanup started')
-      
+
       large_objects <- c(
-        'Data_case_raw', 'Data_case', 'Data_drug_raw', 
+        'Data_case_raw', 'Data_case', 'Data_drug_raw',
         'Data_drug_raw_rename', 'Data_report_raw', 'Data_report',
         'OUTPUT_DATA', 'Data_cluster_ID', 'tmp_post', 'analysis_env'
       )
-      
+
       for (obj_name in large_objects) {
         if (exists(obj_name, envir = .GlobalEnv)) {
           rm(list = obj_name, envir = .GlobalEnv)
           message('[R] Removed: ', obj_name)
         }
       }
-      
+
       all_objects <- ls(envir = .GlobalEnv)
       for (obj_name in all_objects) {
         tryCatch({
@@ -170,36 +170,36 @@ session$onSessionEnded(function() {
           }
         }, error = function(e) {})
       }
-      
+
       session$reactlog(FALSE)
       gc()
-      
+
       message('[R] Cleanup completed')
       message('[R] ========== session$onSessionEnded() finished (reload skipped) ==========')
       return(NULL)
     }
-    
+
     # 通常のクローズまたはログアウト
     if (!isTRUE(session$userData$logged_out)) {
       message('[R] Window/tab closed detected - calling do_logout()')
       do_logout(session, reason = 'window_closed')
     }
-    
+
     message('[R] Cleanup started')
-    
+
     large_objects <- c(
-      'Data_case_raw', 'Data_case', 'Data_drug_raw', 
+      'Data_case_raw', 'Data_case', 'Data_drug_raw',
       'Data_drug_raw_rename', 'Data_report_raw', 'Data_report',
       'OUTPUT_DATA', 'Data_cluster_ID', 'tmp_post', 'analysis_env'
     )
-    
+
     for (obj_name in large_objects) {
       if (exists(obj_name, envir = .GlobalEnv)) {
         rm(list = obj_name, envir = .GlobalEnv)
         message('[R] Removed: ', obj_name)
       }
     }
-    
+
     all_objects <- ls(envir = .GlobalEnv)
     for (obj_name in all_objects) {
       tryCatch({
@@ -211,10 +211,10 @@ session$onSessionEnded(function() {
         }
       }, error = function(e) {})
     }
-    
+
     session$reactlog(FALSE)
     gc()
-    
+
     message('[R] Cleanup completed')
     message('[R] ========== session$onSessionEnded() finished ==========')
   }, delay = 0.8)

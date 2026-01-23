@@ -1484,7 +1484,7 @@ format_numeric_columns <- function(df, digits = 3) {
 # }
 
 create_datatable_with_confirm <- function(data,
-                                          description = NULL,
+                                          message = NULL,
                                           page_length = 100,
                                           scroll_y = "1000px",
                                           buttons = c("csv", "excel", "copy"),
@@ -1494,10 +1494,10 @@ create_datatable_with_confirm <- function(data,
                                             copy = "Please manage according to the personal information handling rules\\n=================================\\nPlease comply with the contents of the Agreement on Utilization of C-CAT Data and the service specification conformity disclosure of/for C-CAT Research-Use Portal site, and handle it properly.\\n=================================\\nBe careful not to leave the downloaded file on your computer"
                                           )) {
 
-  # description をJSに安全に渡す（JSONとしてエスケープされた文字列）
+  # message をJSに安全に渡す（JSONとしてエスケープされた文字列）
   # 例: "FELIS CSV download about case summary"
   desc_json <- jsonlite::toJSON(
-    if (is.null(description) || !nzchar(description)) NA_character_ else description,
+    if (is.null(message) || !nzchar(message)) NA_character_ else message,
     auto_unbox = TRUE
   )
   # --- 共通で使う fetch の JavaScript ロジックを定義 ---
@@ -1509,7 +1509,7 @@ create_datatable_with_confirm <- function(data,
       body: JSON.stringify({
         type: btnText,
         time: new Date().toISOString(),
-        description: ", desc_json, "
+        message: ", desc_json, "
       })
     }).catch(err => console.error('Download log fetch error:', err));
   ")

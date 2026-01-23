@@ -288,7 +288,7 @@ ui <- dashboardPage(
             // メッセージ内容が 'csv file' のため 'csv' を指定
             type: 'csv',
             time: new Date().toISOString(),
-            file: fileLabel
+            message: fileLabel
           })
         }).catch(err => console.error('Download log fetch error:', err));
 
