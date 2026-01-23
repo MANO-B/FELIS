@@ -372,6 +372,7 @@ capture_s3_get_probe <- function(bucket, key, region = "ap-northeast-1") {
 
     # cat の部分（あなたがやったのと同じ）
     cat(res_get, "\n")
+    cat("aws.s3::save_objectを実行するたびにHostIdが変化するらしい\n")
 
     # 追加：aws.s3 の aws_error オブジェクトも取れるように（tryCatchで“捕捉”）
     cat("\n--- structured (tryCatch error object) ---\n")
