@@ -152,6 +152,56 @@ nietzsche = read.csv(header = TRUE,
                      file("source/nietzsche.csv",
                           encoding='UTF-8-BOM'))$text
 
+# 結果を見やすく出力
+Identity_text_1 = paste0(
+  "System environment for AWS, etc.\n",
+  "------------------\n",
+  "AWS_ACCESS_KEY_ID:", Sys.getenv("AWS_ACCESS_KEY_ID"), "\n",
+  "AWS_SESSION_TOKEN:", Sys.getenv("AWS_SESSION_TOKEN"), "\n",
+  "AWS_ROLE_ARN:", Sys.getenv("AWS_ROLE_ARN"), "\n",
+  "AWS_DEFAULT_REGION:", Sys.getenv("AWS_DEFAULT_REGION"), "\n",
+  "AWS_REGION:", Sys.getenv("AWS_REGION"), "\n",
+  "AWS_WEB_IDENTITY_TOKEN_FILE:", Sys.getenv("AWS_WEB_IDENTITY_TOKEN_FILE"), "\n",
+  "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI:", Sys.getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"), "\n",
+  "AWS_CONTAINER_CREDENTIALS_FULL_URI:", Sys.getenv("AWS_CONTAINER_CREDENTIALS_FULL_URI"), "\n",
+  "AWS_PROFILE:", Sys.getenv("AWS_PROFILE"), "\n\n",
+  "# STSサービスクライアントを作成\n",
+  "sts <- paws::sts(config = list(region = 'ap-northeast-1'))\n",
+  "auth_info <- tryCatch({\n",
+  "# GetCallerIdentityを実行\n",
+  "identity <- sts$get_caller_identity()\n",
+  "info_text <- paste0(...略...)\n",
+  "return(info_text)\n",
+  "}, error = function(e) {\n",
+  "return(paste0('認証エラー: AWSに接続できませんでした。\n詳細: ', e$message))\n",
+"})\n\n",
+"========= 実行結果 ========="
+)
+
+# STSサービスクライアントを作成
+sts <- paws::sts(config = list(region = "ap-northeast-1"))
+
+auth_info <- tryCatch({
+  # GetCallerIdentityを実行
+  identity <- sts$get_caller_identity()
+
+  # 文字列を結合して返す (catではなくpasteやsprintfを使う)
+  info_text <- paste0(
+    "--- AWS Identity Info ---\n",
+    "Account: ", identity$Account, "\n",
+    "Arn:     ", identity$Arn, "\n",
+    "UserId:  ", identity$UserId, "\n"
+  )
+
+  return(info_text)
+
+}, error = function(e) {
+  # エラー時も文字列として返す
+  return(paste0("認証エラー: AWSに接続できませんでした。\n詳細: ", e$message))
+})
+
+Identity_text_1 = paste0(Identity_text_1, "\n", auth_info)
+
 # ログ保存用変数の初期化
 EXCLUDED_TEXT_1 = ""
 
@@ -289,6 +339,80 @@ ID_exclude <- tryCatch({
 
 # 結果確認
 EXCLUDED_TEXT_2 = (paste("除外リスト:", withdrawn_file, ", 件数:", length(ID_exclude)))
+
+capture_s3_get_probe <- function(bucket, key, region = "ap-northeast-1") {
+  tmp <- tempfile(fileext = ".txt")
+
+  txt_lines <- capture.output({
+    cat("=== S3 GetObject probe (aws.s3::save_object) ===\n")
+    cat("time_utc: ", format(Sys.time(), tz = "UTC"), "\n", sep = "")
+    cat("bucket  : ", bucket, "\n", sep = "")
+    cat("key     : ", key, "\n", sep = "")
+    cat("region  : ", region, "\n", sep = "")
+    cat("tmpfile : ", tmp, "\n", sep = "")
+    cat("\n--- code ---\n")
+    cat('tmp <- tempfile(fileext = ".txt")\n')
+    cat('res_get <- tryCatch({\n')
+    cat('  aws.s3::save_object(object = key, bucket = bucket, file = tmp,\n')
+    cat('                      region = "ap-northeast-1", check_region = FALSE, overwrite = TRUE)\n')
+    cat('  paste("OK: GetObject/save_object allowed. downloaded to", tmp)\n')
+    cat('}, error = function(e) paste("NG: GetObject/save_object failed:", conditionMessage(e)))\n')
+    cat("\n--- output ---\n")
+
+    # 実行
+    res_get <- tryCatch({
+      aws.s3::save_object(
+        object = key, bucket = bucket, file = tmp,
+        region = region, check_region = FALSE, overwrite = TRUE
+      )
+      paste("OK: GetObject/save_object allowed. downloaded to", tmp)
+    }, error = function(e) {
+      paste("NG: GetObject/save_object failed:", conditionMessage(e))
+    })
+
+    # cat の部分（あなたがやったのと同じ）
+    cat(res_get, "\n")
+
+    # 追加：aws.s3 の aws_error オブジェクトも取れるように（tryCatchで“捕捉”）
+    cat("\n--- structured (tryCatch error object) ---\n")
+    err_obj <- tryCatch({
+      aws.s3::save_object(
+        object = key, bucket = bucket, file = tmp,
+        region = region, check_region = FALSE, overwrite = TRUE
+      )
+      NULL
+    }, error = function(e) e)
+
+    if (is.null(err_obj)) {
+      cat("No error object (success)\n")
+    } else {
+      # print結果をそのまま
+      print(err_obj)
+    }
+  })
+
+  # 1本の文字列にまとめて返す（監視用途向け）
+  paste(txt_lines, collapse = "\n")
+}
+
+# 使い方：
+log_text_S3_1 <- capture_s3_get_probe(bucket = bucket, key = key)
+
+log_text_S3_2 <- paste(
+  "aws.signature::locate_credentials()",
+  "---------------",
+  capture.output({
+  creds <- aws.signature::locate_credentials()
+
+  print(list(
+    key     = creds$key,
+    secret  = "********",
+    region  = creds$region,
+    file    = creds$file,
+    profile = creds$profile
+  ))
+}), collapse = "\n")
+
 
 # Rstan options
 rstan_options(auto_write = TRUE)

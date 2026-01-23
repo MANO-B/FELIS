@@ -305,7 +305,9 @@ ui <- dashboardPage(
     ")),
     tabItems(
       tabItem(tabName = "Setting",
-              h6(paste0(EXCLUDED_TEXT_1, ",", EXCLUDED_TEXT_2)),
+              h6("Amazon access check"),
+              verbatimTextOutput("log_text_output"),
+              hr(),
               fluidRow(
                 column(6,
                        fluidRow(box(

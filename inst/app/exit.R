@@ -38,71 +38,87 @@ shinyjs::runjs("
   });
 ")
 
-# ログアウトボタン
+# =========================================================
+# 1. ログアウトボタン（確認のみ行い、R側へ通知）
+# =========================================================
 observeEvent(input$logout_button, {
   message('[R] Logout button clicked')
 
+  # 確認ダイアログのみJSで表示
   shinyjs::runjs('
-    console.log("[JS] Logout button event");
-    if (confirm("Want to log out?")) {
+    if (confirm("ログアウトしますか？")) {
       console.log("[JS] Logout confirmed");
+      // R側の input$confirm_logout を true に設定してイベント発火
       Shiny.setInputValue("confirm_logout", true, {priority: "event"});
     }
   ')
 })
 
+# =========================================================
+# 2. 確認後の処理（do_logoutを呼び出し）
+# =========================================================
 observeEvent(input$confirm_logout, {
   message('[R] confirm_logout fired - calling do_logout()')
   do_logout(session, reason = 'explicit_button')
 })
 
-# ログアウト処理
+# =========================================================
+# 3. ログアウト実行関数（クリーンアップ ＋ 画面遷移）
+# =========================================================
 do_logout <- function(session, reason = 'unknown') {
   message('[R] ========== do_logout() called ==========')
   message('[R] Reason: ', reason)
 
   if (is.null(session) || isTRUE(session$userData$logged_out)) {
-    message('[R] Already logged out - returning')
     return(invisible(NULL))
   }
 
+  # フラグを立てる
   session$userData$logged_out <- TRUE
-  message('[R] logged_out set to TRUE')
 
-  # セッションが有効な場合のみJavaScriptを実行
-  if (reason != 'session_ended') {
-    tryCatch({
-      message('[R] Showing JavaScript alert')
-      shinyjs::runjs('
-      const logoutUrl = window.location.origin + "/@@/logout";
-      console.log("[JS] Sending logout request to:", logoutUrl);
+  # -------------------------------------------------------
+  # A. クリーンアップ処理 (メモリ解放)
+  # -------------------------------------------------------
+  # ※ onSessionEnded と重複しても問題ないよう tryCatch で囲むか、
+  #    共通関数化するとより良いですが、ここでは直接実行します。
+  message('[R] Performing explicit cleanup before redirect...')
 
-      fetch(logoutUrl, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ reason: "logout" })
-      })
-        .then(resp => {
-          console.log("[JS] Logout request sent. Status:", resp.status);
-          alert("Session finished. Please close this tab. Logging out via " + logoutUrl);
-          setTimeout(() => window.close(), 1500);
-        })
-        .catch(err => {
-          console.error("[JS] Logout request failed:", err);
-          alert("Logout failed: " + err);
-        });
-    ')
-    }, error = function(e) {
-      message("[R] Could not run JavaScript (session may be closed): ", e$message)
-    })
+  large_objects <- c(
+    'Data_case_raw', 'Data_case', 'Data_drug_raw',
+    'Data_drug_raw_rename', 'Data_report_raw', 'Data_report',
+    'OUTPUT_DATA', 'Data_cluster_ID', 'tmp_post', 'analysis_env'
+  )
+
+  # グローバル環境の変数を削除
+  for (obj_name in large_objects) {
+    if (exists(obj_name, envir = .GlobalEnv)) {
+      rm(list = obj_name, envir = .GlobalEnv)
+    }
   }
 
-  later::later(function() {
-    message('[R] Closing session - Reason: ', reason)
-    try(session$close(), silent = TRUE)
-    if (interactive()) stopApp()
-  }, delay = 1)
+  # ガベージコレクション
+  gc()
+
+  # -------------------------------------------------------
+  # B. 画面遷移 (リダイレクト)
+  # -------------------------------------------------------
+  # 条件判定（サーバー環境かつCCATフラグがTRUEの場合のみ遷移など）
+  do_redirect <- isTRUE(ENV_ == "server" && isTRUE(CCAT_FLAG))
+
+  if (do_redirect) {
+    message('[R] Redirecting to logout URL...')
+    shinyjs::runjs('
+      const logoutUrl = window.location.origin + "/@@/logout";
+      console.log("[JS] Redirecting to:", logoutUrl);
+      // 同じタブで移動
+      window.location.href = logoutUrl;
+    ')
+  } else {
+    # 条件に合致しない場合（ローカル環境など）は、単にアプリを閉じる等の処理
+    message('[R] Not redirecting (Condition not met). Closing session.')
+    shinyjs::runjs('alert("ログアウトしました");')
+    session$close() # 遷移しない場合のみ明示的に閉じる
+  }
 
   message('[R] ========== do_logout() finished ==========')
 }
