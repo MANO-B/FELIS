@@ -1127,7 +1127,7 @@ output$figure_survival_CGP_1 = renderPlot({
           out_path <- file.path(tempdir(), "check_IPCW.pdf")
           ggsave(
             filename = out_path,
-            plot = p_hist_censor,
+            plot = p_love_censor,
             width = 7,
             height = min(nrow(bal_censor$Balance) / 9 + 2, 40)
           )
@@ -1318,7 +1318,7 @@ output$figure_survival_CGP_1 = renderPlot({
       out_path <- file.path(tempdir(), "love_plot_PSM.pdf")
       ggsave(
         filename = out_path,
-        plot = p,
+        plot = p_love,
         width = 7,
         height = min(nrow(bal$Balance) / 9 + 2, 40)
       )
@@ -1359,7 +1359,7 @@ output$figure_survival_CGP_1 = renderPlot({
       out_path <- file.path(tempdir(), "IPW_weight.pdf")
       ggsave(
         filename = out_path,
-        plot = p,
+        plot = p_hist_iptw,
         width = 7,
         height = 6
       )
