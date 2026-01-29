@@ -3533,33 +3533,79 @@ output$figure_survival_CGP_7 <- render_gt({
       univ_tab <- QS_READ(nthreads = PARALLEL, file = params$file_uni)
     } else {
       run_univariate_model <- function(var, data, outcome_var) {
-        fml <- as.formula(paste(outcome_var, "~", paste("`", var, "`", sep = "")))
-        model <- glm(fml, data = data, family = binomial)
-        tbl_regression(model, exponentiate = TRUE, conf.int = FALSE) %>%
-          add_global_p() %>%
-          add_n(location = "level") %>%
-          add_nevent(location = "level") %>%
-          add_q() %>%
-          bold_p() %>%
-          apply_custom_format(columns = c("estimate", "p.value", "q.value")) %>%
-          bold_labels() %>%
-          tbl_butcher()
+        tryCatch({
+          fml <- as.formula(paste(outcome_var, "~", paste("`", var, "`", sep = "")))
+          model <- glm(fml, data = data, family = binomial)
+          tbl_regression(model, exponentiate = TRUE, conf.int = FALSE) %>%
+            add_global_p() %>%
+            add_n(location = "level") %>%
+            add_nevent(location = "level") %>%
+            add_q() %>%
+            bold_p() %>%
+            apply_custom_format(columns = c("estimate", "p.value", "q.value")) %>%
+            bold_labels() %>%
+            tbl_butcher()
+        }, error = function(e) {
+          return(NULL) # エラー時はNULLを返す
+        })
       }
 
       univ_vars <- setdiff(names(params$data_uni), params$outcome_var)
       num_cores <- min(1 + 3*DOCKER, PARALLEL)
-      if(DOCKER) {
-        univ_models_parallel <- parallel::mclapply(univ_vars, run_univariate_model,
-                                                   data = params$data_uni,
-                                                   outcome_var = params$outcome_var,
-                                                   mc.cores = num_cores)
-      } else {
-        univ_models_parallel <- lapply(univ_vars, run_univariate_model,
-                                       data = params$data_uni,
-                                       outcome_var = params$outcome_var)
+      # 結果格納用リスト
+      univ_models_list <- list()
+
+      # ---------------------------------------------------------
+      # 並列処理の実行トライ
+      # ---------------------------------------------------------
+      run_serial <- TRUE # デフォルトで直列実行フラグを立てておく
+
+      if(DOCKER && num_cores > 1) {
+        # 並列実行
+        univ_models_parallel <- tryCatch({
+          parallel::mclapply(univ_vars, run_univariate_model,
+                             data = params$data_uni,
+                             outcome_var = params$outcome_var,
+                             mc.cores = num_cores)
+        }, warning = function(w) {
+          # "core did not deliver a result" 警告が出たらここに来る
+          return(NULL)
+        }, error = function(e) {
+          return(NULL)
+        })
+
+        # 結果の検証: NULLが含まれている、またはリストの長さが足りない場合は失敗とみなす
+        # parallel::mclapplyは失敗した要素に "try-error" クラスを入れることがある
+        is_valid <- !is.null(univ_models_parallel) &&
+          length(univ_models_parallel) == length(univ_vars) &&
+          !any(sapply(univ_models_parallel, function(x) inherits(x, "try-error")))
+
+        if (is_valid) {
+          univ_models_list <- univ_models_parallel
+          run_serial <- FALSE # 並列成功したので直列はやらない
+        } else {
+          # 失敗時のログ（コンソールに出力）
+          message("Parallel processing failed (core crash or memory issue). Switching to serial processing.")
+        }
       }
-      names(univ_models_parallel) <- univ_vars
-      univ_tab <- tbl_stack(univ_models_parallel)
+
+      # ---------------------------------------------------------
+      # 直列処理 (Parallelがオフ または Parallelが失敗した場合に実行)
+      # ---------------------------------------------------------
+      if (run_serial) {
+        univ_models_list <- lapply(univ_vars, run_univariate_model,
+                                   data = params$data_uni,
+                                   outcome_var = params$outcome_var)
+      }
+
+      names(univ_models_list) <- univ_vars
+      univ_models_clean <- Filter(function(x) !is.null(x) && inherits(x, "gtsummary"), univ_models_list)
+
+      if (length(univ_models_clean) == 0) {
+        validate(need(FALSE, "No univariate models converged."))
+      }
+
+      univ_tab <- tbl_stack(univ_models_clean)
 
       if (input$intermediate_file != "No") {
         QS_SAVE(nthreads = PARALLEL, univ_tab, file = params$file_uni)

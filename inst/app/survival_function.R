@@ -1212,36 +1212,47 @@ rmst_diff_iptw_boot_ci <- function(data, time_var, status_var, group_var,
                                    n_boot = 2000, seed = 1) {
   set.seed(seed)
 
+  # 点推定（ここは元のまま正解）
   point <- rmst_diff_iptw_exact(data, time_var, status_var, group_var, weight_var, tau_days)
 
   boot_once <- function() {
     if (!is.null(pair_var) && pair_var %in% names(data)) {
+      # ペアがある場合（PSM）: ペア単位でリサンプリング
       pairs <- unique(data[[pair_var]])
       sp <- sample(pairs, length(pairs), replace = TRUE)
+      # ここはOK
       idx <- unlist(lapply(sp, function(p) which(data[[pair_var]] == p)))
       d_boot <- data[idx, , drop = FALSE]
     } else {
+      # --- 修正箇所: IPWの場合 ---
       w <- data[[weight_var]]
       ok <- is.finite(w) & w >= 0
       if (!any(ok)) return(NA_real_)
-      p <- w[ok] / sum(w[ok])
+
       idx_ok <- which(ok)
-      idx <- sample(idx_ok, size = length(idx_ok), replace = TRUE, prob = p)
+
+      # 【修正】prob = p を削除。単純な復元抽出にする。
+      # 重み付き解析なので、データは公平に選び、解析関数内で weights=w を効かせるのが正しい。
+      idx <- sample(idx_ok, size = length(idx_ok), replace = TRUE)
+
       d_boot <- data[idx, , drop = FALSE]
     }
 
+    # ここで weights=w が使われるので、抽出自体はランダムで良い
     rmst_diff_iptw_exact(d_boot, time_var, status_var, group_var, weight_var, tau_days)
   }
 
   boots <- replicate(n_boot, boot_once())
   boots <- boots[is.finite(boots)]
 
+  # 点推定値とCIのズレを確認するため、mean/medianも見ておくと良い
+  # print(summary(boots))
+
   ll <- unname(stats::quantile(boots, 0.025, na.rm = TRUE))
   ul <- unname(stats::quantile(boots, 0.975, na.rm = TRUE))
 
   list(point = point, ll = ll, ul = ul, boots = boots)
 }
-
 
 survival_compare_and_plot_CTx <- function(data,
                                           time_var1 = "time_pre",

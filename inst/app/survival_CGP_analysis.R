@@ -931,12 +931,24 @@ output$figure_survival_CGP_1 = renderPlot({
     )
     matching = NA
     if(!all(Data_survival$Group_0_1 == Data_survival$Group_0_1[1])){
-      matching = MatchIt::matchit(formula_PS,
-                                   data = Data_survival,
-                                   method = "nearest",
-                                   distance = "logit",
-                                  std.caliper = TRUE,
-                                  caliper = 0.2, replace = FALSE)
+      if("Cancers" %in% input$propensity_survival_CGP && input$propensity_survival_cancer_complete_match_CGP == "Yes"){
+        matching = MatchIt::matchit(formula_PS,
+                                    data = Data_survival,
+                                    method = "nearest",
+                                    exact = "Cancers",
+                                    distance = "logit",
+                                    std.caliper = TRUE,
+                                    caliper = 0.2, replace = FALSE)
+      } else {
+        matching = MatchIt::matchit(formula_PS,
+                                    data = Data_survival,
+                                    method = "nearest",
+                                    distance = "logit",
+                                    std.caliper = TRUE,
+                                    caliper = 0.2, replace = FALSE)
+      }
+
+
     }
     if(!is.na(matching)[[1]]){
       bal <- cobalt::bal.tab(matching, un = TRUE)
@@ -945,6 +957,28 @@ output$figure_survival_CGP_1 = renderPlot({
       max_smd <- max(abs(bal_df$Diff.Adj), na.rm=TRUE)
       subtitle_balance <- paste0("PSM balance: max |SMD| = ",
                                  format(max_smd, digits = 2, nsmall = 2))
+      # -------------------------------------------------------
+      # ★追加: PS分布のプロット (マッチング前後比較)
+      # -------------------------------------------------------
+      # cobalt::bal.plot を使うと、Unadjusted(前) と Adjusted(後) を自動で並べてくれます
+
+      p_ps_dist <- cobalt::bal.plot(
+        matching,
+        var.name = "distance", # 傾向スコア(logit)の分布を指定
+        which = "both",        # マッチング前(Unadjusted)と後(Adjusted)の両方を表示
+        type = "histogram",    # ヒストグラム
+        mirror = TRUE,         # 上下対象(Mirrored)にして見やすく
+        colors = c("#F8766D", "#00BFC4") # ggplot風の色
+      ) +
+        ggplot2::labs(
+          title = "Propensity Score Distribution (Before & After Matching)",
+          caption = "Unadjusted = Original / Adjusted = Matched"
+        ) +
+        ggplot2::theme(legend.position = "top")
+
+      # PDFとして保存
+      ggsave(file.path(tempdir(), "PS_distribution.pdf"), p_ps_dist, width = 8, height = 6)
+
       Data_matched <- MatchIt::match.data(matching)
       p <- cobalt::love.plot(
         bal,
@@ -991,42 +1025,274 @@ output$figure_survival_CGP_1 = renderPlot({
     # 2群が混在しているときだけ実行
     if (!all(Data_iptw$Group_0_1 == Data_iptw$Group_0_1[1])) {
 
+      # -------------------------------------------------------
       # 1) PS推定（ロジスティック回帰）
+      # -------------------------------------------------------
       fit_ps <- glm(formula_PS, data = Data_iptw, family = binomial())
-
       ps <- predict(fit_ps, type = "response")
 
-      # PSが0/1に張り付くと重みが発散するので最低限のクリップ（任意）
+      # PSクリッピング
       eps <- 1e-6
       ps <- pmin(pmax(ps, eps), 1 - eps)
 
-      # 2) IPTW（安定化重み：stabilized weights）
+      # -------------------------------------------------------
+      # 2) IPTW（治療重み）の計算
+      # -------------------------------------------------------
       trt <- Data_iptw$Group_0_1
       p_trt <- mean(trt == 1, na.rm = TRUE)
 
-      w <- ifelse(trt == 1, p_trt / ps, (1 - p_trt) / (1 - ps))
+      if(input$IPW_survival_CGP_ATE_ATT == "ATE"){
+        w_trt <- ifelse(trt == 1, p_trt / ps, (1 - p_trt) / (1 - ps)) # ATE
+      } else {
+        w_trt <- ifelse(trt == 1, 1, ps / (1 - ps)) # ATT
+      }
 
-      # 3) 外れ値（巨大重み）除外：input$IPW_threshold を上限として除外
-      #    例：threshold=10 なら w > 10 を落とす
+      # -------------------------------------------------------
+      # 3) 外れ値（巨大重み）除外：治療重みに基づいてトリミング
+      # -------------------------------------------------------
       thr <- suppressWarnings(as.numeric(input$IPW_threshold))
       if (is.na(thr) || thr <= 0) thr <- Inf
 
-      keep <- is.finite(w) & (w <= thr)
-      Data_iptw <- Data_iptw[keep, , drop = FALSE]
-      w <- w[keep]
+      keep <- is.finite(w_trt) & (w_trt <= thr)
 
-      # 重みを列として保持（後段の関数に渡す用）
-      Data_iptw$iptw <- w
+      # データをフィルタリング（行が減る）
+      Data_iptw <- Data_iptw[keep, , drop = FALSE]
+      w_trt <- w_trt[keep]
       Data_iptw$.ps <- ps[keep]
 
-      # 4) バランス評価（cobalt）
-      # MatchItオブジェクト無しでも、処置/共変量/重み を渡せば bal.tab できます
-      covs <- Data_iptw %>% select(input$IPW_survival_CGP)
+      # -------------------------------------------------------
+      # ★追加・修正: IPCWを実行するかどうかの分岐
+      # -------------------------------------------------------
+
+      # デフォルトは「打ち切り重み = 1」（補正なし）
+      w_censor <- rep(1, nrow(Data_iptw))
+      ipcw_status_text <- "" # タイトルに表示する用
+
+      # UIで "Yes" が選択されている場合のみ計算を実行
+      if (!is.null(input$IPCW_survival_CGP) && input$IPCW_survival_CGP == "Yes") {
+
+        # A. 打ち切りステータスの作成 (1=打ち切り, 0=イベント発生or観察終了)
+        Data_iptw$status_for_ipc <- 1 - Data_iptw$censor
+
+        # B. 打ち切りモデルの構築 (Cox比例ハザード)
+        # ※共変量はIPWと同じものを使用
+        formula_censor <- formula(
+          paste0("Surv(time_enroll_final, status_for_ipc) ~ Group_0_1 +",
+                 paste(input$IPW_survival_CGP, collapse = "+"))
+        )
+
+        # 計算エラー回避（万が一モデルが収束しない場合など）
+        tryCatch({
+          fit_censor <- survival::coxph(formula_censor, data = Data_iptw)
+
+          # C. 「打ち切られない確率」の推定 (累積ハザードから換算)
+          chaz_censor <- predict(fit_censor, type = "expected")
+          prob_uncensored <- exp(-chaz_censor)
+
+          # D. 逆確率重み
+          w_censor_calc <- 1 / prob_uncensored
+
+          # クリッピング（上限10）
+          w_censor <- pmin(w_censor_calc, as.numeric(input$IPW_threshold))
+
+          # -------------------------------------------------------
+          # ★追加: IPCWの適切性評価 (Diagnostics)
+          # -------------------------------------------------------
+
+          # (1) 打ち切りバランステスト (Censoring Balance)
+          # 目的: 「打ち切られた群」と「残った群」の背景差が重みで補正されたか確認
+          # treat引数に「打ち切りステータス(status_for_ipc)」を渡します
+
+          covs_censor <- Data_iptw %>% dplyr::select(all_of(input$IPW_survival_CGP))
+
+          bal_censor <- cobalt::bal.tab(
+            x = covs_censor,
+            treat = Data_iptw$status_for_ipc, # 1=Censored, 0=Event/End
+            weights = w_censor,               # IPCW重み
+            method = "weighting",
+            un = TRUE
+          )
+
+          # Love Plot (Censoring)
+          p_love_censor <- cobalt::love.plot(
+            bal_censor,
+            stats = "mean.diffs",
+            abs = TRUE,
+            thresholds = c(m = .1),
+            var.order = "unadjusted",
+            drop.distance = TRUE,
+            title = "Covariate Balance for Censoring (IPCW)"
+          ) +
+            ggplot2::labs(subtitle = "Comparing 'Censored' vs 'Not Censored'")
+          out_path <- file.path(tempdir(), "check_IPCW.pdf")
+          ggsave(
+            filename = out_path,
+            plot = p_hist_censor,
+            width = 7,
+            height = min(nrow(bal_censor$Balance) / 9 + 2, 40)
+          )
+
+
+          # (2) 重みの分布確認 (Weight Histogram)
+          # 目的: 極端な重みがないか、平均が1付近かを確認
+          df_weights <- data.frame(w = w_censor)
+          p_hist_censor <- ggplot2::ggplot(df_weights, aes(x = w)) +
+            ggplot2::geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+            ggplot2::theme_bw() +
+            ggplot2::labs(
+              title = "Distribution of Censoring Weights (IPCW)",
+              subtitle = paste0("Mean: ", round(mean(w_censor), 3),
+                                ", Max: ", round(max(w_censor), 3),
+                                " (Capped at 10)"),
+              x = "Inverse Probability of Censoring Weight",
+              y = "Count"
+            )
+          out_path <- file.path(tempdir(), "IPCW_weight.pdf")
+          ggsave(
+            filename = out_path,
+            plot = p_hist_censor,
+            width = 7,
+            height = 6
+          )
+
+          ipcw_status_text <- "+ IPCW"
+
+        }, error = function(e) {
+          showNotification("IPCW calculation failed. Using standard IPW only.", type = "warning")
+        })
+      }
+
+      # -------------------------------------------------------
+      # 4) 最終的な重みの合成
+      # -------------------------------------------------------
+      # Noの場合: w_trt * 1 = w_trt
+      # Yesの場合: w_trt * w_censor
+      Data_iptw$iptw_final <- w_trt * w_censor
+
+      # -------------------------------------------------------
+      # ★追加: 重みの正規化 (Normalization)
+      # -------------------------------------------------------
+      # 目的: No at risk が仮想人数で膨れ上がるのを防ぎ、実人数レベルに戻す
+
+      sum_w <- sum(Data_iptw$iptw_final)
+      n_obs <- nrow(Data_iptw)
+
+      # 正規化された重み = 元の重み * (実人数 / 重みの総和)
+      Data_iptw$iptw_final_norm <- Data_iptw$iptw_final * (n_obs / sum_w)
+
+      # バランス評価用（常に治療重みのみ）
+      Data_iptw$w_trt_only <- w_trt
+
+      # -------------------------------------------------------
+      # ★追加 1: 傾向スコアの分布プロット (Mirrored Histogram)
+      # -------------------------------------------------------
+      # 目的: 2群の重なり (Overlap) を視覚的に確認する
+      # ps: 傾向スコア, Group_0_1: 0 or 1
+      # -------------------------------------------------------
+      # -------------------------------------------------------
+      # ★追加 2: E-value の算出
+      # -------------------------------------------------------
+
+      # 関数: CoxモデルからE-valueを計算して表示用テキストを返す
+      calc_evalue_from_cox <- function(model, label) {
+        # 1. モデルから要約統計量を取得
+        summ <- summary(model)
+
+        # Group変数の行を特定（行名に "Group" を含むものを探す）
+        target_rows <- grep("Group", rownames(summ$conf.int), value = TRUE)
+        if (length(target_rows) == 0) {
+          target_row_name <- rownames(summ$conf.int)[1] # 見つからなければ1行目
+        } else {
+          target_row_name <- target_rows[1] # 見つかればその先頭
+        }
+
+        # 2. 値の抽出（属性を完全に削除して純粋な数値にする）
+        # as.numeric() で属性を剥がし、[1] で確実に1つの値にします
+        hr_val      <- as.numeric(summ$conf.int[target_row_name, "exp(coef)"])[1]
+        ci_low_val  <- as.numeric(summ$conf.int[target_row_name, "lower .95"])[1]
+        ci_high_val <- as.numeric(summ$conf.int[target_row_name, "upper .95"])[1]
+
+        # 3. E-value計算用の内部関数
+        # 公式: E = HR + sqrt(HR * (HR - 1))
+        # ※ HR < 1 の場合は、逆数 (1/HR) をとってから計算するのがルールです
+        calc_formula <- function(val) {
+          if (is.na(val) || !is.finite(val)) return(NA)
+          if (val < 1) val <- 1 / val
+          return(val + sqrt(val * (val - 1)))
+        }
+
+        # 4. 計算実行
+        # 点推定値のE-value
+        e_point <- round(calc_formula(hr_val), 2)
+
+        # 信頼区間限界のE-value (より1に近い側の限界値を使います)
+        # HR < 1 (予防的) なら、信頼区間の上限 (ci_high) が 1 に近い側
+        # HR > 1 (有害)   なら、信頼区間の下限 (ci_low)  が 1 に近い側
+        if (hr_val < 1) {
+          e_ci <- round(calc_formula(ci_high_val), 2)
+          # 信頼区間が1をまたいでいる（有意でない）場合、E-valueは定義上 1 になります
+          if (ci_high_val >= 1) e_ci <- 1
+        } else {
+          e_ci <- round(calc_formula(ci_low_val), 2)
+          if (ci_low_val <= 1) e_ci <- 1
+        }
+
+        # 5. 結果をリストで返す
+        list(
+          text = paste0(label, " HR: ", round(hr_val, 2),
+                        " (", round(ci_low_val, 2), "-", round(ci_high_val, 2), ")\n",
+                        "E-value: Point = ", e_point, ", CI Limit = ", e_ci),
+          # 以前のコードとの互換性のため val も返しますが、中身は単純な行列にします
+          val = matrix(c(e_point, e_ci), ncol = 2, dimnames = list(NULL, c("point", "lower")))
+        )
+      }
+
+      # IPWのみ (治療重みだけ)
+      fit_cox_ipw <- coxph(Surv(time_enroll_final, censor) ~ Group_0_1,
+                           data = Data_iptw, weights = w_trt, robust = TRUE)
+      ev_ipw <- calc_evalue_from_cox(fit_cox_ipw, "[Cox model]")
+
+      # プロット用データ作成
+      df_plot <- data.frame(
+        PS = Data_iptw$.ps,
+        Group = factor(Data_iptw$Group_0_1, labels = c("Group1", "Group2")),
+        Weight = Data_iptw$iptw_final_norm # 正規化済み重みを使用（分布確認用）
+      )
+
+      p_hist_ps <- ggplot(df_plot, aes(x = PS, fill = Group)) +
+        # 上向き (Group2)
+        geom_histogram(data = subset(df_plot, Group == "Group2"),
+                       aes(y = ..count..),
+                       binwidth = 0.05, color = "black", alpha = 0.7) +
+        # 下向き (Group1) - yをマイナスにする
+        geom_histogram(data = subset(df_plot, Group == "Group1"),
+                       aes(y = -..count..),
+                       binwidth = 0.05, color = "black", alpha = 0.7) +
+        scale_fill_manual(values = c("Group1" = "#F8766D", "Group2" = "#00BFC4")) +
+        geom_hline(yintercept = 0, color = "white") +
+        labs(
+          title = "Distribution of Propensity Scores (Mirrored Histogram)",
+          subtitle = paste0("Upper: Group2 / Lower: Group1\n", ev_ipw$text),
+          x = "Propensity Score",
+          y = "Count"
+        ) +
+        theme_minimal() +
+        theme(legend.position = "top")
+
+      # 保存 (UIで表示する場合は renderPlot 等に渡す)
+      ggsave(file.path(tempdir(), "PS_distribution.pdf"), p_hist_ps, width = 7, height = 5)
+
+
+      # -------------------------------------------------------
+      # 5) バランス評価（cobalt）
+      # ※ここにはIPCWの影響を入れないのが一般的（Baseline Balanceのため）
+      # -------------------------------------------------------
+      covs <- Data_iptw %>% dplyr::select(all_of(input$IPW_survival_CGP))
 
       bal <- cobalt::bal.tab(
         x = covs,
         treat = Data_iptw$Group_0_1,
-        weights = Data_iptw$iptw,
+        weights = Data_iptw$w_trt_only, # 治療重みのみ
         method = "weighting",
         estimand = "ATE",
         un = TRUE
@@ -1040,34 +1306,81 @@ output$figure_survival_CGP_1 = renderPlot({
         ", threshold(w) <= ", thr
       )
 
-      p <- cobalt::love.plot(
+      p_love <- cobalt::love.plot(
         bal,
         stats = "mean.diffs",
         abs = TRUE,
         thresholds = c(m = .1),
         var.order = "unadjusted",
-        drop.distance = TRUE
+        drop.distance = TRUE,
+        title = "Covariate Balance (Love Plot)"
       )
-
       out_path <- file.path(tempdir(), "love_plot_PSM.pdf")
       ggsave(
         filename = out_path,
         plot = p,
         width = 7,
-        height = min(nrow(bal$Balance) / 9 + 2, 45)
+        height = min(nrow(bal$Balance) / 9 + 2, 40)
       )
 
-      # 5) 生存解析（重み付き）
+      # -------------------------------------------------------
+      # ★追加: IPTW重みの分布プロット (Histogram)
+      # -------------------------------------------------------
+
+      # プロット用データフレーム作成
+      # w_trt はトリミング後のデータに対応している必要があります
+      df_w_trt <- data.frame(
+        Weight = w_trt,
+        Group = factor(Data_iptw$Group_0_1, labels = c("Group1", "Group2"))
+      )
+
+      # 統計量（最大値など）を字幕に入れると便利です
+      summary_txt <- paste0(
+        "Max Weight: ", round(max(w_trt), 2),
+        " / Mean Weight: ", round(mean(w_trt), 2),
+        "\n(Threshold applied: ", thr, ")"
+      )
+
+      p_hist_iptw <- ggplot2::ggplot(df_w_trt, ggplot2::aes(x = Weight, fill = Group)) +
+        ggplot2::geom_histogram(bins = 30, position = "identity", alpha = 0.6, color = "white") +
+        ggplot2::scale_fill_manual(values = c("Group1" = "#F8766D", "Group2" = "#00BFC4")) +
+        ggplot2::labs(
+          title = "Distribution of IPTW Weights",
+          subtitle = summary_txt,
+          x = "Weight",
+          y = "Count"
+        ) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(legend.position = "top")
+
+      # -------------------------------------------------------
+      # 保存処理
+      # -------------------------------------------------------
+      out_path <- file.path(tempdir(), "IPW_weight.pdf")
+      ggsave(
+        filename = out_path,
+        plot = p,
+        width = 7,
+        height = 6
+      )
+
+
+      # -------------------------------------------------------
+      # 6) 生存解析（合成重みを使用）
+      # -------------------------------------------------------
+      # タイトル作成
+      final_plot_title <- paste0("IPW ", ipcw_status_text, " weighted survival, ", subtitle_balance)
+
       survival_compare_and_plot_match(
         data = Data_iptw,
         time_var = "time_enroll_final",
         status_var = "censor",
         group_var = "Group",
         input_rmst_cgp = input$RMST_CGP,
-        plot_title = paste0("IPW-weighted survival, ", subtitle_balance),
+        plot_title = final_plot_title,
         n_boot = 2000,
         seed = 123,
-        weight_var = "iptw"
+        weight_var = "iptw_final_norm" # ★ここを正規化版に変更
       )
     } else {
       # CGPサバイバル解析実行
@@ -1094,13 +1407,85 @@ output$figure_survival_CGP_1 = renderPlot({
 })
 
 output$dl_love_plot_PSM <- downloadHandler(
-  filename = function(){
+  filename = function() {
     "love_plot_PSM.pdf"
   },
-  content = function(file){
+  content = function(file) {
+    # Check the existence of the source file in temp directory
     src <- file.path(tempdir(), "love_plot_PSM.pdf")
-    validate(need(!is.null(src) && file.exists(src),
-                  "PDF is not available yet. Please generate the plot first."))
+
+    if (!file.exists(src)) {
+      # Show a message to the user via notification instead of validate()
+      showNotification("PDF is not available yet. Please generate the plot first.", type = "error")
+      # Stop the download process quietly
+      return(NULL)
+    }
+
+    # Copy file to the download target
+    file.copy(src, file, overwrite = TRUE)
+  }
+)
+output$dl_weight_IPW <- downloadHandler(
+  filename = function() {
+    "IPW_weight.pdf"
+  },
+  content = function(file) {
+    src <- file.path(tempdir(), "IPW_weight.pdf")
+
+    # ファイルが存在するかチェック (IPCWが実行されていない場合は警告)
+    if (!file.exists(src)) {
+      showNotification("IPW weight distribution not available. Please analyse IPW first.", type = "error")
+      return(NULL)
+    }
+
+    file.copy(src, file, overwrite = TRUE)
+  }
+)
+output$dl_weight_IPCW <- downloadHandler(
+  filename = function() {
+    "IPCW_weight.pdf"
+  },
+  content = function(file) {
+    src <- file.path(tempdir(), "IPCW_weight.pdf")
+
+    # ファイルが存在するかチェック (IPCWが実行されていない場合は警告)
+    if (!file.exists(src)) {
+      showNotification("IPCW weight distribution not available. Please analyse IPCW first.", type = "error")
+      return(NULL)
+    }
+
+    file.copy(src, file, overwrite = TRUE)
+  }
+)
+output$dl_check_IPCW <- downloadHandler(
+  filename = function() {
+    "IPCW_diagnostics.pdf"
+  },
+  content = function(file) {
+    src <- file.path(tempdir(), "check_IPCW.pdf")
+
+    # ファイルが存在するかチェック (IPCWが実行されていない場合は警告)
+    if (!file.exists(src)) {
+      showNotification("IPCW diagnostics not available. Please enable IPCW first.", type = "error")
+      return(NULL)
+    }
+
+    file.copy(src, file, overwrite = TRUE)
+  }
+)
+output$dl_PS_distribution <- downloadHandler(
+  filename = function() {
+    "PS_distribution.pdf"
+  },
+  content = function(file) {
+    src <- file.path(tempdir(), "PS_distribution.pdf")
+
+    # ファイルが存在するかチェック (IPCWが実行されていない場合は警告)
+    if (!file.exists(src)) {
+      showNotification("PS distribution not available. Please enable IPCW first.", type = "error")
+      return(NULL)
+    }
+
     file.copy(src, file, overwrite = TRUE)
   }
 )

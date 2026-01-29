@@ -108,7 +108,7 @@ do_logout <- function(session, reason = 'unknown') {
   if (do_redirect) {
     message('[R] Redirecting to logout URL...')
     shinyjs::runjs('
-      const logoutUrl = window.location.origin + "/logout";
+      const logoutUrl = window.location.origin + "/@@/logout";
       console.log("[JS] Redirecting to:", logoutUrl);
       // 同じタブで移動
       window.location.href = logoutUrl;

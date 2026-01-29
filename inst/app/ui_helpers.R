@@ -938,6 +938,30 @@ output$select_propensity_survival_CGP = renderUI({
     selected = NULL,
     multiple = TRUE)
 })
+
+output$select_IPW_survival_CGP_ATE_ATT = renderUI({
+  radioButtons(
+    inputId = "IPW_survival_CGP_ATE_ATT",
+    label = "IPW for average treatment effect (group 2 as treated)",
+    choices = c("ATE", "ATT"),
+    selected = "ATT")
+})
+output$select_IPCW_survival_CGP = renderUI({
+  radioButtons(
+    inputId = "IPCW_survival_CGP",
+    label = "IPCW for informative truncation",
+    choices = c("Yes", "No"),
+    selected = "No")
+})
+
+output$select_propensity_survival_cancer_complete_match_CGP = renderUI({
+  radioButtons(
+    inputId = "propensity_survival_cancer_complete_match_CGP",
+    label = "Complete matching for diagnosis",
+    choices = c("Yes", "No"),
+    selected = "No")
+})
+
 output$select_IPW_survival_CGP = renderUI({
   pickerInput(
     inputId = "IPW_survival_CGP",

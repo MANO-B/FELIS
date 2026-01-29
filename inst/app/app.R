@@ -79,6 +79,7 @@ server <- function(input, output, session) {
   analysis_env <- NULL
 
   OUTPUT_DATA = reactiveValues()
+  source_app("initialize_each_run.R")
   source_app("case_load.R")
   source_app("drug_load.R")
   source_app("report_load.R")

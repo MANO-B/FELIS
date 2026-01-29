@@ -222,7 +222,19 @@ Data_case_raw_pre =  reactive({
       dplyr::arrange(症例.EP後レジメン情報.投与開始日) %>%
       dplyr::distinct(C.CAT調査結果.基本項目.ハッシュID,.keep_all = T)
     colnames(EP_treat_data) = c("C.CAT調査結果.基本項目.ハッシュID", "EP_treat_date")
-
+    # Define column names
+    id_col     <- "C.CAT調査結果.基本項目.ハッシュID"
+    reason_col <- "症例.EP後レジメン情報.提示された治療薬を投与しなかった理由.名称."
+    # Broadcast the first non-NA value to all rows within each group
+    clin_tmp[, (reason_col) := {
+      # Get the vector for the current group
+      x <- .SD[[reason_col]]
+      # Pick the first non-NA value
+      v <- x[!is.na(x)][1L]
+      # If v is NA (all values in group are NA), return x.
+      # Otherwise, return v (it will be recycled to all rows in the group).
+      if (is.na(v)) x else v
+    }, by = id_col, .SDcols = reason_col]
     clin_tmp = clin_tmp %>%
       left_join(EP_treat_data, by="C.CAT調査結果.基本項目.ハッシュID")
     clin_tmp = clin_tmp %>%
@@ -1068,9 +1080,8 @@ Data_case =  reactive({
 })
 
 output$log_text_output <- renderText({
-
-  # ここでテキストを結合する
-  log_text <- paste(EXCLUDED_TEXT_1, EXCLUDED_TEXT_2, Identity_text_1, log_text_S3_1, log_text_S3_2, sep = "\n\n")
-
-  return(log_text)
+  if(AMAZON_FLAG){
+    log_text <- paste(EXCLUDED_TEXT_1, EXCLUDED_TEXT_2, Identity_text_1, log_text_S3_1, log_text_S3_2, sep = "\n\n")
+    return(log_text)
+  }
 })

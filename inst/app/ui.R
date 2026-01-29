@@ -305,7 +305,6 @@ ui <- dashboardPage(
     ")),
     tabItems(
       tabItem(tabName = "Setting",
-              h6("Amazon access check"),
               verbatimTextOutput("log_text_output"),
               hr(),
               fluidRow(
@@ -986,9 +985,14 @@ ui <- dashboardPage(
                        h6("Propensity score matching"),
                        htmlOutputWithPopover(
                          "select_propensity_survival_CGP",
-                         "指定した因子で傾向スコアマッチングを行います",
+                         "指定した因子で傾向スコアマッチングを行います。Group2を治療群としたATT解析になります。",
                          "ロジットPSでのマッチ、caliper=0.2 * sd_logit,ペア単位の2000回のブートストラップでRMSTの差の信頼区間を推定"
                        ),
+                       htmlOutputWithPopover(
+                         "select_propensity_survival_cancer_complete_match_CGP",
+                         "マッチングで組織型は完全マッチにします",
+                         "CaseとControlで、組織型を1：1の完全マッチにします"
+                       )
                 ),
                 column(3,
                        h6("Inverse probability weighting"),
@@ -997,6 +1001,16 @@ ui <- dashboardPage(
                          "指定した因子でIPW重み付けを行います",
                          "重み付きKMのstep関数を厳密に積分してRMSTを算出。抽出確率をweightsに比例させて再標本化、2000回のブートストラップでRMSTの差の信頼区間を推定"
                        ),
+                       htmlOutputWithPopover(
+                         "select_IPW_survival_CGP_ATE_ATT",
+                         "IPW重み付けを、ATE用に行うか、group2のATTを求めるようにgroup1の分布をgroup2に近づけるかの設定",
+                         "重みはATE：p_trt / ps, (1 - p_trt) / (1 - ps)、ATT：1, ps / (1 - ps)、p_trtは全体のうちのgroup1の割合"
+                       ),
+                       htmlOutputWithPopover(
+                         "select_IPCW_survival_CGP",
+                         "IPCW重み付けをCox比例ハザードモデルに基づいて行うかの設定(推奨しません)",
+                         "IPCW重みはベースラインの因子で決定され、時間依存性はないとして処理します。重み>10は10にします"
+                       )
                 ),
                 column(3,
                        h6("Threshold for IPW"),
@@ -1009,6 +1023,10 @@ ui <- dashboardPage(
               ),
               br(),
               downloadButton("dl_love_plot_PSM", "Download love plot of PS-matching"),
+              downloadButton("dl_check_IPCW", "Download love plot of IPCW"),
+              downloadButton("dl_weight_IPW", "Download IPW weight distribution"),
+              downloadButton("dl_weight_IPCW", "Download IPCW weight distribution"),
+              downloadButton("dl_PS_distribution", "Download PS distribution"),
               hr(),
               h6("To reduce confounding between the two groups, we performed propensity score matching. The propensity score was estimated using a logistic regression model including prespecified clinically relevant covariates (CGP platform, sex, age, PS, histology, treatment lines before CGP, and the best treatment effect before CGP). Patients were matched 1:1 using nearest‐neighbor matching without replacement on the logit of the propensity score (MatchIt package, method = “nearest”, distance = “logit”). A caliper width of 0.2 on the logit scale was applied to restrict matches to comparable individuals. Matched sets were identified using the MatchIt subclass variable, and each subclass was treated as a matched pair for following analyses."),
               h6("Covariate balance before and after matching was evaluated using standardized mean differences (SMDs) with the cobalt package. Adequate balance was defined a priori as an absolute SMD < 0.1 for all covariates. Balance diagnostics were visualized using Love plots. The maximum absolute SMD after matching was additionally reported to provide a single summary measure of balance."),

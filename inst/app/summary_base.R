@@ -30,8 +30,8 @@ summary_base_logic <- function() {
           症例.背景情報.重複がん有無.異なる臓器..名称.,
           症例.背景情報.多発がん有無.同一臓器..名称.,
           症例.検体情報.パネル.名称.,
-          症例.EP後レジメン情報.EPの結果新たな治療薬の選択肢が提示された.名称.,
-          症例.EP後レジメン情報.提示された治療薬を投与した.名称.,
+          # 症例.EP後レジメン情報.EPの結果新たな治療薬の選択肢が提示された.名称.,
+          # 症例.EP後レジメン情報.提示された治療薬を投与した.名称.,
           症例.EP後レジメン情報.提示された治療薬を投与しなかった理由.名称.,
           症例.がん種情報.肺.EGFR.名称.,
           症例.がん種情報.肺.ALK融合.名称.,
@@ -59,6 +59,8 @@ summary_base_logic <- function() {
           Other_met,
           Not_brain_bone_liver_met,
           CTx_lines_before_CGP,
+          EP_treat,
+          EP_option,
           YoungOld)
       incProgress(1 / 8)
       if(!"BOWEL" %in% Data_summary$症例.基本情報.がん種.OncoTree.LEVEL1. &
@@ -223,14 +225,16 @@ summary_base_logic <- function() {
           YoungOld = case_when(
             YoungOld == "Younger" ~ paste0("Younger than ", input$mid_age + 1),
             TRUE ~ paste0(input$mid_age + 1, " and older")
-          ))
-
+          ),
+          EP_option = as.character(EP_option),
+          EP_treat = as.character(EP_treat)
+        )
       translation_map <- list(
         "Family cancer history" = c("あり" = "Yes", "なし" = "No", "不明" = "Unknown"),
         "Double cancer in a different organ" = c("あり" = "Yes", "なし" = "No", "不明" = "Unknown"),
         "Multiple tumor nodules in the organ" = c("あり" = "Yes", "なし" = "No", "不明" = "Unknown"),
-        "Treatment recommended by expert panel" = c("はい" = "Yes", "いいえ" = "No"),
-        "Indicated treatment administered" = c("投与した" = "Yes", "投与しなかった" = "No"),
+        "Treatment recommended by expert panel" = c("1" = "Yes", "0" = "No"),
+        "Indicated treatment administered" = c("1" = "Yes", "0" = "No"),
         "Any distant metastasis" = c("あり" = "Yes", "なし" = "No", "不明" = "Unknown"),
         "EGFR muts in lung" = c("陽性" = "Positive", "陰性" = "Negative", "不明or未検査" = "Unknown", "判定不能" = "Undetermined"),
         "ALK fusion in lung" = c("陽性" = "Positive", "陰性" = "Negative", "不明or未検査" = "Unknown", "判定不能" = "Undetermined"),
@@ -277,8 +281,8 @@ summary_base_logic <- function() {
         "症例.背景情報.重複がん有無.異なる臓器..名称." = "Double cancer in a different organ",
         "症例.背景情報.多発がん有無.同一臓器..名称." = "Multiple tumor nodules in the organ",
         "症例.検体情報.パネル.名称." = "Cancer gene panel",
-        "症例.EP後レジメン情報.EPの結果新たな治療薬の選択肢が提示された.名称." = "Treatment recommended by expert panel",
-        "症例.EP後レジメン情報.提示された治療薬を投与した.名称." = "Indicated treatment administered",
+        "EP_option" = "Treatment recommended by expert panel",
+        "EP_treat" = "Indicated treatment administered",
         "症例.EP後レジメン情報.提示された治療薬を投与しなかった理由.名称." = "Reason for no indicated CTx",
         "症例.がん種情報.登録時転移有無.名称." = "Any distant metastasis",
         "Lymph_met" = "Lymphatic metastasis",
@@ -321,7 +325,6 @@ summary_base_logic <- function() {
         Data_summary[is.na(get(col)), (col) := "Unknown"]
       }
       OUTPUT_DATA$table_summary_1_Data_summary = Data_summary
-      browser()
       incProgress(1 / 8)
     })
   })
