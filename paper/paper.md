@@ -31,13 +31,21 @@ Several analytical components implemented in `FELIS` are based on methods previo
 
 # Statement of need
 
-Large clinicogenomic resources have accelerated discovery by enabling standardized exploration of molecular and clinical features (e.g., cBioPortal [@cerami2012cbioportal; @gao2013cbioportal] and AACR Project GENIE [@genie2017]). However, C-CAT secondary-use data are typically analyzed in controlled environments under data use agreements, limiting the utility of hosted public portals. Moreover, clinically relevant real-world evidence (RWE) questions in CGP practice often require analysis features that are uncommon in general-purpose genomics portals—for example, survival modeling that accounts for delayed testing and left truncation, which can meaningfully bias CGP-based outcome analyses [@tamura2023lengthbias; @ikegami2023jjcoletter].
+Large clinicogenomic resources create unique opportunities for real-world evidence (RWE) generation. However, utilizing Japan’s national C-CAT secondary-use data presents specific challenges. These datasets are accessed in strictly controlled, offline environments under data use agreements, which prevents the use of cloud-based analysis tools. Furthermore, clinically relevant questions in comprehensive genomic profiling (CGP) practice often require addressing specific statistical biases, such as delayed testing and left truncation, which can meaningfully distort outcome analyses if ignored [@tamura2023lengthbias; @ikegami2023jjcoletter]. There is a lack of accessible tools that allow domain experts to perform these complex, bias-aware analyses within the required security constraints without extensive programming skills.
 `FELIS` addresses these gaps by offering:
 
 - **No-code cohort building** from de-identified, preprocessed tables derived from secondary-use C-CAT datasets.
 - **Bias-aware survival analysis** suitable for CGP settings with delayed entry/left truncation.
 - **Clinically oriented outputs** (tables and figures) designed for downstream reporting and manuscript preparation.
 - **Privacy-preserving deployment** on a local workstation or institutional server (including offline/containerized setups), so sensitive data remain within the user’s controlled environment.
+
+# State of the Field
+The domain of cancer genomics visualization is currently supported by robust, publicly hosted platforms such as cBioPortal [@cerami2012cbioportal; @gao2013cbioportal] and AACR Project GENIE [@genie2017]. These tools have established the standard for exploring large-scale, open-access genomic datasets. However, they are often ill-suited for secondary-use clinical datasets governed by strict governance and privacy controls, like those from C-CAT, which typically prohibit data upload to external hosted services.
+
+While general-purpose R/Bioconductor packages offer the statistical flexibility required for such analyses, they present a steep learning curve for clinicians and translational researchers lacking programming expertise. Furthermore, standard genomic analysis pipelines often overlook specific biases inherent to real-world evidence (RWE), such as left truncation and delayed entry, which require specialized statistical handling not typically found in off-the-shelf genomic visualization tools.
+
+`FELIS` addresses this specific niche by bridging the gap between inflexible hosted portals and code-heavy statistical packages. A "build" approach was chosen over contributing to existing platforms to satisfy two critical constraints: (1) the need for a lightweight, locally deployable architecture compatible with offline secure environments, and (2) the integration of bias-aware survival analysis methods into a no-code interface. By operationalizing these specific methodological and governance requirements, FELIS provides a unique scholarly contribution that enables reproducible RWE generation in restricted clinical environments.
+
 
 # Software Design
 
