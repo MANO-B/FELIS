@@ -1078,10 +1078,3 @@ Data_case =  reactive({
   clin_tmp$year = as.POSIXlt(as.Date(clin_tmp$症例.管理情報.登録日))$year + 1900
   return(clin_tmp)
 })
-
-output$log_text_output <- renderText({
-  if(AMAZON_FLAG){
-    log_text <- paste(EXCLUDED_TEXT_1, EXCLUDED_TEXT_2, Identity_text_1, log_text_S3_1, log_text_S3_2, sep = "\n\n")
-    return(log_text)
-  }
-})

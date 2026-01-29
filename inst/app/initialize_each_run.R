@@ -14,73 +14,175 @@ paths <- file.path(tempdir(), files_to_remove)
 file.remove(paths[file.exists(paths)])
 
 if(Sys.getenv("SHINY_SERVER_VERSION") != ""){
-  if(file.exists(file.path(tempdir(), "Data_mutation_cord.qs"))){
-    file.remove(file.path(tempdir(), "Data_mutation_cord.qs"))
-  }
-  if(file.exists(file.path(tempdir(), "clinical_data.qs"))){
-    file.remove(file.path(tempdir(), "clinical_data.qs"))
-  }
-  if(file.exists(file.path(tempdir(), "variant_data.qs"))){
-    file.remove(file.path(tempdir(), "variant_data.qs"))
-  }
-  if(file.exists(file.path(tempdir(), "drug_data.qs"))){
-    file.remove(file.path(tempdir(), "drug_data.qs"))
-  }
+  files_to_remove <- c(
+    "clinical_data.qs", "variant_data.qs", "drug_data.qs")
+  file.remove(paths[file.exists(paths)])
 }
 
+
+# ==============================================================================
+# AWS ECS Credential Retrieval and S3 Download Script
+# ==============================================================================
+
+bucket <- "3e040086-data-production-felisanalysisportal"
+key    <- "ic_withdrawn_list.txt"
+connect_timeout_sec = 5
+total_timeout_sec = 10
+AMAZON_FLAG <- file.exists("/srv/shiny-server/felis-ccat/AMAZON")
+# AMAZON_FLAG <- TRUE # for debugging
+
 if(AMAZON_FLAG){
-  # 結果を見やすく出力
-  Identity_text_1 = paste0(
-    "System environment for AWS, etc.\n",
-    "------------------\n",
-    "AWS_ACCESS_KEY_ID:", Sys.getenv("AWS_ACCESS_KEY_ID"), "\n",
-    "AWS_SESSION_TOKEN:", Sys.getenv("AWS_SESSION_TOKEN"), "\n",
-    "AWS_ROLE_ARN:", Sys.getenv("AWS_ROLE_ARN"), "\n",
-    "AWS_DEFAULT_REGION:", Sys.getenv("AWS_DEFAULT_REGION"), "\n",
-    "AWS_REGION:", Sys.getenv("AWS_REGION"), "\n",
-    "AWS_WEB_IDENTITY_TOKEN_FILE:", Sys.getenv("AWS_WEB_IDENTITY_TOKEN_FILE"), "\n",
-    "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI:", Sys.getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"), "\n",
-    "AWS_CONTAINER_CREDENTIALS_FULL_URI:", Sys.getenv("AWS_CONTAINER_CREDENTIALS_FULL_URI"), "\n",
-    "AWS_PROFILE:", Sys.getenv("AWS_PROFILE"), "\n\n",
-    "# STSサービスクライアントを作成\n",
-    "sts <- paws::sts(config = list(region = 'ap-northeast-1'))\n",
-    "auth_info <- tryCatch({\n",
-    "# GetCallerIdentityを実行\n",
-    "identity <- sts$get_caller_identity()\n",
-    "info_text <- paste0(...略...)\n",
-    "return(info_text)\n",
-    "}, error = function(e) {\n",
-    "return(paste0('認証エラー: AWSに接続できませんでした。\n詳細: ', e$message))\n",
-    "})\n\n",
-    "========= 実行結果 ========="
+  library(jsonlite)
+  library(httr)
+  library(aws.s3)
+  library(readr)
+  library(stringr)
+
+  # ----------------------------------------------------------------------------
+  # 1. Fetch Credentials from ECS Task Metadata Endpoint
+  # ----------------------------------------------------------------------------
+
+  # Get the relative URI from the environment variable
+  ecs_creds_uri <- Sys.getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI")
+  Identity_text_1 <- "【Log: Credential Retrieval】"
+
+  # Check if the URI is defined (Fallbacks for local testing if needed)
+  if (ecs_creds_uri == "") {
+    # If empty, we can't fetch credentials. Log this state.
+    # Note: In a real ECS environment, this should not be empty.
+    Identity_text_1 <- paste0(Identity_text_1, "\nAWS_CONTAINER_CREDENTIALS_RELATIVE_URI is not defined.")
+  } else {
+    Identity_text_1 <- paste0(Identity_text_1, "\nAWS_CONTAINER_CREDENTIALS_RELATIVE_URI: http://169.254.170.2", ecs_creds_uri)
+  }
+
+  # Construct the full URL
+  # The IP 169.254.170.2 is static for ECS Task Metadata
+  credential_url <- paste0("http://169.254.170.2", ecs_creds_uri)
+
+  # Execute HTTP GET request with a timeout
+  response <- tryCatch({
+    httr::GET(credential_url, timeout(5))
+  }, error = function(e) {
+    return(NULL) # Return NULL on connection failure
+  })
+
+  # Initialize credential list
+  creds_list <- NULL
+
+  # Process the response
+  if (is.null(response)) {
+    Identity_text_1 <- paste0(Identity_text_1, "\nError: Failed to connect to credential endpoint (Connection Error).")
+  } else if (httr::status_code(response) != 200) {
+    Identity_text_1 <- paste0(Identity_text_1, "\nError: HTTP Status ", as.character(httr::status_code(response)))
+  } else {
+    Identity_text_1 <- paste0(Identity_text_1, "\nSuccess: Connected to credential endpoint. Status 200.")
+
+    # Parse JSON content
+    content_text <- httr::content(response, as = "text", encoding = "UTF-8")
+
+    creds_list <- tryCatch({
+      parsed <- jsonlite::fromJSON(content_text)
+
+      # Verify required keys exist
+      required_keys <- c("AccessKeyId", "SecretAccessKey", "Token")
+      if (!all(required_keys %in% names(parsed))) {
+        stop("JSON missing required credential keys.")
+      }
+
+      Identity_text_1 <<- paste0(Identity_text_1, "\nJSON validation: OK")
+      parsed
+    }, error = function(e) {
+      Identity_text_1 <<- paste0(Identity_text_1, "\nWarning: JSON parsing failed. Using dummy credentials.")
+      return(NULL)
+    })
+
+    if(!is.null(creds_list)) {
+      Identity_text_1 <- paste0(Identity_text_1, "\nExtracted Token Expiration: ", creds_list$Expiration)
+    }
+  }
+
+  # ----------------------------------------------------------------------------
+  # 2. Set Credentials to Variables (Handling Failures)
+  # ----------------------------------------------------------------------------
+
+  if(is.null(creds_list)){
+    # Fallback to dummy credentials if retrieval failed
+    # (Operations will fail, but the app won't crash immediately)
+    my_access_key    <- "DUMMY_ACCESS_KEY"
+    my_secret_key    <- "DUMMY_SECRET_KEY"
+    my_session_token <- "DUMMY_TOKEN"
+    my_expiration    <- "N/A"
+  } else {
+    my_access_key    <- creds_list$AccessKeyId
+    my_secret_key    <- creds_list$SecretAccessKey
+    my_session_token <- creds_list$Token
+    my_expiration    <- creds_list$Expiration
+  }
+
+  message("AccessKeyId retrieved: ", my_access_key)
+
+  # ============================================================================
+  # [IMPORTANT] Store keys in global variables for explicit passing
+  # ============================================================================
+  MY_AWS_ACCESS_KEY_ID     <- my_access_key
+  MY_AWS_SECRET_ACCESS_KEY <- my_secret_key
+  MY_AWS_SESSION_TOKEN     <- my_session_token
+  MY_AWS_REGION            <- "ap-northeast-1"
+
+  # Also set as environment variables for compatibility with other libs/logging
+  Sys.setenv("AWS_ACCESS_KEY_ID"     = MY_AWS_ACCESS_KEY_ID)
+  Sys.setenv("AWS_SECRET_ACCESS_KEY" = MY_AWS_SECRET_ACCESS_KEY)
+  Sys.setenv("AWS_SESSION_TOKEN"     = MY_AWS_SESSION_TOKEN)
+  Sys.setenv("AWS_DEFAULT_REGION"    = MY_AWS_REGION)
+  Sys.setenv("AWS_REGION"            = MY_AWS_REGION)
+
+  # ----------------------------------------------------------------------------
+  # 3. Log Environment Details
+  # ----------------------------------------------------------------------------
+
+  Identity_text_1 <- paste0(Identity_text_1, "\n\n",
+                            "System environment for AWS\n",
+                            "------------------\n",
+                            "AWS_ACCESS_KEY_ID: ", Sys.getenv("AWS_ACCESS_KEY_ID"), "\n",
+                            "AWS_SESSION_TOKEN: ", Sys.getenv("AWS_SESSION_TOKEN"), "\n", # Token is visible here
+                            "AWS_DEFAULT_REGION: ", Sys.getenv("AWS_DEFAULT_REGION"), "\n",
+                            "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: ", Sys.getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"), "\n\n",
+                            "========= STS Caller Identity Check =========\n"
   )
 
-  # STSサービスクライアントを作成
-  sts <- paws::sts(config = list(region = "ap-northeast-1"))
+  # Check identity using the explicitly retrieved credentials
+  paws_config <- list(
+    region = MY_AWS_REGION,
+    credentials = list(
+      creds = list(
+        access_key_id = MY_AWS_ACCESS_KEY_ID,
+        secret_access_key = MY_AWS_SECRET_ACCESS_KEY,
+        session_token = if(MY_AWS_SESSION_TOKEN != "") MY_AWS_SESSION_TOKEN else NULL
+      )
+    )
+  )
 
   auth_info <- tryCatch({
-    # GetCallerIdentityを実行
+    sts <- paws::sts(config = paws_config)
     identity <- sts$get_caller_identity()
 
-    # 文字列を結合して返す (catではなくpasteやsprintfを使う)
-    info_text <- paste0(
+    paste0(
       "--- AWS Identity Info ---\n",
       "Account: ", identity$Account, "\n",
       "Arn:     ", identity$Arn, "\n",
       "UserId:  ", identity$UserId, "\n"
     )
-
-    return(info_text)
-
   }, error = function(e) {
-    # エラー時も文字列として返す
-    return(paste0("認証エラー: AWSに接続できませんでした。\n詳細: ", e$message))
+    paste0("Authentication Error: Could not connect to AWS STS.\nDetail: ", e$message)
   })
 
-  Identity_text_1 = paste0(Identity_text_1, "\n", auth_info)
+  Identity_text_1 <- paste0(Identity_text_1, auth_info)
 
-  # ログ保存用変数の初期化
-  EXCLUDED_TEXT_1 = ""
+  # ----------------------------------------------------------------------------
+  # 4. Define Download Function with Explicit Credentials
+  # ----------------------------------------------------------------------------
+
+  EXCLUDED_TEXT_1 <- "" # Initialize log variable
 
   download_withdrawn_list_safe <- function(bucket, key,
                                            local_path = file.path(tempdir(), "ic_withdrawn_list.txt")) {
@@ -89,207 +191,195 @@ if(AMAZON_FLAG){
       file.remove(local_path)
     }
 
-    # ログバッファの準備
     log_buffer <- character(0)
-
-    # ログ記録用関数
     add_log <- function(...) {
       msg <- paste0("[", format(Sys.time(), "%H:%M:%S"), "] ", paste0(...))
       log_buffer <<- c(log_buffer, msg)
     }
 
-    add_log("=== S3ダウンロード開始 (東京リージョン固定) ===")
+    add_log("=== S3 Download Start (Explicit Credentials) ===")
     add_log("Target Bucket: ", bucket)
     add_log("Target Key:    ", key)
-    add_log("Target Region: ap-northeast-1")
+    add_log("Target Region: ", MY_AWS_REGION)
 
     success <- FALSE
-
-    connect_timeout_sec = 5
-    total_timeout_sec = 10
+    connect_timeout_sec <- 5
+    total_timeout_sec <- 10
 
     tryCatch({
-      # タイムアウト設定
       httr_opts <- list(
         httr::config(connecttimeout = connect_timeout_sec),
         httr::timeout(total_timeout_sec)
       )
 
-      # ダウンロード実行
+      # [CRITICAL] Passing credentials explicitly here
       aws.s3::save_object(
         object = key,
         bucket = bucket,
         file   = local_path,
-        region = "ap-northeast-1",
+        region = MY_AWS_REGION,
+        key    = MY_AWS_ACCESS_KEY_ID,      # Explicit
+        secret = MY_AWS_SECRET_ACCESS_KEY,  # Explicit
+        session_token = if(MY_AWS_SESSION_TOKEN != "") MY_AWS_SESSION_TOKEN else NULL, # Explicit
         check_region = FALSE,
         config = httr_opts,
         overwrite = TRUE
       )
 
       success <- TRUE
-      add_log("  -> ダウンロード成功！ (Success)")
+      add_log(" -> Download Success!")
 
       if (file.exists(local_path)) {
         f_size <- file.info(local_path)$size
-        add_log("  -> 保存先: ", local_path)
-        add_log("  -> サイズ: ", f_size, " bytes")
+        add_log(" -> Path: ", local_path)
+        add_log(" -> Size: ", f_size, " bytes")
       }
 
     }, error = function(e) {
       err_msg <- conditionMessage(e)
-      add_log("  -> 失敗 (Error): ", err_msg)
+      add_log(" -> Failed (Error): ", err_msg)
 
-      # --- 追加: 詳細なオブジェクト構造をログに取り込む ---
-      add_log("  -> [詳細エラーオブジェクト構造]")
-      # str(e) の出力を文字列ベクトルとしてキャプチャ
+      # Log detailed error structure
+      add_log(" -> [Error Details]")
       detailed_structure <- capture.output(str(e))
       for(line in detailed_structure) {
-        add_log("     ", line)
+        add_log("    ", line)
       }
-      # -----------------------------------------------
 
-      # エラー内容に応じたヒント
       if (grepl("403", err_msg)) {
-        add_log("     [ヒント] 403 Forbidden: 場所は合っていますが、アクセス権限がありません。")
-        add_log("     AWSアクセスキーまたはIAMロールの権限を確認してください。")
+        add_log("    [Hint] 403 Forbidden: Check IAM Role permissions.")
       } else if (grepl("404", err_msg)) {
-        add_log("     [ヒント] 404 Not Found: バケットまたはファイル名が間違っています。")
+        add_log("    [Hint] 404 Not Found: Check Bucket/Key name.")
       }
     })
 
-    add_log("=== 処理終了 ===")
-
-    # ログをグローバル変数に保存
+    add_log("=== Process End ===")
     EXCLUDED_TEXT_1 <<- paste(log_buffer, collapse = "\n")
 
-    # 失敗時は空ファイル作成
+    # Safe fallback: create empty file if failed
     if (!success && !file.exists(local_path)) {
       file.create(local_path)
-      add_log("  -> (安全策) 空ファイルを作成しました")
+      add_log(" -> Created empty file as fallback.")
     }
 
     return(local_path)
   }
 
-  # 実行
+  # ----------------------------------------------------------------------------
+  # 5. Execute Download and Read File
+  # ----------------------------------------------------------------------------
+
   withdrawn_file <- download_withdrawn_list_safe(bucket = bucket, key = key)
 
   ID_exclude <- tryCatch({
-    # ファイルサイズ0または存在しない場合は空文字を返す
     if (!file.exists(withdrawn_file) || is.na(file.info(withdrawn_file)$size) || file.info(withdrawn_file)$size == 0) {
       character(0)
     } else {
-      # エンコーディング判定
+      # Encoding detection
       Encode <- tryCatch(
         readr::guess_encoding(withdrawn_file, n_max = 1000)[[1]]$encoding,
         error = function(e) "UTF-8"
       )
-      # readr::guess_encoding は Shift_JIS を返すことがあるが、locale では CP932 推奨
       if (!is.null(Encode) && identical(Encode, "Shift_JIS")) Encode <- "CP932"
-      if (is.null(Encode)) Encode <- "UTF-8" # 念のため
+      if (is.null(Encode)) Encode <- "UTF-8"
 
-      # CSV読み込み (headerなし前提)
+      # Read CSV (assuming no header)
       df <- readr::read_csv(
         file = withdrawn_file,
-        col_names = "X1", # ヘッダーなしとして読み込み、列名をX1に固定
+        col_names = "X1",
         locale = readr::locale(encoding = Encode),
         progress = FALSE,
         show_col_types = FALSE
       )
 
-      # データフレームが空でないか確認してベクトル化
+      # Validation and Vectorization
       if(nrow(df) > 0){
         if(stringr::str_detect(df$X1[1], "xml version")){
           character(0)
-        } else if(nrow(df) > 1){
-          if(stringr::str_detect(df$X1[2], "<Error>")) character(0)
+        } else if(nrow(df) > 1 && stringr::str_detect(df$X1[2], "<Error>")){
+          character(0)
         } else {
           as.character(df$X1)
         }
-      }else character(0)
+      } else {
+        character(0)
+      }
     }
   }, error = function(e) {
-    # 読み込みエラー時は安全に空ベクトルを返す
     if(interactive()) message("Error reading csv: ", e$message)
     character(0)
   })
 
-  # 結果確認
-  EXCLUDED_TEXT_2 = (paste("除外リスト:", withdrawn_file, ", 件数:", length(ID_exclude)))
+  EXCLUDED_TEXT_2 <- paste("Withdrawn List:", withdrawn_file, ", Count:", length(ID_exclude))
+
+  # ----------------------------------------------------------------------------
+  # 6. Capture Probe Function (Debugging Tool)
+  # ----------------------------------------------------------------------------
+
+  # Define timeouts globally for the probe function
+  httr_opts_probe <- list(
+    httr::config(connecttimeout = 5),
+    httr::timeout(10)
+  )
 
   capture_s3_get_probe <- function(bucket, key, region = "ap-northeast-1") {
-    tmp <- tempfile(fileext = ".txt")
+    local_path_probe <- file.path(tempdir(), "ic_withdrawn_list_probe.txt")
 
     txt_lines <- capture.output({
-      cat("=== S3 GetObject probe (aws.s3::save_object) ===\n")
-      cat("time_utc: ", format(Sys.time(), tz = "UTC"), "\n", sep = "")
-      cat("bucket  : ", bucket, "\n", sep = "")
-      cat("key     : ", key, "\n", sep = "")
-      cat("region  : ", region, "\n", sep = "")
-      cat("tmpfile : ", tmp, "\n", sep = "")
-      cat("\n--- code ---\n")
-      cat('tmp <- tempfile(fileext = ".txt")\n')
-      cat('res_get <- tryCatch({\n')
-      cat('  aws.s3::save_object(object = key, bucket = bucket, file = tmp,\n')
-      cat('                      region = "ap-northeast-1", check_region = FALSE, overwrite = TRUE)\n')
-      cat('  paste("OK: GetObject/save_object allowed. downloaded to", tmp)\n')
-      cat('}, error = function(e) paste("NG: GetObject/save_object failed:", conditionMessage(e)))\n')
-      cat("\n--- output ---\n")
+      cat("=== S3 GetObject Probe (aws.s3::save_object) ===\n")
+      cat("Time (UTC) : ", format(Sys.time(), tz = "UTC"), "\n", sep = "")
+      cat("Bucket     : ", bucket, "\n", sep = "")
+      cat("Key        : ", key, "\n", sep = "")
+      cat("Region     : ", region, "\n", sep = "")
+      cat("Local Path : ", local_path_probe, "\n", sep = "")
+      cat("\n--- Execution Log ---\n")
 
-      # 実行
+      # Explicitly use global credential variables
       res_get <- tryCatch({
         aws.s3::save_object(
-          object = key, bucket = bucket, file = tmp,
-          region = region, check_region = FALSE, overwrite = TRUE
+          object = key,
+          bucket = bucket,
+          file = local_path_probe,
+          region = MY_AWS_REGION,
+          key = MY_AWS_ACCESS_KEY_ID,
+          secret = MY_AWS_SECRET_ACCESS_KEY,
+          session_token = if(MY_AWS_SESSION_TOKEN != "") MY_AWS_SESSION_TOKEN else NULL,
+          check_region = FALSE,
+          config = httr_opts_probe,
+          overwrite = TRUE
         )
-        paste("OK: GetObject/save_object allowed. downloaded to", tmp)
+        paste("OK: GetObject/save_object allowed. Downloaded to", local_path_probe)
       }, error = function(e) {
         paste("NG: GetObject/save_object failed:", conditionMessage(e))
       })
 
-      # cat の部分（あなたがやったのと同じ）
       cat(res_get, "\n")
-      cat("aws.s3::save_objectを実行するたびにHostIdが変化するらしい\n")
-
-      # 追加：aws.s3 の aws_error オブジェクトも取れるように（tryCatchで“捕捉”）
-      cat("\n--- structured (tryCatch error object) ---\n")
-      err_obj <- tryCatch({
-        aws.s3::save_object(
-          object = key, bucket = bucket, file = tmp,
-          region = region, check_region = FALSE, overwrite = TRUE
-        )
-        NULL
-      }, error = function(e) e)
-
-      if (is.null(err_obj)) {
-        cat("No error object (success)\n")
-      } else {
-        # print結果をそのまま
-        print(err_obj)
-      }
+      cat("---------------------\n")
     })
 
-    # 1本の文字列にまとめて返す（監視用途向け）
     paste(txt_lines, collapse = "\n")
   }
 
-  # 使い方：
+  # Execute Probe
   log_text_S3_1 <- capture_s3_get_probe(bucket = bucket, key = key)
 
-  log_text_S3_2 <- paste(
-    "aws.signature::locate_credentials()",
-    "---------------",
-    capture.output({
-      creds <- aws.signature::locate_credentials()
-
-      print(list(
-        key     = creds$key,
-        secret  = "********",
-        region  = creds$region,
-        file    = creds$file,
-        profile = creds$profile
-      ))
-    }), collapse = "\n")
 } else {
-  ID_exclude = character(0)
+  # When AMAZON_FLAG is FALSE
+  ID_exclude <- character(0)
+  # Define empty log variables to prevent renderText errors
+  EXCLUDED_TEXT_1 <- "AWS Flag is OFF"
+  EXCLUDED_TEXT_2 <- ""
+  Identity_text_1 <- ""
+  log_text_S3_1   <- ""
 }
+
+# ------------------------------------------------------------------------------
+# 7. Render Output
+# ------------------------------------------------------------------------------
+
+output$log_text_output <- renderText({
+  if(AMAZON_FLAG){
+    log_text <- paste(EXCLUDED_TEXT_1, EXCLUDED_TEXT_2, Identity_text_1, log_text_S3_1, sep = "\n\n")
+    return(log_text)
+  }
+})

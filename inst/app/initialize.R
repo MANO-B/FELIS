@@ -1,10 +1,8 @@
 SOFT_VERSION = "4.2.8"
 DATA_VERSION = "20251024"
-bucket <- "3e040086-data-production-felisanalysisportal"
-key    <- "ic_withdrawn_list.txt"
+
 app_dir <- Sys.getenv("FELIS_DATA_ROOT", unset = getOption("felis_data_root", tempdir()))
 CCAT_FLAG <- file.exists(file.path(app_dir, "ccat"))
-AMAZON_FLAG <- file.exists("/srv/shiny-server/felis-ccat/AMAZON")
 addResourcePath(prefix = "APP_DIR", directoryPath = APP_DIR)
 app_path <- function(...) {
   file.path(APP_DIR, ...)
