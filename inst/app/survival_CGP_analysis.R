@@ -968,7 +968,7 @@ output$figure_survival_CGP_1 = renderPlot({
         which = "both",        # マッチング前(Unadjusted)と後(Adjusted)の両方を表示
         type = "histogram",    # ヒストグラム
         mirror = TRUE,         # 上下対象(Mirrored)にして見やすく
-        colors = c("#F8766D", "#00BFC4") # ggplot風の色
+        colors = c("#00BFC4", "#F8766D") # ggplot風の色
       ) +
         ggplot2::labs(
           title = "Propensity Score Distribution (Before & After Matching)",
@@ -1268,7 +1268,7 @@ output$figure_survival_CGP_1 = renderPlot({
         geom_histogram(data = subset(df_plot, Group == "Group1"),
                        aes(y = -..count..),
                        binwidth = 0.05, color = "black", alpha = 0.7) +
-        scale_fill_manual(values = c("Group1" = "#F8766D", "Group2" = "#00BFC4")) +
+        scale_fill_manual(values = c("Group1" = "#00BFC4", "Group2" = "#F8766D")) +
         geom_hline(yintercept = 0, color = "white") +
         labs(
           title = "Distribution of Propensity Scores (Mirrored Histogram)",
@@ -1343,7 +1343,7 @@ output$figure_survival_CGP_1 = renderPlot({
 
       p_hist_iptw <- ggplot2::ggplot(df_w_trt, ggplot2::aes(x = Weight, fill = Group)) +
         ggplot2::geom_histogram(bins = 30, position = "identity", alpha = 0.6, color = "white") +
-        ggplot2::scale_fill_manual(values = c("Group1" = "#F8766D", "Group2" = "#00BFC4")) +
+        ggplot2::scale_fill_manual(values = c("Group1" ="#00BFC4", "Group2" = "#F8766D")) +
         ggplot2::labs(
           title = "Distribution of IPTW Weights",
           subtitle = summary_txt,
