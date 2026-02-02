@@ -305,7 +305,6 @@ ui <- dashboardPage(
     ")),
     tabItems(
       tabItem(tabName = "Setting",
-              verbatimTextOutput("log_text_output"),
               hr(),
               fluidRow(
                 column(6,
