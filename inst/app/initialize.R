@@ -1,4 +1,4 @@
-SOFT_VERSION = "4.2.8"
+SOFT_VERSION = "4.2.9"
 DATA_VERSION = "20251024"
 
 app_dir <- Sys.getenv("FELIS_DATA_ROOT", unset = getOption("felis_data_root", tempdir()))
