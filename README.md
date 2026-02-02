@@ -2,7 +2,7 @@
 
 FELIS (Flexible Exploration for LIquid and Solid tumor clinical sequencing data) for the C-CAT database.  
 [日本語の説明はこちら](README_JPN.md).  
-[日本語のスライドその1はこちら](https://www.felis-portal.com/slide/多地点合同メディカルカンファ20241010.pptx).  
+[日本語のスライドその1はこちら](https://www.felis-portal.com/slide/%E5%A4%9A%E5%9C%B0%E7%82%B9%E5%90%88%E5%90%8C%E3%83%A1%E3%83%86%E3%82%99%E3%82%A3%E3%82%AB%E3%83%AB%E3%82%AB%E3%83%B3%E3%83%95%E3%82%A120241010.pptx).  
 [日本語のスライドその2はこちら](https://www.felis-portal.com/slide/臨床疫学会2026_CGP到達予測.pptx).  
 [日本語のスライドその3はこちら](https://www.felis-portal.com/slide/整形外科学会基礎学術集会2025-2.pptx).  
 
