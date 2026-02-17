@@ -49,7 +49,7 @@ ui <- dashboardPage(
                hr()
       ),
       menuItem("Mutual exclusivity", tabName = "Mutualexclusivity", icon = icon("th")),
-      menuItem("Variat rate by histology", tabName = "Variationbyhistology", icon = icon("th")),
+      menuItem("Variant rate by histology", tabName = "Variantionbyhistology", icon = icon("th")),
       menuItem("Mutation and treatment option", icon = icon("th"),
                hr(),
                p("Mutation-based clustering"),
@@ -863,7 +863,7 @@ ui <- dashboardPage(
                         "Therefore, while an OR less than 1 suggests a negative association, it should not be solely relied upon to infer mutual exclusivity, especially when using models like the",
                         "negative binomial distribution. A comprehensive analysis considering the specific context and model assumptions is essential for accurate interpretation."))
       ),
-      tabItem(tabName = "Variationbyhistology",
+      tabItem(tabName = "Variantionbyhistology",
               h6("Figure. Recurrent oncogenic mutations across subtypes. The 30 genes with the highest frequency of oncogenic mutations were displayed."),
               hr(),
               girafeOutput('figure_mut_subtype_plot')
