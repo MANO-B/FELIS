@@ -126,7 +126,7 @@ server <- function(input, output, session) {
       withProgress(message = "Data processing...", {
         mutually_exclusive_logic()
       })
-    } else if (input$tabs == "Variationbyhistology" &&
+    } else if (input$tabs == "Variantbyhistology" &&
                is.null(OUTPUT_DATA$figure_mut_subtype_plot_Data_tmp)) {
       withProgress(message = "Data processing...", {
         mut_subtype_logic()
