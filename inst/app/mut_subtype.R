@@ -32,13 +32,18 @@ mut_subtype_logic <- function() {
                       症例.背景情報.重複がん有無.異なる臓器..名称.,
                       症例.背景情報.多発がん有無.同一臓器..名称.
         )
+      if(length(unique(Data_case_target$症例.基本情報.がん種.OncoTree.)) > 50){
+        Data_case_target$症例.基本情報.がん種.OncoTree. = Data_case_target$症例.基本情報.がん種.OncoTree.LEVEL1.
+        Data_case_target$症例.基本情報.がん種.OncoTree..名称. = Data_case_target$症例.基本情報.がん種.OncoTree.LEVEL1.
+      }
+
       Data_MAF = Data_report() %>%
         dplyr::filter(
           !str_detect(Hugo_Symbol, ",") &
             Hugo_Symbol != "" &
             Evidence_level %in% c("","A","B","C","D","E","F") &
             Variant_Classification != "expression"
-        ) %>% 
+        ) %>%
         dplyr::arrange(desc(Evidence_level)) %>%
         dplyr::distinct(Tumor_Sample_Barcode,
                         Hugo_Symbol,
@@ -47,7 +52,7 @@ mut_subtype_logic <- function() {
       if(length(Data_MAF[Data_MAF$TMB > 30,]$TMB) > 0){
         Data_MAF[Data_MAF$TMB > 30,]$TMB = 30
       }
-      
+
       Data_MAF_target = Data_MAF %>%
         dplyr::filter(Tumor_Sample_Barcode %in%
                         Data_case_target$C.CAT調査結果.基本項目.ハッシュID)
@@ -57,7 +62,7 @@ mut_subtype_logic <- function() {
       } else {
         Data_MAF_target = Data_MAF_target %>%
           dplyr::filter(!Hugo_Symbol %in% c("TMB", "MSI") | Evidence_level == "F")
-        
+
       }
       Data_MAF_target = Data_MAF_target  %>%
         dplyr::distinct(Tumor_Sample_Barcode,
@@ -74,7 +79,7 @@ mut_subtype_logic <- function() {
                                                   ncol=length(gene_to_analyze)))
       colnames(Summary_Gene_alteration) = gene_to_analyze
       rownames(Summary_Gene_alteration) = Diseases
-      
+
       for(i in Diseases){
         Data_tmp = Data_case_target %>%
           dplyr::filter(症例.基本情報.がん種.OncoTree. == i)
@@ -87,7 +92,7 @@ mut_subtype_logic <- function() {
                 Tumor_Sample_Barcode %in% Data_tmp))$Tumor_Sample_Barcode)) / patient_no * 100
         }
       }
-      
+
       Data_tmp = Summary_Gene_alteration
       Data_tmp$Disease = rownames(Data_tmp)
       if(dim(Data_tmp)[1]>0){
@@ -112,7 +117,7 @@ output$figure_mut_subtype_plot <- renderGirafe({
   ggiraph::girafe(ggobj = ggplot(OUTPUT_DATA$figure_mut_subtype_plot_Data_tmp,
                                  aes(as.factor(Gene), as.factor(Disease))) +
                     geom_tile_interactive(aes(fill = freq), color = "black",
-                                          linetype = 1) + 
+                                          linetype = 1) +
                     geom_text_interactive(aes(label = as.integer(freq)), size=3.2) +
                     scale_fill_gradient_interactive(low = "white", high = "red", limit=c(0,100), name="Frequency (%)") +
                     theme_classic() +
@@ -120,7 +125,7 @@ output$figure_mut_subtype_plot <- renderGirafe({
                     theme(legend.key.width = unit(0.4, "cm"),  # 凡例の色バーの幅を狭く
                           plot.title = element_text(size = 8, face = "bold"),         # タイトルのフォントサイズ
                           legend.title = element_text(size = 8),                      # 凡例タイトルのフォントサイズ
-                          legend.text = element_text(size = 8),                       
+                          legend.text = element_text(size = 8),
                           axis.text.x = element_text(face = "italic", angle = 45, hjust = 1, size=10),
                           axis.text.y = element_text(size=10),
                           axis.title.x = element_blank(),

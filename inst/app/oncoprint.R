@@ -11,6 +11,10 @@ oncoprint_logic <- function() {
           dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in%
                           Data_report()$Tumor_Sample_Barcode)
       }
+      if(length(unique(Data_case_target$症例.基本情報.がん種.OncoTree.)) > 50){
+        Data_case_target$症例.基本情報.がん種.OncoTree. = Data_case_target$症例.基本情報.がん種.OncoTree.LEVEL1.
+        Data_case_target$症例.基本情報.がん種.OncoTree..名称. = Data_case_target$症例.基本情報.がん種.OncoTree.LEVEL1.
+      }
       Data_MAF = Data_report() %>%
         dplyr::filter(
           !str_detect(Hugo_Symbol, ",") &
