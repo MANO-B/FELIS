@@ -2681,8 +2681,8 @@ output$table_drug_ToT_1 <- render_gt({
 
 
 output$table_volcano_AE = DT::renderDataTable(server = TRUE,{
-  req(OUTPUT_DATA$Data_drug_df_volcano_AE)
-  create_datatable_with_confirm(OUTPUT_DATA$Data_drug_df_volcano_AE, "FELIS downloaded raw data in Volcano plot for adverse effect tab")
+  req(OUTPUT_DATA$drug_analysis_df_volcano_AE)
+  create_datatable_with_confirm(OUTPUT_DATA$drug_analysis_df_volcano_AE, "FELIS downloaded raw data in Volcano plot for adverse effect tab")
 })
 
 output$table_outcome_3 = DT::renderDataTable(server = TRUE,{
@@ -3900,10 +3900,13 @@ output$figure_volcano_1 = renderPlot({
 })
 
 output$table_volcano = DT::renderDataTable(server = TRUE,{
-  req(OUTPUT_DATA$Data_drug_df_volcano)
-  create_datatable_with_confirm(OUTPUT_DATA$Data_drug_df_volcano, "FELIS downloaded raw data in Volcano plot for objective response rate tab")
+  req(OUTPUT_DATA$drug_analysis_df_volcano)
+  create_datatable_with_confirm(OUTPUT_DATA$drug_analysis_df_volcano, "FELIS downloaded raw data in Volcano plot for objective response rate tab")
 })
-
+output$table_volcano_ToT = DT::renderDataTable(server = TRUE,{
+  req(OUTPUT_DATA$drug_analysis_df_volcano_ToT)
+  create_datatable_with_confirm(OUTPUT_DATA$drug_analysis_df_volcano_ToT, "FELIS downloaded raw data in Volcano plot for time on treatment tab")
+})
 
 output$select_table_var_volcano_1 = renderUI({
   req(OUTPUT_DATA$drug_analysis_regimen_choice_ToT)
@@ -3918,19 +3921,6 @@ output$figure_volcano_ToT_1 = renderPlot({
   req(input$table_var_volcano_1,
       OUTPUT_DATA$drug_analysis_g_volcano_ToT)
   OUTPUT_DATA$drug_analysis_g_volcano_ToT[[as.integer(input$table_var_volcano_1)]]
-})
-
-output$table_volcano_ToT = DT::renderDataTable(server = TRUE,{
-  req(OUTPUT_DATA$drug_analysis_df_volcano_ToT)
-  DT::datatable(OUTPUT_DATA$drug_analysis_df_volcano_ToT,
-                filter = 'top',
-                extensions = c('Buttons'),
-                options = list(pageLength = 100,
-                               scrollX = TRUE,
-                               scrollY = "1000px",
-                               scrollCollapse = TRUE,
-                               dom="Blfrtip",
-                               buttons = c('csv', 'excel', 'copy')))
 })
 
 output$table_drug_all_summary = DT::renderDataTable(server = TRUE,{
