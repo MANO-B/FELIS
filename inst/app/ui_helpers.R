@@ -455,7 +455,7 @@ output$select_histology_detail = renderUI({
     "histology_detail", "Analyze without detailed histology",
     choices = c("Yes, use oncotree 1st level",
                 "No"),
-    selected = "No")
+    selected = "Yes, use oncotree 1st level")
 })
 output$select_MSI = renderUI({
   radioButtons(

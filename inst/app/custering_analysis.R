@@ -41,6 +41,10 @@ custering_analysis_logic <- function() {
                       time_palliative_enroll
         )
       incProgress(1 / 13)
+      if(length(unique(Data_case_target$症例.基本情報.がん種.OncoTree.)) > 50){
+        Data_case_target$症例.基本情報.がん種.OncoTree. = Data_case_target$症例.基本情報.がん種.OncoTree.LEVEL1.
+        Data_case_target$症例.基本情報.がん種.OncoTree..名称. = Data_case_target$症例.基本情報.がん種.OncoTree.LEVEL1.
+      }
       Data_case_target$Cancers = Data_case_target$症例.基本情報.がん種.OncoTree.
       Data_case_target = Data_case_target %>%
         dplyr::distinct(.keep_all = TRUE, C.CAT調査結果.基本項目.ハッシュID)
