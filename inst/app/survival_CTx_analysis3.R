@@ -492,9 +492,13 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   n_sim_per_group <- 5000
   simulated_data <- list()
 
-  # Extract T2 model coefficients safely
-  shape_t2 <- exp(fit_t2$res["shape", "est"])
-  beta0_t2 <- fit_t2$res["scale", "est"]
+  # =========================================================================
+  # [FIX] Extract T2 model coefficients correctly
+  # flexsurvreg outputs baseline 'shape' and 'scale' in their NATURAL form (NOT log)
+  # Do not use exp() on them. Covariates are on the log scale.
+  # =========================================================================
+  shape_t2 <- fit_t2$res["shape", "est"]
+  baseline_scale <- fit_t2$res["scale", "est"]
 
   # Guard against variables being dropped from the flexsurvreg model
   beta_time_pre <- ifelse("time_pre" %in% rownames(fit_t2$res), fit_t2$res["time_pre", "est"], 0)
@@ -515,24 +519,24 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
       params <- t1_params[[ag]]
       if(is.null(params) || is.na(params$lambda) || is.na(params$p)) params <- t1_params[[1]] # Safe fallback
 
-      # [FIX 1] Inverse Transform Sampling for T1 with bounded uniform to avoid Inf/NaN
+      # Inverse Transform Sampling for T1 with bounded uniform to avoid Inf/NaN
       u <- runif(n_ag, min = 0.001, max = 0.999)
       sim_t1_years <- (1 / params$lambda) * ((1 - u) / u)^(1 / params$p)
       sim_t1_days[idx] <- sim_t1_years * 365.25
     }
 
-    # Predict T2 scale parameter for each simulated patient
+    # [FIX] Predict T2 scale parameter correctly
     group_eff <- ifelse(g == "2", beta_group2, 0)
-    sim_scale_t2 <- exp(beta0_t2 + beta_time_pre * sim_t1_days + group_eff)
+    sim_scale_t2 <- baseline_scale * exp(beta_time_pre * sim_t1_days + group_eff)
 
-    # [FIX 2] Sample T2 using Log-logistic distribution with bounded uniform
+    # Sample T2 using Log-logistic distribution with bounded uniform
     u2 <- runif(n_sim_per_group, min = 0.001, max = 0.999)
     sim_t2_days <- sim_scale_t2 * ((1 - u2) / u2)^(1 / shape_t2)
 
     # Total Overall Survival (OS = T1 + T2)
     sim_os_days <- sim_t1_days + sim_t2_days
 
-    # [FIX 3] Cap the maximum survival time at 20 years to prevent plot scale breakdown
+    # Cap the maximum survival time at 20 years to prevent plot scale breakdown
     sim_os_days <- pmin(sim_os_days, 365.25 * 20)
 
     simulated_data[[length(simulated_data) + 1]] <- data.frame(
