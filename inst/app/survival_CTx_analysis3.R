@@ -451,24 +451,6 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   # =====================================================================
   # Data Pre-processing for Models
   # =====================================================================
-  # Ensure there is enough data to proceed
-  validate(need(nrow(Data_survival) > 0, "No patients match the selected criteria."))
-
-  Data_survival <- Data_survival %>%
-    dplyr::mutate(
-      time_t2 = time_all - time_pre,
-      event_t1 = 1,
-      Group = as.factor(Group),
-      # Fix possible missing or negative weights safely
-      iptw = ifelse(is.na(iptw) | iptw <= 0, 1.0, iptw)
-    ) %>%
-    dplyr::filter(time_pre > 0, time_t2 > 0)
-
-  validate(need(nrow(Data_survival) >= 10, "Not enough valid cases (time_pre > 0 and time_t2 > 0) to fit parametric models."))
-
-  # =====================================================================
-  # Data Pre-processing for Models
-  # =====================================================================
   # Ensure there is enough data to proceed (Using shiny:: to prevent namespace collision)
   shiny::validate(shiny::need(nrow(Data_survival) > 0, "No patients match the selected criteria."))
 
