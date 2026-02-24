@@ -2594,7 +2594,7 @@ output$select_gene_survival_interactive_2_W_control = renderUI({
 output$select_gene_survival_interactive_2_D_control = renderUI({
   req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control)
   pickerInput("gene_survival_interactive_2_D_control", "Drugs used in any lines",
-              OUTPUT_DATA$figure_surv_interactive_candidate_drugs,
+              OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control,
               options = list(`actions-box` = TRUE, `live-search`=TRUE),
               selected = NULL,
               multiple = TRUE)

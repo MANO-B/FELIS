@@ -1263,7 +1263,7 @@ survival_compare_and_plot_CTx <- function(data,
                                           adjustment = TRUE,
                                           color_var_surv_CTx_1 = "CTx",
                                           group_labels = NULL,
-                                          weights_var = NULL) { # <-- Added weights_var for backward compatibility
+                                          weights_var = NULL) {
 
   data$time_pre = data[[time_var1]]
   data$time_all = data[[time_var2]]
@@ -1272,9 +1272,12 @@ survival_compare_and_plot_CTx <- function(data,
   use_weights <- !is.null(weights_var) && (weights_var %in% colnames(data))
 
   if (use_weights) {
-    # If using IPTW, we avoid delayed entry to fix the dependent truncation error,
-    # and instead apply the calculated weights to the OS model.
-    surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
+    # =========================================================================
+    # FIX: Use Left Truncation (time_pre, time_all) combined with IPTW weights.
+    # This prevents the Immortal Time Bias (which caused the 5-year median OS),
+    # while the IPTW weights prevent the hazard explosion of the standard model.
+    # =========================================================================
+    surv_formula <- as.formula(paste0("Surv(", time_var1, ", ", time_var2, ", ", status_var, ") ~ ", group_var))
     Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", IPTW adjusted (months)")
     weight_vector <- data[[weights_var]]
   } else {
