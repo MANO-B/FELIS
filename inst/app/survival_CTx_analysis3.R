@@ -449,94 +449,88 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   req(nrow(Data_survival) > 0)
 
   # =====================================================================
-  # Parametric Simulation Implementation (Tamura & Ikegami Extended)
+  # Parametric Simulation Implementation (Weighted Tamura & Ikegami Model)
   # =====================================================================
   req(requireNamespace("flexsurv", quietly = TRUE))
 
   # Calculate T2 explicitly (Survival time after CGP)
+  # Define event for T1 (everyone reached CGP, so event_t1 = 1)
   Data_survival <- Data_survival %>%
     dplyr::mutate(
       time_t2 = time_all - time_pre,
+      event_t1 = 1,
       Group = as.factor(Group)
     ) %>%
     dplyr::filter(time_pre > 0, time_t2 > 0)
 
-  # Ensure enough data to fit the model without crashing
+  # Ensure enough data to fit the models
   req(nrow(Data_survival) >= 10)
 
-  # 1. Fit Log-logistic AFT model for T2
-  # Modeling T2 conditional on T1 (time_pre) and Group to absorb dependent truncation
-  fit_t2 <- tryCatch({
-    flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre + Group, data = Data_survival, dist = "llogis")
+  # 1. Fit Weibull model for T1 (Time from diagnosis to CGP)
+  # We use IPTW weights so the model reconstructs the unbiased general population's T1
+  fit_t1 <- tryCatch({
+    flexsurv::flexsurvreg(Surv(time_pre, event_t1) ~ 1,
+                          data = Data_survival,
+                          weights = iptw,
+                          dist = "weibull")
   }, error = function(e) { NULL })
 
-  req(!is.null(fit_t2))
+  # 2. Fit Log-logistic AFT model for T2 (Survival after CGP)
+  # We include time_pre to absorb dependent truncation, weighted by IPTW
+  fit_t2 <- tryCatch({
+    flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre + Group,
+                          data = Data_survival,
+                          weights = iptw,
+                          dist = "llogis")
+  }, error = function(e) { NULL })
 
-  # 2. Extract Log-logistic parameters for T1 from Macro Data
-  t1_params <- list()
-  t_points <- 1:5
-  for(ag in names(ref_surv_list)) {
-    S_t <- ref_surv_list[[ag]][1:5] / 100
-    S_t <- pmax(pmin(S_t, 0.999), 0.001)
-    y_linear <- log(1/S_t - 1)
-    x_linear <- log(t_points)
-
-    fit_lm <- lm(y_linear ~ x_linear)
-    p_t1 <- coef(fit_lm)[2]
-    lambda_t1 <- exp(coef(fit_lm)[1] / p_t1)
-
-    t1_params[[ag]] <- list(p = p_t1, lambda = lambda_t1)
-  }
+  req(!is.null(fit_t1) && !is.null(fit_t2))
 
   # 3. Simulate Cohort (n = 5000 per group for smooth, stable curves)
   n_sim_per_group <- 5000
   simulated_data <- list()
 
-  # =========================================================================
-  # [FIX] Extract T2 model coefficients correctly
-  # flexsurvreg outputs baseline 'shape' and 'scale' in their NATURAL form (NOT log)
-  # Do not use exp() on them. Covariates are on the log scale.
-  # =========================================================================
-  shape_t2 <- fit_t2$res["shape", "est"]
-  baseline_scale <- fit_t2$res["scale", "est"]
+  # Extract T1 model coefficients (NATURAL scale in flexsurv)
+  shape_t1 <- fit_t1$res["shape", "est"]
+  scale_t1 <- fit_t1$res["scale", "est"]
 
-  # Guard against variables being dropped from the flexsurvreg model
+  # Extract T2 model coefficients (NATURAL scale for baseline shape/scale)
+  shape_t2 <- fit_t2$res["shape", "est"]
+  baseline_scale_t2 <- fit_t2$res["scale", "est"]
+
+  # Guard against covariates being dropped
   beta_time_pre <- ifelse("time_pre" %in% rownames(fit_t2$res), fit_t2$res["time_pre", "est"], 0)
   beta_group2 <- ifelse("Group2" %in% rownames(fit_t2$res), fit_t2$res["Group2", "est"], 0)
 
   for (g in levels(Data_survival$Group)) {
-    obs_group <- Data_survival %>% dplyr::filter(Group == g)
-    if(nrow(obs_group) == 0) next
-
-    # Bootstrap age classes to accurately reflect the group's demographics
-    sim_ages <- sample(obs_group$age_class, n_sim_per_group, replace = TRUE)
-    sim_t1_days <- numeric(n_sim_per_group)
-
-    for(ag in unique(sim_ages)) {
-      idx <- which(sim_ages == ag)
-      n_ag <- length(idx)
-
-      params <- t1_params[[ag]]
-      if(is.null(params) || is.na(params$lambda) || is.na(params$p)) params <- t1_params[[1]] # Safe fallback
-
-      # Inverse Transform Sampling for T1 with bounded uniform to avoid Inf/NaN
-      u <- runif(n_ag, min = 0.001, max = 0.999)
-      sim_t1_years <- (1 / params$lambda) * ((1 - u) / u)^(1 / params$p)
-      sim_t1_days[idx] <- sim_t1_years * 365.25
-    }
-
-    # [FIX] Predict T2 scale parameter correctly
-    group_eff <- ifelse(g == "2", beta_group2, 0)
-    sim_scale_t2 <- baseline_scale * exp(beta_time_pre * sim_t1_days + group_eff)
-
-    # Sample T2 using Log-logistic distribution with bounded uniform
+    # Generate random probabilities bounded to avoid Inf/NaN errors
+    u1 <- runif(n_sim_per_group, min = 0.001, max = 0.999)
     u2 <- runif(n_sim_per_group, min = 0.001, max = 0.999)
+
+    # ---------------------------------------------------------
+    # Step A: Sample T1 from the IPTW-weighted Weibull distribution
+    # ---------------------------------------------------------
+    # Using the standard R quantile function for Weibull
+    sim_t1_days <- qweibull(u1, shape = shape_t1, scale = scale_t1)
+
+    # ---------------------------------------------------------
+    # Step B: Predict individual scale for T2 based on simulated T1
+    # ---------------------------------------------------------
+    group_eff <- ifelse(g == "2", beta_group2, 0)
+    # Scale parameter changes exponentially with linear covariates
+    sim_scale_t2 <- baseline_scale_t2 * exp(beta_time_pre * sim_t1_days + group_eff)
+
+    # ---------------------------------------------------------
+    # Step C: Sample T2 from the Log-logistic distribution
+    # ---------------------------------------------------------
     sim_t2_days <- sim_scale_t2 * ((1 - u2) / u2)^(1 / shape_t2)
 
-    # Total Overall Survival (OS = T1 + T2)
+    # ---------------------------------------------------------
+    # Step D: Integrate Overall Survival (OS = T1 + T2)
+    # ---------------------------------------------------------
     sim_os_days <- sim_t1_days + sim_t2_days
 
-    # Cap the maximum survival time at 20 years to prevent plot scale breakdown
+    # Cap the maximum survival time at 20 years to prevent plot breakdown
     sim_os_days <- pmin(sim_os_days, 365.25 * 20)
 
     simulated_data[[length(simulated_data) + 1]] <- data.frame(
@@ -548,20 +542,22 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     )
   }
 
-  # Ensure completely clean data without missing values
+  # Clean up and ensure finite values
   Data_survival_simulated <- do.call(rbind, simulated_data) %>%
     dplyr::filter(is.finite(time_all), is.finite(time_pre))
 
   # =====================================================================
   # Plot the Unbiased Simulated Cohort Data
   # =====================================================================
+  # Since the simulation directly generates unbiased OS from the point of diagnosis,
+  # we pass adjustment = FALSE and weights_var = NULL to the plotting function.
   survival_compare_and_plot_CTx(
     data = Data_survival_simulated,
-    time_var1 = "time_pre", # Ignored because adjustment=FALSE
+    time_var1 = "time_pre", # Ignored in the non-adjusted plotting branch
     time_var2 = "time_all",
     status_var = "censor",
     group_var = "Group",
-    plot_title = "Unbiased Parametric Simulation OS",
+    plot_title = "Unbiased Parametric Simulation OS (Weighted)",
     adjustment = FALSE,
     color_var_surv_CTx_1 = "diagnosis",
     weights_var = NULL
