@@ -241,15 +241,6 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
   Data_drug = OUTPUT_DATA$figure_surv_CTx_Data_drug_control
 
-  # 転移部位のマッピングを定義
-  metastasis_mapping <- c(
-    "Lymph_met" = "Lymph_met",
-    "Brain_met" = "Brain_met",
-    "Lung_met" = "Lung_met",
-    "Bone_met" = "Bone_met",
-    "Liver_met" = "Liver_met"
-  )
-
   # ID抽出関数を定義
   extract_group_ids <- function(group_num) {
     # 初期IDセット
@@ -259,21 +250,21 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     input_prefix <- paste0("gene_survival_interactive_", group_num, "_")
 
     # 遺伝子フィルタ（P_1: 必須変異1）
-    p1_input <- input[[paste0(input_prefix, "P_1")]]
+    p1_input <- input[[paste0(input_prefix, "P_1_control")]]
     if(!all(is.null(p1_input))) {
       IDs <- intersect(IDs, (Data_MAF_target %>%
                                dplyr::filter(Hugo_Symbol %in% p1_input))$Tumor_Sample_Barcode)
     }
 
     # 遺伝子フィルタ（P_2: 必須変異2）
-    p2_input <- input[[paste0(input_prefix, "P_2")]]
+    p2_input <- input[[paste0(input_prefix, "P_2_control")]]
     if(!all(is.null(p2_input))) {
       IDs <- intersect(IDs, (Data_MAF_target %>%
                                dplyr::filter(Hugo_Symbol %in% p2_input))$Tumor_Sample_Barcode)
     }
 
     # 遺伝子除外（W: 除外変異）
-    w_input <- input[[paste0(input_prefix, "W")]]
+    w_input <- input[[paste0(input_prefix, "W_control")]]
     if(!all(is.null(w_input))) {
       IDs <- setdiff(IDs, (Data_MAF_target %>%
                              dplyr::filter(Hugo_Symbol %in% w_input))$Tumor_Sample_Barcode)
@@ -281,11 +272,9 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 
     # 臨床データフィルタ
     clinical_filters <- list(
-      L = "CTx_lines_before_CGP",
-      R = "pre_CGP_best_RECIST",
-      A = "YoungOld",
-      S = "症例.基本情報.性別.名称.",
-      H = "Cancers"
+      A_control = "YoungOld",
+      S_control = "症例.基本情報.性別.名称.",
+      H_control = "Cancers"
     )
 
     for(filter_key in names(clinical_filters)) {
@@ -299,7 +288,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     }
 
     # 薬剤フィルタ（D）
-    d_input <- input[[paste0(input_prefix, "D")]]
+    d_input <- input[[paste0(input_prefix, "D_control")]]
     if(!all(is.null(d_input))) {
       IDs <- intersect(IDs, (Data_drug %>%
                                dplyr::filter(Drug %in% d_input))$ID)
