@@ -492,10 +492,12 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   n_sim_per_group <- 5000
   simulated_data <- list()
 
-  # Extract T2 model coefficients
+  # Extract T2 model coefficients safely
   shape_t2 <- exp(fit_t2$res["shape", "est"])
   beta0_t2 <- fit_t2$res["scale", "est"]
-  beta_time_pre <- fit_t2$res["time_pre", "est"]
+
+  # Guard against variables being dropped from the flexsurvreg model
+  beta_time_pre <- ifelse("time_pre" %in% rownames(fit_t2$res), fit_t2$res["time_pre", "est"], 0)
   beta_group2 <- ifelse("Group2" %in% rownames(fit_t2$res), fit_t2$res["Group2", "est"], 0)
 
   for (g in levels(Data_survival$Group)) {
@@ -511,10 +513,10 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
       n_ag <- length(idx)
 
       params <- t1_params[[ag]]
-      if(is.null(params)) params <- t1_params[[1]] # Safe fallback
+      if(is.null(params) || is.na(params$lambda) || is.na(params$p)) params <- t1_params[[1]] # Safe fallback
 
-      # Inverse Transform Sampling for T1
-      u <- runif(n_ag)
+      # [FIX 1] Inverse Transform Sampling for T1 with bounded uniform to avoid Inf/NaN
+      u <- runif(n_ag, min = 0.001, max = 0.999)
       sim_t1_years <- (1 / params$lambda) * ((1 - u) / u)^(1 / params$p)
       sim_t1_days[idx] <- sim_t1_years * 365.25
     }
@@ -523,12 +525,15 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     group_eff <- ifelse(g == "2", beta_group2, 0)
     sim_scale_t2 <- exp(beta0_t2 + beta_time_pre * sim_t1_days + group_eff)
 
-    # Sample T2 using Log-logistic distribution
-    u2 <- runif(n_sim_per_group)
+    # [FIX 2] Sample T2 using Log-logistic distribution with bounded uniform
+    u2 <- runif(n_sim_per_group, min = 0.001, max = 0.999)
     sim_t2_days <- sim_scale_t2 * ((1 - u2) / u2)^(1 / shape_t2)
 
     # Total Overall Survival (OS = T1 + T2)
     sim_os_days <- sim_t1_days + sim_t2_days
+
+    # [FIX 3] Cap the maximum survival time at 20 years to prevent plot scale breakdown
+    sim_os_days <- pmin(sim_os_days, 365.25 * 20)
 
     simulated_data[[length(simulated_data) + 1]] <- data.frame(
       C.CAT調査結果.基本項目.ハッシュID = paste0("SIM_", g, "_", 1:n_sim_per_group),
@@ -539,22 +544,20 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     )
   }
 
-  Data_survival_simulated <- do.call(rbind, simulated_data)
+  # Ensure completely clean data without missing values
+  Data_survival_simulated <- do.call(rbind, simulated_data) %>%
+    dplyr::filter(is.finite(time_all), is.finite(time_pre))
 
   # =====================================================================
   # Plot the Unbiased Simulated Cohort Data
   # =====================================================================
-  # We plot the fully simulated data.
-  # Because simulation intrinsically reconstructs the unbiased cohort from
-  # the moment of diagnosis, we do not need left-truncation (time_pre, time_all)
-  # or IPTW here. The OS curve is naturally unbiased.
   survival_compare_and_plot_CTx(
     data = Data_survival_simulated,
     time_var1 = "time_pre", # Ignored because adjustment=FALSE
     time_var2 = "time_all",
     status_var = "censor",
     group_var = "Group",
-    plot_title = "Unbiased Parametric Simulation OS (Tamura & Ikegami Extrapolated)",
+    plot_title = "Unbiased Parametric Simulation OS",
     adjustment = FALSE,
     color_var_surv_CTx_1 = "diagnosis",
     weights_var = NULL
