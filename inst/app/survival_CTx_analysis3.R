@@ -443,139 +443,110 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   req(nrow(Data_survival) > 0)
 
   # =====================================================================
-  # Data Pre-processing for Models
+  # Data Pre-processing for Anchored Models
   # =====================================================================
-  # Ensure there is enough data to proceed (Using shiny:: to prevent namespace collision)
-  shiny::validate(shiny::need(nrow(Data_survival) > 0, "No patients match the selected criteria."))
+  # Create a baseline reference group (EP_treat == 0)
+  Data_EP0 <- Data_survival_interactive %>%
+    dplyr::filter(EP_treat == 0) %>%
+    dplyr::mutate(Group = "EP0")
 
-  # [FIX] Force iptw to be a pure numeric vector to prevent "non-atomic" errors
-  if (!"iptw" %in% colnames(Data_survival)) {
-    Data_survival$iptw <- 1.0
-  }
-  # unlistとas.numericを使って、ネストされたリストやデータフレーム属性を完全に剥がす
-  Data_survival$iptw <- as.numeric(unlist(Data_survival$iptw))
-
-  Data_survival <- Data_survival %>%
-    dplyr::mutate(
-      time_t2 = time_all - time_pre,
-      event_t1 = 1,
-      Group = as.factor(Group),
-      # Fix possible missing or negative weights safely
-      iptw = ifelse(is.na(iptw) | iptw <= 0, 1.0, iptw)
-    ) %>%
+  # Combine EP0, Group 1, and Group 2 for modeling
+  Data_model <- rbind(Data_EP0, Data_survival_1, Data_survival_2) %>%
+    dplyr::mutate(time_t2 = time_all - time_pre) %>%
     dplyr::filter(time_pre > 0, time_t2 > 0)
 
-  shiny::validate(shiny::need(nrow(Data_survival) >= 10, "Not enough valid cases (time_pre > 0 and time_t2 > 0) to fit parametric models."))
+  shiny::validate(shiny::need(nrow(Data_model) > 0, "No valid data to fit the model."))
+
+  # Set EP0 as the reference baseline level
+  Data_model$Group <- factor(Data_model$Group, levels = c("EP0", "1", "2"))
+
+  shiny::validate(shiny::need(nrow(Data_model %>% dplyr::filter(Group == "EP0")) >= 5,
+                              "Not enough EP_treat == 0 patients to establish the reference baseline."))
 
   # =====================================================================
-  # Robust Parametric Simulation Implementation (Weighted Models)
+  # Fit Conditional T2 Model to Bypass Dependent Truncation (Kendall tau != 0)
   # =====================================================================
+  # By conditioning on time_pre, we neutralize the dependent left truncation bias.
+  # We use Log-logistic distribution to extract the unbiased Acceleration Factor (AF).
   req(requireNamespace("flexsurv", quietly = TRUE))
-  n_groups <- length(unique(Data_survival$Group))
 
-  # 1. Fit Weibull model for T1 (Time from diagnosis to CGP)
-  fit_t1 <- tryCatch({
-    flexsurv::flexsurvreg(Surv(time_pre, event_t1) ~ 1,
-                          data = Data_survival,
-                          weights = Data_survival$iptw,
-                          dist = "weibull")
-  }, error = function(e) {
-    # Fallback to unweighted model if IPTW causes a matrix singularity
-    tryCatch({
-      flexsurv::flexsurvreg(Surv(time_pre, event_t1) ~ 1, data = Data_survival, dist = "weibull")
-    }, error = function(e2) { NULL })
-  })
+  fit_cgp_t2 <- tryCatch({
+    flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre + Group, data = Data_model, dist = "llogis")
+  }, error = function(e) { NULL })
 
-  shiny::validate(shiny::need(!is.null(fit_t1), "Failed to fit Weibull model for T1 (CGP entry time). Data might be too sparse."))
+  shiny::validate(shiny::need(!is.null(fit_cgp_t2), "Failed to fit conditional T2 model. Data might be too sparse."))
 
-  # 2. Fit Log-logistic AFT model for T2 (Survival after CGP)
-  fit_t2 <- tryCatch({
-    if (n_groups > 1) {
-      flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre + Group,
-                            data = Data_survival,
-                            weights = Data_survival$iptw,
-                            dist = "llogis")
-    } else {
-      flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre,
-                            data = Data_survival,
-                            weights = Data_survival$iptw,
-                            dist = "llogis")
-    }
-  }, error = function(e) {
-    # Fallback to unweighted model
-    tryCatch({
-      if (n_groups > 1) {
-        flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre + Group, data = Data_survival, dist = "llogis")
-      } else {
-        flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre, data = Data_survival, dist = "llogis")
-      }
-    }, error = function(e2) { NULL })
-  })
+  # =====================================================================
+  # Extract Baseline Parameters from Macro Data (Log-logistic OS)
+  # =====================================================================
+  macro_surv <- ref_surv_list[["全年齢"]]
+  if(is.null(macro_surv)) macro_surv <- ref_surv_list[[1]]
 
-  shiny::validate(shiny::need(!is.null(fit_t2), "Failed to fit Log-logistic model for T2 (Post-CGP survival)."))
+  S_t <- macro_surv[1:5] / 100
+  S_t <- pmax(pmin(S_t, 0.999), 0.001)
+  t_points <- 1:5
 
-  # 3. Simulate Cohort (n = 5000 per group for smooth, stable curves)
+  # Linearize Log-logistic: log(1/S(t) - 1) = p * log(lambda) + p * log(t)
+  y_llogis <- log(1/S_t - 1)
+  x_llogis <- log(t_points)
+  fit_macro <- lm(y_llogis ~ x_llogis)
+
+  # Extract shape (p) and scale (alpha = 1/lambda)
+  shape_macro <- coef(fit_macro)[2]
+  log_lambda_macro <- coef(fit_macro)[1] / shape_macro
+  scale_macro_years <- exp(-log_lambda_macro) # alpha = 1 / lambda
+  scale_macro_days <- scale_macro_years * 365.25
+
+  # =====================================================================
+  # Direct OS Simulation via Log-logistic Distribution
+  # =====================================================================
   n_sim_per_group <- 5000
   simulated_data <- list()
 
-  # Extract T1 model coefficients
-  shape_t1 <- fit_t1$res["shape", "est"]
-  scale_t1 <- fit_t1$res["scale", "est"]
+  # Extract log(Acceleration Factor) for Group 1 and 2 compared to EP0
+  coef_g1 <- ifelse("Group1" %in% rownames(fit_cgp_t2$res), fit_cgp_t2$res["Group1", "est"], 0)
+  coef_g2 <- ifelse("Group2" %in% rownames(fit_cgp_t2$res), fit_cgp_t2$res["Group2", "est"], 0)
 
-  # Extract T2 model coefficients
-  shape_t2 <- fit_t2$res["shape", "est"]
-  baseline_scale_t2 <- fit_t2$res["scale", "est"]
+  for (g in c("1", "2")) {
+    # Check if the requested group actually had data; skip if empty
+    if (g == "1" && nrow(Data_survival_1) == 0) next
+    if (g == "2" && nrow(Data_survival_2) == 0) next
 
-  # Guard against covariates being completely dropped from the model
-  beta_time_pre <- ifelse("time_pre" %in% rownames(fit_t2$res), fit_t2$res["time_pre", "est"], 0)
-  beta_group2 <- ifelse(n_groups > 1 && "Group2" %in% rownames(fit_t2$res), fit_t2$res["Group2", "est"], 0)
+    # Bounded uniform to avoid Inf/NaN
+    u <- runif(n_sim_per_group, min = 0.001, max = 0.999)
 
-  for (g in levels(Data_survival$Group)) {
-    # Generate random probabilities bounded strictly to avoid Inf/NaN errors
-    u1 <- runif(n_sim_per_group, min = 0.001, max = 0.999)
-    u2 <- runif(n_sim_per_group, min = 0.001, max = 0.999)
+    # Apply the unbiased Acceleration Factor to the Macro OS scale
+    af_g <- ifelse(g == "1", coef_g1, coef_g2)
+    scale_g <- scale_macro_days * exp(af_g)
 
-    # Step A: Sample T1 from the Weibull distribution
-    sim_t1_days <- qweibull(u1, shape = shape_t1, scale = scale_t1)
-
-    # Step B: Predict individual scale for T2 based on simulated T1
-    group_eff <- ifelse(g == "2", beta_group2, 0)
-    sim_scale_t2 <- baseline_scale_t2 * exp(beta_time_pre * sim_t1_days + group_eff)
-
-    # Step C: Sample T2 from the Log-logistic distribution
-    sim_t2_days <- sim_scale_t2 * ((1 - u2) / u2)^(1 / shape_t2)
-
-    # Step D: Integrate Overall Survival (OS = T1 + T2)
-    sim_os_days <- sim_t1_days + sim_t2_days
-
-    # Cap the maximum survival time at 20 years to prevent plot breakdown
-    sim_os_days <- pmin(sim_os_days, 365.25 * 20)
+    # Inverse Transform Sampling for Log-logistic OS
+    # Formula: t = scale * ((1 - u) / u)^(1 / shape)
+    sim_os_days <- scale_g * ((1 - u) / u)^(1 / shape_macro)
+    sim_os_days <- pmin(sim_os_days, 365.25 * 20) # Cap at 20 years
 
     simulated_data[[length(simulated_data) + 1]] <- data.frame(
       C.CAT調査結果.基本項目.ハッシュID = paste0("SIM_", g, "_", 1:n_sim_per_group),
-      time_pre = sim_t1_days,
+      time_pre = 0, # Unused, set to 0
       time_all = sim_os_days,
-      censor = 1, # Uncensored completely in baseline simulation
+      censor = 1, # All simulated baseline patients die eventually
       Group = g
     )
   }
 
-  # Clean up and ensure finite values
-  Data_survival_simulated <- do.call(rbind, simulated_data) %>%
-    dplyr::filter(is.finite(time_all), is.finite(time_pre))
-
-  shiny::validate(shiny::need(nrow(Data_survival_simulated) > 0, "Simulation failed to generate valid survival times."))
+  Data_survival_simulated <- do.call(rbind, simulated_data)
+  shiny::validate(shiny::need(!is.null(Data_survival_simulated) && nrow(Data_survival_simulated) > 0,
+                              "Simulation yielded no data."))
 
   # =====================================================================
   # Plot the Unbiased Simulated Cohort Data
   # =====================================================================
   survival_compare_and_plot_CTx(
     data = Data_survival_simulated,
-    time_var1 = "time_pre",
+    time_var1 = "time_pre", # Not used for adjustment=FALSE
     time_var2 = "time_all",
     status_var = "censor",
     group_var = "Group",
-    plot_title = "Unbiased Parametric Simulation OS (Weighted)",
+    plot_title = "Anchored OS Simulation (Log-logistic, AF from conditional T2)",
     adjustment = FALSE,
     color_var_surv_CTx_1 = "diagnosis",
     weights_var = NULL
