@@ -98,7 +98,7 @@ options(pillar.advice = FALSE, pillar.min_title_chars = Inf)
 nietzsche = read.csv(header = TRUE,
                      file("source/nietzsche.csv",
                           encoding='UTF-8-BOM'))$text
-Data_age_survival_5_year <- fromJSON("source/OncoTree_CancerRegistory.json", simplifyVector = FALSE)
+Data_age_survival_5_year <- fromJSON("source/Data_age_survival_5_year.json", simplifyVector = FALSE)
 
 # Rstan options
 rstan_options(auto_write = TRUE)
