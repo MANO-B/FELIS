@@ -86,7 +86,7 @@ survival_CTx_analysis2_logic_control <- function() {
                                    by = "C.CAT調査結果.基本項目.ハッシュID")
       Data_case_target$cluster[is.na(Data_case_target$cluster)] = max(Data_case_target$cluster, na.rm = T) + 1
       Data_drug = Data_drug_raw()
-      OUTPUT_DATA$figure_surv_CTx_Data_drug = Data_drug
+      OUTPUT_DATA$figure_surv_CTx_Data_drug_control = Data_drug
 
       Data_case_target = Data_case_target %>%
         dplyr::distinct(.keep_all = TRUE, C.CAT調査結果.基本項目.ハッシュID)
@@ -134,16 +134,8 @@ survival_CTx_analysis2_logic_control <- function() {
         Data_case_target$time_pre = Data_case_target$time_diagnosis_enroll
         Data_case_target$time_all = Data_case_target$time_diagnosis_final
         Data_case_target = Data_case_target %>% dplyr::filter(time_pre > 0)
-        adjustment = FALSE
-        OUTPUT_DATA$figure_surv_CTx_adjustment = adjustment
-        if(is.null(input$color_var_surv_CTx_3)){
-          adjustment = TRUE
-        } else if(input$color_var_surv_CTx_3 == "Yes"){
-          adjustment = TRUE
-        } else {
-          adjustment = FALSE
-        }
-        OUTPUT_DATA$figure_surv_CTx_adjustment = adjustment
+        adjustment = TRUE
+        OUTPUT_DATA$figure_surv_CTx_adjustment_control = adjustment
 
         # ========================================================
         # IPTW calculation for left truncation bias adjustment
@@ -211,7 +203,7 @@ survival_CTx_analysis2_logic_control <- function() {
         Data_MAF_target = Data_MAF_target %>%
           dplyr::filter(Tumor_Sample_Barcode %in%
                           Data_survival$C.CAT調査結果.基本項目.ハッシュID)
-        OUTPUT_DATA$figure_surv_CTx_Data_MAF_target = Data_MAF_target
+        OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control = Data_MAF_target
         incProgress(1 / 13)
 
         Data_survival_interactive = Data_survival
@@ -240,121 +232,14 @@ survival_CTx_analysis2_logic_control <- function() {
 }
 
 
-output$figure_survival_CTx_1_2 = renderPlot({
-  req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive,
-      input$color_var_surv_CTx_2,
-      input$color_var_surv_CTx_1)
-  # 変数の初期化
-  plot_data <- OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive
-  group_var <- ""
-  plot_title <- ""
+output$figure_survival_CTx_interactive_1_control = renderPlot({
+  req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
+      OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
+      OUTPUT_DATA$figure_surv_CTx_Data_drug_control)
 
-  # ユーザーの選択に応じて変数を設定
-  if(input$color_var_surv_CTx_2 == "entire"){
-    independence_check = with(plot_data %>% sample_n(min(length(plot_data$C.CAT調査結果.基本項目.ハッシュID), 40000)), cKendall(
-      trun = time_pre,
-      obs = time_all,
-      delta = censor,
-      method = "MB",
-      trans = "linear"))
-    group_var <- "1"
-    plot_title <- paste0(nrow(plot_data), " patients, cKendall tau= ",
-                         format_p(independence_check$PE,digits=2),
-                         ", SE= ", format_p(independence_check$SE,digits=2),
-                         ", p= ", format_p(independence_check$p.value,digits=3))
-
-  } else if(input$color_var_surv_CTx_2 == "treat_option"){
-    group_var <- "EP_option"
-    plot_title <- "Expert panel recommended treatment option existed or not"
-
-  } else if(input$color_var_surv_CTx_2 == "treat_option_pos"){
-    plot_data <- OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive %>% dplyr::filter(EP_option == 1)
-    group_var <- "treat_group_2"
-    plot_title <- "Only patients with expert panel recommended treatment option"
-
-  } else if(input$color_var_surv_CTx_2 == "treat_group"){
-    group_var <- "treat_group"
-    plot_title <- "EP option and treatment"
-
-  } else if(input$color_var_surv_CTx_2 == "treat_group_2"){
-    group_var <- "treat_group_2"
-    plot_title <- "EP option and treatment"
-
-  } else if(input$color_var_surv_CTx_2 == "treat_group_3"){
-    group_var <- "treat_group_3"
-    plot_title <- "EP option and treatment"
-
-  } else if(input$color_var_surv_CTx_2 == "treat_group_4"){
-    plot_data <- OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive %>%
-      dplyr::mutate(CTx_lines_before_CGP = case_when(
-        CTx_lines_before_CGP %in% c("0", "1", "2", "3") ~ CTx_lines_before_CGP,
-        TRUE ~ "4~"
-      ))
-    group_var <- "CTx_lines_before_CGP"
-    plot_title <- "CTx lines before CGP"
-
-  } else if(input$color_var_surv_CTx_2 == "treat_group_5"){
-    group_var <- "pre_CGP_best_RECIST"
-    plot_title <- "Best CTx effect before CGP"
-
-  } else if(input$color_var_surv_CTx_2 == "treat_group_6"){
-    plot_data <- OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive %>% dplyr::filter(treat_group_2 != "No treatment done")
-    group_var <- "treat_group_2"
-    plot_title <- "Recommended vs not-recommended treatment"
-
-  } else if(input$color_var_surv_CTx_2 == "treat_group_7"){
-    plot_data <- OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive %>% dplyr::mutate(PS = `症例.背景情報.ECOG.PS.名称.`)
-    group_var <- "PS"
-    plot_title <- "ECOG Performance status"
-
-  } else if(input$color_var_surv_CTx_2 == "treat_group_8"){
-    plot_data <- OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive %>%
-      dplyr::filter(症例.背景情報.ECOG.PS.名称. != "Unknown") %>%
-      dplyr::mutate(PS = case_when(
-        症例.背景情報.ECOG.PS.名称. == "0" ~ "0",
-        症例.背景情報.ECOG.PS.名称. == "1" ~ "1",
-        TRUE ~ "2_4"
-      ))
-    group_var <- "PS"
-    plot_title <- "ECOG Performance status (unknown patients excluded)"
-
-  } else if(input$color_var_surv_CTx_2 == "treat_group_9"){
-    Data_survival_tmp <- OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive %>%
-      dplyr::filter(Cancers %in% names(sort(table(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive$Cancers), decreasing = TRUE))[1:min(7, length(unique(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive$Cancers)))])
-    Data_survival_tmp2 <- OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive %>%
-      dplyr::mutate(Cancers = " ALL")
-    plot_data <- rbind(Data_survival_tmp, Data_survival_tmp2)
-    group_var <- "Cancers"
-    plot_title <- "Diagnosis"
-  }
-
-  # 最後に一度だけ関数を呼び出す
-  survival_compare_and_plot_CTx(
-    data = plot_data,
-    time_var1 = "time_pre",
-    time_var2 = "time_all",
-    status_var = "censor",
-    group_var = group_var,
-    plot_title = plot_title,
-    adjustment = OUTPUT_DATA$figure_surv_CTx_adjustment,
-    color_var_surv_CTx_1 = input$color_var_surv_CTx_1
-  )
-})
-
-output$figure_survival_CTx_2_data_2_raw = DT::renderDataTable(server = TRUE,{
-  req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive)
-  create_datatable_with_confirm(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive, "FELIS downloaded raw data in Custom survival analysis tab")
-})
-
-output$figure_survival_CTx_interactive_1 = renderPlot({
-  req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive,
-      OUTPUT_DATA$figure_surv_CTx_Data_MAF_target,
-      OUTPUT_DATA$figure_surv_CTx_Data_drug,
-      input$color_var_surv_CTx_1)
-
-  Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive
-  Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target
-  Data_drug = OUTPUT_DATA$figure_surv_CTx_Data_drug
+  Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
+  Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
+  Data_drug = OUTPUT_DATA$figure_surv_CTx_Data_drug_control
 
   # 転移部位のマッピングを定義
   metastasis_mapping <- c(
@@ -446,7 +331,7 @@ output$figure_survival_CTx_interactive_1 = renderPlot({
     status_var = "censor",
     group_var = "Group",
     plot_title = "Survival analisys based on variants and drugs",
-    adjustment = OUTPUT_DATA$figure_surv_CTx_adjustment,
+    adjustment = OUTPUT_DATA$figure_surv_CTx_adjustment_control,
     color_var_surv_CTx_1 = input$color_var_surv_CTx_1
   )
 })
