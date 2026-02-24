@@ -137,59 +137,6 @@ survival_CTx_analysis2_logic_control <- function() {
         adjustment = TRUE
         OUTPUT_DATA$figure_surv_CTx_adjustment_control = adjustment
 
-        # ========================================================
-        # IPTW calculation for left truncation bias adjustment
-        # ========================================================
-        ref_surv_list <- list()
-        age_groups <- c("40未満", "40代", "50代", "60代", "70代", "80以上")
-
-        if (!is.null(input$survival_data_source)) {
-          if (input$survival_data_source == "registry") {
-            # Load from JSON data
-            if(exists("Data_age_survival_5_year") && input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
-
-              cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
-
-              # Extract the overall survival rates as fallback
-              fallback_surv <- cancer_data[["全年齢"]]
-
-              for (ag in age_groups) {
-                # Check if age-specific data exists and has exactly 5 years of data
-                if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
-                  ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
-                } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
-                  # Fallback to "全年齢" (overall) survival rates if age-specific is missing
-                  ref_surv_list[[ag]] <- as.numeric(fallback_surv)
-                }
-              }
-            }
-          } else if (input$survival_data_source == "manual_all") {
-            # Apply overall inputs to all age groups
-            vals <- c(input$surv_all_1y, input$surv_all_2y, input$surv_all_3y, input$surv_all_4y, input$surv_all_5y)
-            for (ag in age_groups) ref_surv_list[[ag]] <- vals
-          } else if (input$survival_data_source == "manual_age") {
-            # Apply detailed inputs by age group
-            ref_surv_list[["40未満"]] <- c(input$surv_u40_1y, input$surv_u40_2y, input$surv_u40_3y, input$surv_u40_4y, input$surv_u40_5y)
-            ref_surv_list[["40代"]] <- c(input$surv_40s_1y, input$surv_40s_2y, input$surv_40s_3y, input$surv_40s_4y, input$surv_40s_5y)
-            ref_surv_list[["50代"]] <- c(input$surv_50s_1y, input$surv_50s_2y, input$surv_50s_3y, input$surv_50s_4y, input$surv_50s_5y)
-            ref_surv_list[["60代"]] <- c(input$surv_60s_1y, input$surv_60s_2y, input$surv_60s_3y, input$surv_60s_4y, input$surv_60s_5y)
-            ref_surv_list[["70代"]] <- c(input$surv_70s_1y, input$surv_70s_2y, input$surv_70s_3y, input$surv_70s_4y, input$surv_70s_5y)
-            ref_surv_list[["80以上"]] <- c(input$surv_80s_1y, input$surv_80s_2y, input$surv_80s_3y, input$surv_80s_4y, input$surv_80s_5y)
-          }
-        }
-
-        # If list is successfully constructed
-        if (length(ref_surv_list) > 0) {
-
-          # Ultimate fallback just in case some rare cancers have NO overall data either
-          for (ag in age_groups) {
-            if (is.null(ref_surv_list[[ag]])) ref_surv_list[[ag]] <- c(10, 5, 3, 2, 1) # Fallback to a poor prognosis
-          }
-
-          Data_case_target <- calculate_iptw_age(Data_case_target, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢")
-        } else {
-          Data_case_target$iptw <- 1.0 # Fallback
-        }
         Data_case_target = Data_case_target %>% dplyr::filter(
           !is.na(time_enroll_final) &
             is.finite(time_enroll_final) &
@@ -240,6 +187,59 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
   Data_drug = OUTPUT_DATA$figure_surv_CTx_Data_drug_control
+  # ========================================================
+  # IPTW calculation for left truncation bias adjustment
+  # ========================================================
+  ref_surv_list <- list()
+  age_groups <- c("40未満", "40代", "50代", "60代", "70代", "80以上")
+
+  if (!is.null(input$survival_data_source)) {
+    if (input$survival_data_source == "registry") {
+      # Load from JSON data
+      if(exists("Data_age_survival_5_year") && input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
+
+        cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
+
+        # Extract the overall survival rates as fallback
+        fallback_surv <- cancer_data[["全年齢"]]
+
+        for (ag in age_groups) {
+          # Check if age-specific data exists and has exactly 5 years of data
+          if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
+            ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
+          } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
+            # Fallback to "全年齢" (overall) survival rates if age-specific is missing
+            ref_surv_list[[ag]] <- as.numeric(fallback_surv)
+          }
+        }
+      }
+    } else if (input$survival_data_source == "manual_all") {
+      # Apply overall inputs to all age groups
+      vals <- c(input$surv_all_1y, input$surv_all_2y, input$surv_all_3y, input$surv_all_4y, input$surv_all_5y)
+      for (ag in age_groups) ref_surv_list[[ag]] <- vals
+    } else if (input$survival_data_source == "manual_age") {
+      # Apply detailed inputs by age group
+      ref_surv_list[["40未満"]] <- c(input$surv_u40_1y, input$surv_u40_2y, input$surv_u40_3y, input$surv_u40_4y, input$surv_u40_5y)
+      ref_surv_list[["40代"]] <- c(input$surv_40s_1y, input$surv_40s_2y, input$surv_40s_3y, input$surv_40s_4y, input$surv_40s_5y)
+      ref_surv_list[["50代"]] <- c(input$surv_50s_1y, input$surv_50s_2y, input$surv_50s_3y, input$surv_50s_4y, input$surv_50s_5y)
+      ref_surv_list[["60代"]] <- c(input$surv_60s_1y, input$surv_60s_2y, input$surv_60s_3y, input$surv_60s_4y, input$surv_60s_5y)
+      ref_surv_list[["70代"]] <- c(input$surv_70s_1y, input$surv_70s_2y, input$surv_70s_3y, input$surv_70s_4y, input$surv_70s_5y)
+      ref_surv_list[["80以上"]] <- c(input$surv_80s_1y, input$surv_80s_2y, input$surv_80s_3y, input$surv_80s_4y, input$surv_80s_5y)
+    }
+  }
+
+  # If list is successfully constructed
+  if (length(ref_surv_list) > 0) {
+
+    # Ultimate fallback just in case some rare cancers have NO overall data either
+    for (ag in age_groups) {
+      if (is.null(ref_surv_list[[ag]])) ref_surv_list[[ag]] <- c(10, 5, 3, 2, 1) # Fallback to a poor prognosis
+    }
+
+    Data_survival_interactive <- calculate_iptw_age(Data_survival_interactive, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢")
+  } else {
+    Data_survival_interactive$iptw <- 1.0 # Fallback
+  }
 
   # ID抽出関数を定義
   extract_group_ids <- function(group_num) {
