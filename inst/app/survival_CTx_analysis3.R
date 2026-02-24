@@ -449,85 +449,103 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   req(nrow(Data_survival) > 0)
 
   # =====================================================================
-  # Parametric Simulation Implementation (Weighted Tamura & Ikegami Model)
+  # Data Pre-processing for Models
   # =====================================================================
-  req(requireNamespace("flexsurv", quietly = TRUE))
+  # Ensure there is enough data to proceed
+  validate(need(nrow(Data_survival) > 0, "No patients match the selected criteria."))
 
-  # Calculate T2 explicitly (Survival time after CGP)
-  # Define event for T1 (everyone reached CGP, so event_t1 = 1)
   Data_survival <- Data_survival %>%
     dplyr::mutate(
       time_t2 = time_all - time_pre,
       event_t1 = 1,
-      Group = as.factor(Group)
+      Group = as.factor(Group),
+      # Fix possible missing or negative weights safely
+      iptw = ifelse(is.na(iptw) | iptw <= 0, 1.0, iptw)
     ) %>%
     dplyr::filter(time_pre > 0, time_t2 > 0)
 
-  # Ensure enough data to fit the models
-  req(nrow(Data_survival) >= 10)
+  validate(need(nrow(Data_survival) >= 10, "Not enough valid cases (time_pre > 0 and time_t2 > 0) to fit parametric models."))
+
+  # =====================================================================
+  # Robust Parametric Simulation Implementation (Weighted Models)
+  # =====================================================================
+  req(requireNamespace("flexsurv", quietly = TRUE))
+  n_groups <- length(unique(Data_survival$Group))
 
   # 1. Fit Weibull model for T1 (Time from diagnosis to CGP)
-  # We use IPTW weights so the model reconstructs the unbiased general population's T1
   fit_t1 <- tryCatch({
     flexsurv::flexsurvreg(Surv(time_pre, event_t1) ~ 1,
                           data = Data_survival,
-                          weights = iptw,
+                          weights = Data_survival$iptw,
                           dist = "weibull")
-  }, error = function(e) { NULL })
+  }, error = function(e) {
+    # Fallback to unweighted model if IPTW causes a matrix singularity
+    tryCatch({
+      flexsurv::flexsurvreg(Surv(time_pre, event_t1) ~ 1, data = Data_survival, dist = "weibull")
+    }, error = function(e2) { NULL })
+  })
+
+  validate(need(!is.null(fit_t1), "Failed to fit Weibull model for T1 (CGP entry time). Data might be too sparse."))
 
   # 2. Fit Log-logistic AFT model for T2 (Survival after CGP)
-  # We include time_pre to absorb dependent truncation, weighted by IPTW
+  # Prevent crash by checking if there is more than 1 group before adding 'Group' to the formula
   fit_t2 <- tryCatch({
-    flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre + Group,
-                          data = Data_survival,
-                          weights = iptw,
-                          dist = "llogis")
-  }, error = function(e) { NULL })
+    if (n_groups > 1) {
+      flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre + Group,
+                            data = Data_survival,
+                            weights = Data_survival$iptw,
+                            dist = "llogis")
+    } else {
+      flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre,
+                            data = Data_survival,
+                            weights = Data_survival$iptw,
+                            dist = "llogis")
+    }
+  }, error = function(e) {
+    # Fallback to unweighted model
+    tryCatch({
+      if (n_groups > 1) {
+        flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre + Group, data = Data_survival, dist = "llogis")
+      } else {
+        flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre, data = Data_survival, dist = "llogis")
+      }
+    }, error = function(e2) { NULL })
+  })
 
-  req(!is.null(fit_t1) && !is.null(fit_t2))
+  validate(need(!is.null(fit_t2), "Failed to fit Log-logistic model for T2 (Post-CGP survival)."))
 
   # 3. Simulate Cohort (n = 5000 per group for smooth, stable curves)
   n_sim_per_group <- 5000
   simulated_data <- list()
 
-  # Extract T1 model coefficients (NATURAL scale in flexsurv)
+  # Extract T1 model coefficients
   shape_t1 <- fit_t1$res["shape", "est"]
   scale_t1 <- fit_t1$res["scale", "est"]
 
-  # Extract T2 model coefficients (NATURAL scale for baseline shape/scale)
+  # Extract T2 model coefficients
   shape_t2 <- fit_t2$res["shape", "est"]
   baseline_scale_t2 <- fit_t2$res["scale", "est"]
 
-  # Guard against covariates being dropped
+  # Guard against covariates being completely dropped from the model
   beta_time_pre <- ifelse("time_pre" %in% rownames(fit_t2$res), fit_t2$res["time_pre", "est"], 0)
-  beta_group2 <- ifelse("Group2" %in% rownames(fit_t2$res), fit_t2$res["Group2", "est"], 0)
+  beta_group2 <- ifelse(n_groups > 1 && "Group2" %in% rownames(fit_t2$res), fit_t2$res["Group2", "est"], 0)
 
   for (g in levels(Data_survival$Group)) {
-    # Generate random probabilities bounded to avoid Inf/NaN errors
+    # Generate random probabilities bounded strictly to avoid Inf/NaN errors
     u1 <- runif(n_sim_per_group, min = 0.001, max = 0.999)
     u2 <- runif(n_sim_per_group, min = 0.001, max = 0.999)
 
-    # ---------------------------------------------------------
-    # Step A: Sample T1 from the IPTW-weighted Weibull distribution
-    # ---------------------------------------------------------
-    # Using the standard R quantile function for Weibull
+    # Step A: Sample T1 from the Weibull distribution
     sim_t1_days <- qweibull(u1, shape = shape_t1, scale = scale_t1)
 
-    # ---------------------------------------------------------
     # Step B: Predict individual scale for T2 based on simulated T1
-    # ---------------------------------------------------------
     group_eff <- ifelse(g == "2", beta_group2, 0)
-    # Scale parameter changes exponentially with linear covariates
     sim_scale_t2 <- baseline_scale_t2 * exp(beta_time_pre * sim_t1_days + group_eff)
 
-    # ---------------------------------------------------------
     # Step C: Sample T2 from the Log-logistic distribution
-    # ---------------------------------------------------------
     sim_t2_days <- sim_scale_t2 * ((1 - u2) / u2)^(1 / shape_t2)
 
-    # ---------------------------------------------------------
     # Step D: Integrate Overall Survival (OS = T1 + T2)
-    # ---------------------------------------------------------
     sim_os_days <- sim_t1_days + sim_t2_days
 
     # Cap the maximum survival time at 20 years to prevent plot breakdown
@@ -546,14 +564,14 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   Data_survival_simulated <- do.call(rbind, simulated_data) %>%
     dplyr::filter(is.finite(time_all), is.finite(time_pre))
 
+  validate(need(nrow(Data_survival_simulated) > 0, "Simulation failed to generate valid survival times."))
+
   # =====================================================================
   # Plot the Unbiased Simulated Cohort Data
   # =====================================================================
-  # Since the simulation directly generates unbiased OS from the point of diagnosis,
-  # we pass adjustment = FALSE and weights_var = NULL to the plotting function.
   survival_compare_and_plot_CTx(
     data = Data_survival_simulated,
-    time_var1 = "time_pre", # Ignored in the non-adjusted plotting branch
+    time_var1 = "time_pre",
     time_var2 = "time_all",
     status_var = "censor",
     group_var = "Group",
