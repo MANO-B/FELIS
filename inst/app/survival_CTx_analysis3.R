@@ -79,12 +79,6 @@ survival_CTx_analysis2_logic_control <- function() {
       }
       Data_case_target$Cancers = Data_case_target$症例.基本情報.がん種.OncoTree.
       incProgress(1 / 13)
-      Data_cluster_ID_list = Data_cluster_ID() %>%
-        dplyr::select(C.CAT調査結果.基本項目.ハッシュID, cluster)
-      Data_case_target = left_join(Data_case_target,
-                                   Data_cluster_ID_list,
-                                   by = "C.CAT調査結果.基本項目.ハッシュID")
-      Data_case_target$cluster[is.na(Data_case_target$cluster)] = max(Data_case_target$cluster, na.rm = T) + 1
       Data_drug = Data_drug_raw()
       OUTPUT_DATA$figure_surv_CTx_Data_drug_control = Data_drug
 
