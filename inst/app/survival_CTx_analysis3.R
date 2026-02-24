@@ -179,46 +179,203 @@ survival_CTx_analysis2_logic_control <- function() {
 }
 
 
+# output$figure_survival_CTx_interactive_1_control = renderPlot({
+#   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
+#       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
+#       OUTPUT_DATA$figure_surv_CTx_Data_drug_control)
+#
+#   Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
+#   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
+#   Data_drug = OUTPUT_DATA$figure_surv_CTx_Data_drug_control
+#   # ========================================================
+#   # IPTW calculation for left truncation bias adjustment
+#   # ========================================================
+#   ref_surv_list <- list()
+#   age_groups <- c("40未満", "40代", "50代", "60代", "70代", "80以上")
+#
+#   if (!is.null(input$survival_data_source)) {
+#     if (input$survival_data_source == "registry") {
+#       # Load from JSON data
+#       if(exists("Data_age_survival_5_year") && input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
+#
+#         cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
+#
+#         # Extract the overall survival rates as fallback
+#         fallback_surv <- cancer_data[["全年齢"]]
+#
+#         for (ag in age_groups) {
+#           # Check if age-specific data exists and has exactly 5 years of data
+#           if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
+#             ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
+#           } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
+#             # Fallback to "全年齢" (overall) survival rates if age-specific is missing
+#             ref_surv_list[[ag]] <- as.numeric(fallback_surv)
+#           }
+#         }
+#       }
+#     } else if (input$survival_data_source == "manual_all") {
+#       # Apply overall inputs to all age groups
+#       vals <- c(input$surv_all_1y, input$surv_all_2y, input$surv_all_3y, input$surv_all_4y, input$surv_all_5y)
+#       for (ag in age_groups) ref_surv_list[[ag]] <- vals
+#     } else if (input$survival_data_source == "manual_age") {
+#       # Apply detailed inputs by age group
+#       ref_surv_list[["40未満"]] <- c(input$surv_u40_1y, input$surv_u40_2y, input$surv_u40_3y, input$surv_u40_4y, input$surv_u40_5y)
+#       ref_surv_list[["40代"]] <- c(input$surv_40s_1y, input$surv_40s_2y, input$surv_40s_3y, input$surv_40s_4y, input$surv_40s_5y)
+#       ref_surv_list[["50代"]] <- c(input$surv_50s_1y, input$surv_50s_2y, input$surv_50s_3y, input$surv_50s_4y, input$surv_50s_5y)
+#       ref_surv_list[["60代"]] <- c(input$surv_60s_1y, input$surv_60s_2y, input$surv_60s_3y, input$surv_60s_4y, input$surv_60s_5y)
+#       ref_surv_list[["70代"]] <- c(input$surv_70s_1y, input$surv_70s_2y, input$surv_70s_3y, input$surv_70s_4y, input$surv_70s_5y)
+#       ref_surv_list[["80以上"]] <- c(input$surv_80s_1y, input$surv_80s_2y, input$surv_80s_3y, input$surv_80s_4y, input$surv_80s_5y)
+#     }
+#   }
+#
+#   # If list is successfully constructed
+#   if (length(ref_surv_list) > 0) {
+#
+#     # Ultimate fallback just in case some rare cancers have NO overall data either
+#     for (ag in age_groups) {
+#       if (is.null(ref_surv_list[[ag]])) ref_surv_list[[ag]] <- c(10, 5, 3, 2, 1) # Fallback to a poor prognosis
+#     }
+#
+#     Data_survival_interactive <- calculate_iptw_age(Data_survival_interactive, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢")
+#   } else {
+#     Data_survival_interactive$iptw <- 1.0 # Fallback
+#   }
+#
+#   # ID抽出関数を定義
+#   extract_group_ids <- function(group_num) {
+#     # 初期IDセット
+#     IDs <- unique(Data_survival_interactive$C.CAT調査結果.基本項目.ハッシュID)
+#
+#     # 動的に入力名を構築
+#     input_prefix <- paste0("gene_survival_interactive_", group_num, "_")
+#
+#     # 遺伝子フィルタ（P_1: 必須変異1）
+#     p1_input <- input[[paste0(input_prefix, "P_1_control")]]
+#     if(!all(is.null(p1_input))) {
+#       IDs <- intersect(IDs, (Data_MAF_target %>%
+#                                dplyr::filter(Hugo_Symbol %in% p1_input))$Tumor_Sample_Barcode)
+#     }
+#
+#     # 遺伝子フィルタ（P_2: 必須変異2）
+#     p2_input <- input[[paste0(input_prefix, "P_2_control")]]
+#     if(!all(is.null(p2_input))) {
+#       IDs <- intersect(IDs, (Data_MAF_target %>%
+#                                dplyr::filter(Hugo_Symbol %in% p2_input))$Tumor_Sample_Barcode)
+#     }
+#
+#     # 遺伝子除外（W: 除外変異）
+#     w_input <- input[[paste0(input_prefix, "W_control")]]
+#     if(!all(is.null(w_input))) {
+#       IDs <- setdiff(IDs, (Data_MAF_target %>%
+#                              dplyr::filter(Hugo_Symbol %in% w_input))$Tumor_Sample_Barcode)
+#     }
+#
+#     # 臨床データフィルタ
+#     clinical_filters <- list(
+#       A_control = "YoungOld",
+#       S_control = "症例.基本情報.性別.名称.",
+#       H_control = "Cancers"
+#     )
+#
+#     for(filter_key in names(clinical_filters)) {
+#       filter_input <- input[[paste0(input_prefix, filter_key)]]
+#       if(!all(is.null(filter_input))) {
+#         column_name <- clinical_filters[[filter_key]]
+#         filter_expr <- paste0(column_name, " %in% filter_input")
+#         IDs <- intersect(IDs, (Data_survival_interactive %>%
+#                                  dplyr::filter(!!parse_expr(filter_expr)))$C.CAT調査結果.基本項目.ハッシュID)
+#       }
+#     }
+#
+#     # 薬剤フィルタ（D）
+#     d_input <- input[[paste0(input_prefix, "D_control")]]
+#     if(!all(is.null(d_input))) {
+#       IDs <- intersect(IDs, (Data_drug %>%
+#                                dplyr::filter(Drug %in% d_input))$ID)
+#     }
+#
+#     return(IDs)
+#   }
+#
+#   # Group1とGroup2のIDを取得
+#   ID_1 <- extract_group_ids(1)
+#   ID_2 <- extract_group_ids(2)
+#
+#   # データ作成
+#   Data_survival_1 <- Data_survival_interactive %>%
+#     dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_1) %>%
+#     dplyr::mutate(Group = 1)
+#
+#   Data_survival_2 <- Data_survival_interactive %>%
+#     dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_2) %>%
+#     dplyr::mutate(Group = 2)
+#
+#   Data_survival <- rbind(Data_survival_1, Data_survival_2)
+#
+#   # サバイバル解析実行
+#   survival_compare_and_plot_CTx(
+#     data = Data_survival,
+#     time_var1 = "time_pre",
+#     time_var2 = "time_all",
+#     status_var = "censor",
+#     group_var = "Group",
+#     plot_title = "Survival analisys based on cohort data",
+#     adjustment = FALSE,
+#     color_var_surv_CTx_1 = "diagnosis",
+#     weights_var = "iptw"
+#   )
+# })
+
+R
 output$figure_survival_CTx_interactive_1_control = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
       OUTPUT_DATA$figure_surv_CTx_Data_drug_control)
 
+  # =========================================================================
+  # Force Reactivity: Evaluate inputs explicitly so Shiny redraws on changes
+  # =========================================================================
+  lapply(1:2, function(i) {
+    prefix <- paste0("gene_survival_interactive_", i, "_")
+    list(
+      input[[paste0(prefix, "P_1_control")]],
+      input[[paste0(prefix, "P_2_control")]],
+      input[[paste0(prefix, "W_control")]],
+      input[[paste0(prefix, "A_control")]],
+      input[[paste0(prefix, "S_control")]],
+      input[[paste0(prefix, "H_control")]],
+      input[[paste0(prefix, "D_control")]]
+    )
+  })
+
   Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
   Data_drug = OUTPUT_DATA$figure_surv_CTx_Data_drug_control
+
   # ========================================================
-  # IPTW calculation for left truncation bias adjustment
+  # Prepare Reference Survival Data (Macro Data)
   # ========================================================
   ref_surv_list <- list()
   age_groups <- c("40未満", "40代", "50代", "60代", "70代", "80以上")
 
   if (!is.null(input$survival_data_source)) {
     if (input$survival_data_source == "registry") {
-      # Load from JSON data
       if(exists("Data_age_survival_5_year") && input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
-
         cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
-
-        # Extract the overall survival rates as fallback
         fallback_surv <- cancer_data[["全年齢"]]
 
         for (ag in age_groups) {
-          # Check if age-specific data exists and has exactly 5 years of data
           if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
             ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
           } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
-            # Fallback to "全年齢" (overall) survival rates if age-specific is missing
             ref_surv_list[[ag]] <- as.numeric(fallback_surv)
           }
         }
       }
     } else if (input$survival_data_source == "manual_all") {
-      # Apply overall inputs to all age groups
       vals <- c(input$surv_all_1y, input$surv_all_2y, input$surv_all_3y, input$surv_all_4y, input$surv_all_5y)
       for (ag in age_groups) ref_surv_list[[ag]] <- vals
     } else if (input$survival_data_source == "manual_age") {
-      # Apply detailed inputs by age group
       ref_surv_list[["40未満"]] <- c(input$surv_u40_1y, input$surv_u40_2y, input$surv_u40_3y, input$surv_u40_4y, input$surv_u40_5y)
       ref_surv_list[["40代"]] <- c(input$surv_40s_1y, input$surv_40s_2y, input$surv_40s_3y, input$surv_40s_4y, input$surv_40s_5y)
       ref_surv_list[["50代"]] <- c(input$surv_50s_1y, input$surv_50s_2y, input$surv_50s_3y, input$surv_50s_4y, input$surv_50s_5y)
@@ -228,100 +385,179 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     }
   }
 
-  # If list is successfully constructed
-  if (length(ref_surv_list) > 0) {
-
-    # Ultimate fallback just in case some rare cancers have NO overall data either
-    for (ag in age_groups) {
-      if (is.null(ref_surv_list[[ag]])) ref_surv_list[[ag]] <- c(10, 5, 3, 2, 1) # Fallback to a poor prognosis
-    }
-
-    Data_survival_interactive <- calculate_iptw_age(Data_survival_interactive, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢")
+  # Fallback generation for empty lists
+  if (length(ref_surv_list) == 0) {
+    for (ag in age_groups) ref_surv_list[[ag]] <- c(50, 30, 20, 15, 10)
   } else {
-    Data_survival_interactive$iptw <- 1.0 # Fallback
+    for (ag in age_groups) {
+      if (is.null(ref_surv_list[[ag]])) ref_surv_list[[ag]] <- ref_surv_list[[1]]
+    }
   }
 
-  # ID抽出関数を定義
-  extract_group_ids <- function(group_num) {
-    # 初期IDセット
-    IDs <- unique(Data_survival_interactive$C.CAT調査結果.基本項目.ハッシュID)
-
-    # 動的に入力名を構築
-    input_prefix <- paste0("gene_survival_interactive_", group_num, "_")
-
-    # 遺伝子フィルタ（P_1: 必須変異1）
-    p1_input <- input[[paste0(input_prefix, "P_1_control")]]
-    if(!all(is.null(p1_input))) {
-      IDs <- intersect(IDs, (Data_MAF_target %>%
-                               dplyr::filter(Hugo_Symbol %in% p1_input))$Tumor_Sample_Barcode)
-    }
-
-    # 遺伝子フィルタ（P_2: 必須変異2）
-    p2_input <- input[[paste0(input_prefix, "P_2_control")]]
-    if(!all(is.null(p2_input))) {
-      IDs <- intersect(IDs, (Data_MAF_target %>%
-                               dplyr::filter(Hugo_Symbol %in% p2_input))$Tumor_Sample_Barcode)
-    }
-
-    # 遺伝子除外（W: 除外変異）
-    w_input <- input[[paste0(input_prefix, "W_control")]]
-    if(!all(is.null(w_input))) {
-      IDs <- setdiff(IDs, (Data_MAF_target %>%
-                             dplyr::filter(Hugo_Symbol %in% w_input))$Tumor_Sample_Barcode)
-    }
-
-    # 臨床データフィルタ
-    clinical_filters <- list(
-      A_control = "YoungOld",
-      S_control = "症例.基本情報.性別.名称.",
-      H_control = "Cancers"
+  # Pre-calculate age class for simulation sampling
+  Data_survival_interactive <- Data_survival_interactive %>%
+    dplyr::mutate(
+      age_num = as.numeric(症例.基本情報.年齢),
+      age_class = dplyr::case_when(
+        age_num < 40 ~ "40未満",
+        age_num < 50 ~ "40代",
+        age_num < 60 ~ "50代",
+        age_num < 70 ~ "60代",
+        age_num < 80 ~ "70代",
+        age_num >= 80 ~ "80以上",
+        TRUE ~ "全年齢"
+      )
     )
 
+  # Define ID extraction function
+  extract_group_ids <- function(group_num) {
+    IDs <- unique(Data_survival_interactive$C.CAT調査結果.基本項目.ハッシュID)
+    input_prefix <- paste0("gene_survival_interactive_", group_num, "_")
+
+    p1_input <- input[[paste0(input_prefix, "P_1_control")]]
+    if(!all(is.null(p1_input))) IDs <- intersect(IDs, (Data_MAF_target %>% dplyr::filter(Hugo_Symbol %in% p1_input))$Tumor_Sample_Barcode)
+
+    p2_input <- input[[paste0(input_prefix, "P_2_control")]]
+    if(!all(is.null(p2_input))) IDs <- intersect(IDs, (Data_MAF_target %>% dplyr::filter(Hugo_Symbol %in% p2_input))$Tumor_Sample_Barcode)
+
+    w_input <- input[[paste0(input_prefix, "W_control")]]
+    if(!all(is.null(w_input))) IDs <- setdiff(IDs, (Data_MAF_target %>% dplyr::filter(Hugo_Symbol %in% w_input))$Tumor_Sample_Barcode)
+
+    clinical_filters <- list(A_control = "YoungOld", S_control = "症例.基本情報.性別.名称.", H_control = "Cancers")
     for(filter_key in names(clinical_filters)) {
       filter_input <- input[[paste0(input_prefix, filter_key)]]
       if(!all(is.null(filter_input))) {
         column_name <- clinical_filters[[filter_key]]
         filter_expr <- paste0(column_name, " %in% filter_input")
-        IDs <- intersect(IDs, (Data_survival_interactive %>%
-                                 dplyr::filter(!!parse_expr(filter_expr)))$C.CAT調査結果.基本項目.ハッシュID)
+        IDs <- intersect(IDs, (Data_survival_interactive %>% dplyr::filter(!!rlang::parse_expr(filter_expr)))$C.CAT調査結果.基本項目.ハッシュID)
       }
     }
 
-    # 薬剤フィルタ（D）
     d_input <- input[[paste0(input_prefix, "D_control")]]
-    if(!all(is.null(d_input))) {
-      IDs <- intersect(IDs, (Data_drug %>%
-                               dplyr::filter(Drug %in% d_input))$ID)
-    }
+    if(!all(is.null(d_input))) IDs <- intersect(IDs, (Data_drug %>% dplyr::filter(Drug %in% d_input))$ID)
 
     return(IDs)
   }
 
-  # Group1とGroup2のIDを取得
+  # Get IDs for Group 1 and Group 2
   ID_1 <- extract_group_ids(1)
   ID_2 <- extract_group_ids(2)
 
-  # データ作成
-  Data_survival_1 <- Data_survival_interactive %>%
-    dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_1) %>%
-    dplyr::mutate(Group = 1)
-
-  Data_survival_2 <- Data_survival_interactive %>%
-    dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_2) %>%
-    dplyr::mutate(Group = 2)
+  Data_survival_1 <- Data_survival_interactive %>% dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_1) %>% dplyr::mutate(Group = "1")
+  Data_survival_2 <- Data_survival_interactive %>% dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_2) %>% dplyr::mutate(Group = "2")
 
   Data_survival <- rbind(Data_survival_1, Data_survival_2)
+  req(nrow(Data_survival) > 0)
 
-  # サバイバル解析実行
+  # =====================================================================
+  # Parametric Simulation Implementation (Tamura & Ikegami Extended)
+  # =====================================================================
+  req(requireNamespace("flexsurv", quietly = TRUE))
+
+  # Calculate T2 explicitly (Survival time after CGP)
+  Data_survival <- Data_survival %>%
+    dplyr::mutate(
+      time_t2 = time_all - time_pre,
+      Group = as.factor(Group)
+    ) %>%
+    dplyr::filter(time_pre > 0, time_t2 > 0)
+
+  # Ensure enough data to fit the model without crashing
+  req(nrow(Data_survival) >= 10)
+
+  # 1. Fit Log-logistic AFT model for T2
+  # Modeling T2 conditional on T1 (time_pre) and Group to absorb dependent truncation
+  fit_t2 <- tryCatch({
+    flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre + Group, data = Data_survival, dist = "llogis")
+  }, error = function(e) { NULL })
+
+  req(!is.null(fit_t2))
+
+  # 2. Extract Log-logistic parameters for T1 from Macro Data
+  t1_params <- list()
+  t_points <- 1:5
+  for(ag in names(ref_surv_list)) {
+    S_t <- ref_surv_list[[ag]][1:5] / 100
+    S_t <- pmax(pmin(S_t, 0.999), 0.001)
+    y_linear <- log(1/S_t - 1)
+    x_linear <- log(t_points)
+
+    fit_lm <- lm(y_linear ~ x_linear)
+    p_t1 <- coef(fit_lm)[2]
+    lambda_t1 <- exp(coef(fit_lm)[1] / p_t1)
+
+    t1_params[[ag]] <- list(p = p_t1, lambda = lambda_t1)
+  }
+
+  # 3. Simulate Cohort (n = 5000 per group for smooth, stable curves)
+  n_sim_per_group <- 5000
+  simulated_data <- list()
+
+  # Extract T2 model coefficients
+  shape_t2 <- exp(fit_t2$res["shape", "est"])
+  beta0_t2 <- fit_t2$res["scale", "est"]
+  beta_time_pre <- fit_t2$res["time_pre", "est"]
+  beta_group2 <- ifelse("Group2" %in% rownames(fit_t2$res), fit_t2$res["Group2", "est"], 0)
+
+  for (g in levels(Data_survival$Group)) {
+    obs_group <- Data_survival %>% dplyr::filter(Group == g)
+    if(nrow(obs_group) == 0) next
+
+    # Bootstrap age classes to accurately reflect the group's demographics
+    sim_ages <- sample(obs_group$age_class, n_sim_per_group, replace = TRUE)
+    sim_t1_days <- numeric(n_sim_per_group)
+
+    for(ag in unique(sim_ages)) {
+      idx <- which(sim_ages == ag)
+      n_ag <- length(idx)
+
+      params <- t1_params[[ag]]
+      if(is.null(params)) params <- t1_params[[1]] # Safe fallback
+
+      # Inverse Transform Sampling for T1
+      u <- runif(n_ag)
+      sim_t1_years <- (1 / params$lambda) * ((1 - u) / u)^(1 / params$p)
+      sim_t1_days[idx] <- sim_t1_years * 365.25
+    }
+
+    # Predict T2 scale parameter for each simulated patient
+    group_eff <- ifelse(g == "2", beta_group2, 0)
+    sim_scale_t2 <- exp(beta0_t2 + beta_time_pre * sim_t1_days + group_eff)
+
+    # Sample T2 using Log-logistic distribution
+    u2 <- runif(n_sim_per_group)
+    sim_t2_days <- sim_scale_t2 * ((1 - u2) / u2)^(1 / shape_t2)
+
+    # Total Overall Survival (OS = T1 + T2)
+    sim_os_days <- sim_t1_days + sim_t2_days
+
+    simulated_data[[length(simulated_data) + 1]] <- data.frame(
+      C.CAT調査結果.基本項目.ハッシュID = paste0("SIM_", g, "_", 1:n_sim_per_group),
+      time_pre = sim_t1_days,
+      time_all = sim_os_days,
+      censor = 1, # Uncensored completely in baseline simulation
+      Group = g
+    )
+  }
+
+  Data_survival_simulated <- do.call(rbind, simulated_data)
+
+  # =====================================================================
+  # Plot the Unbiased Simulated Cohort Data
+  # =====================================================================
+  # We plot the fully simulated data.
+  # Because simulation intrinsically reconstructs the unbiased cohort from
+  # the moment of diagnosis, we do not need left-truncation (time_pre, time_all)
+  # or IPTW here. The OS curve is naturally unbiased.
   survival_compare_and_plot_CTx(
-    data = Data_survival,
-    time_var1 = "time_pre",
+    data = Data_survival_simulated,
+    time_var1 = "time_pre", # Ignored because adjustment=FALSE
     time_var2 = "time_all",
     status_var = "censor",
     group_var = "Group",
-    plot_title = "Survival analisys based on cohort data",
+    plot_title = "Unbiased Parametric Simulation OS (Tamura & Ikegami Extrapolated)",
     adjustment = FALSE,
     color_var_surv_CTx_1 = "diagnosis",
-    weights_var = "iptw"
+    weights_var = NULL
   )
 })
