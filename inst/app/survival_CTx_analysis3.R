@@ -448,6 +448,13 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   # Ensure there is enough data to proceed (Using shiny:: to prevent namespace collision)
   shiny::validate(shiny::need(nrow(Data_survival) > 0, "No patients match the selected criteria."))
 
+  # [FIX] Force iptw to be a pure numeric vector to prevent "non-atomic" errors
+  if (!"iptw" %in% colnames(Data_survival)) {
+    Data_survival$iptw <- 1.0
+  }
+  # unlistとas.numericを使って、ネストされたリストやデータフレーム属性を完全に剥がす
+  Data_survival$iptw <- as.numeric(unlist(Data_survival$iptw))
+
   Data_survival <- Data_survival %>%
     dplyr::mutate(
       time_t2 = time_all - time_pre,
