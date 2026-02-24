@@ -467,6 +467,24 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   validate(need(nrow(Data_survival) >= 10, "Not enough valid cases (time_pre > 0 and time_t2 > 0) to fit parametric models."))
 
   # =====================================================================
+  # Data Pre-processing for Models
+  # =====================================================================
+  # Ensure there is enough data to proceed (Using shiny:: to prevent namespace collision)
+  shiny::validate(shiny::need(nrow(Data_survival) > 0, "No patients match the selected criteria."))
+
+  Data_survival <- Data_survival %>%
+    dplyr::mutate(
+      time_t2 = time_all - time_pre,
+      event_t1 = 1,
+      Group = as.factor(Group),
+      # Fix possible missing or negative weights safely
+      iptw = ifelse(is.na(iptw) | iptw <= 0, 1.0, iptw)
+    ) %>%
+    dplyr::filter(time_pre > 0, time_t2 > 0)
+
+  shiny::validate(shiny::need(nrow(Data_survival) >= 10, "Not enough valid cases (time_pre > 0 and time_t2 > 0) to fit parametric models."))
+
+  # =====================================================================
   # Robust Parametric Simulation Implementation (Weighted Models)
   # =====================================================================
   req(requireNamespace("flexsurv", quietly = TRUE))
@@ -485,10 +503,9 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     }, error = function(e2) { NULL })
   })
 
-  validate(need(!is.null(fit_t1), "Failed to fit Weibull model for T1 (CGP entry time). Data might be too sparse."))
+  shiny::validate(shiny::need(!is.null(fit_t1), "Failed to fit Weibull model for T1 (CGP entry time). Data might be too sparse."))
 
   # 2. Fit Log-logistic AFT model for T2 (Survival after CGP)
-  # Prevent crash by checking if there is more than 1 group before adding 'Group' to the formula
   fit_t2 <- tryCatch({
     if (n_groups > 1) {
       flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre + Group,
@@ -512,7 +529,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     }, error = function(e2) { NULL })
   })
 
-  validate(need(!is.null(fit_t2), "Failed to fit Log-logistic model for T2 (Post-CGP survival)."))
+  shiny::validate(shiny::need(!is.null(fit_t2), "Failed to fit Log-logistic model for T2 (Post-CGP survival)."))
 
   # 3. Simulate Cohort (n = 5000 per group for smooth, stable curves)
   n_sim_per_group <- 5000
@@ -564,7 +581,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   Data_survival_simulated <- do.call(rbind, simulated_data) %>%
     dplyr::filter(is.finite(time_all), is.finite(time_pre))
 
-  validate(need(nrow(Data_survival_simulated) > 0, "Simulation failed to generate valid survival times."))
+  shiny::validate(shiny::need(nrow(Data_survival_simulated) > 0, "Simulation failed to generate valid survival times."))
 
   # =====================================================================
   # Plot the Unbiased Simulated Cohort Data
