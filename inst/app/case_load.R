@@ -1048,6 +1048,9 @@ Data_case =  reactive({
     { if (!is.null(input$sex))
       filter(., 症例.基本情報.性別.名称. %in% input$sex)
       else . } %>%
+    { if (!is.null(input$stage))
+      filter(., 症例.背景情報.初回治療前のステージ分類.名称. %in% input$stage)
+      else . } %>%
     { if (!is.null(input$smoking))
       filter(., 症例.背景情報.喫煙歴有無.名称. %in% input$smoking)
       else . } %>%

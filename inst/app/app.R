@@ -59,6 +59,7 @@ library(future)
 library(furrr)
 library(parallel)
 library(aws.s3)
+library(jsonlite)
 
 APP_DIR <- system.file("app", package = "FELIS")
 source_app <- function(fname) {
@@ -95,6 +96,7 @@ server <- function(input, output, session) {
   source_app("survival_simuration.R")
   source_app("survival_CGP_analysis.R")
   source_app("survival_CTx_analysis2.R")
+  source_app("survival_CTx_analysis3.R")
   source_app("MCMC_function.R")
   source_app("survival_CTx_analysis.R")
   source_app("drug_table.R")
@@ -166,6 +168,11 @@ server <- function(input, output, session) {
                is.null(OUTPUT_DATA$figure_surv_CTx_Data_survival_cancer)) {
       withProgress(message = "Data processing...", {
         survival_CTx_analysis2_logic()
+      })
+    } else if (input$tabs %in% c("ControlCustom") &&
+               is.null(OUTPUT_DATA$figure_surv_CTx_Data_survival_cancer_control)) {
+      withProgress(message = "Data processing...", {
+        survival_CTx_analysis2_logic_control()
       })
     } else if (input$tabs %in% c("Survivalcorrectedforleft-truncationbias",
                                  "BayesCustom",

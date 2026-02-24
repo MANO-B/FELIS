@@ -99,6 +99,11 @@ ui <- dashboardPage(
                menuSubItem("Diagnosis and survival", tabName = "DiagnosisandsurvivalKM-curve", icon = icon("angle-right")),
                hr()
       ),
+      menuItem("Survival after CTx with control cohort data", icon = icon("th"),
+               hr(),
+               menuSubItem("Custom survival analysis", tabName = "ControlCustom", icon = icon("angle-right")),
+               hr()
+      ),
       menuItem("Bias correction simulation", tabName = "SurvivalSimurationKMCurve", icon = icon("th")),
       menuItem("Drug response", icon = icon("th"),
                hr(),
@@ -442,11 +447,15 @@ ui <- dashboardPage(
                        br(),
                        htmlOutput("select_smoking"),
                        br(),
-                       htmlOutput("select_year"),
                        htmlOutputWithPopover(
                          "select_year",
                          "CGP検査の実施年",
                          "2019年と直近は欠損値が多いです"
+                       ),
+                       htmlOutputWithPopover(
+                         "select_stage",
+                         "診断時のステージ情報",
+                         "2019-2021年は欠損値が多いです"
                        ),
                        br()
                 ),
@@ -1315,6 +1324,75 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_interactive_2_C"),
                        htmlOutput("select_gene_survival_interactive_2_M"),
                        htmlOutput("select_gene_survival_interactive_2_P")
+                )
+              ),
+              br(),
+              br(),
+              br(),
+              br(),
+              hr()
+      ),
+      tabItem("Geneticvariantsandsurvivalforestplot2",
+              h6("Figure. Overall survival after the first survival-prolonging chemotherapy after adjusting for left-truncation bias. To evaluate the association between oncogenic mutations and survival, a risk-set adjustment model was performed to adjust for left-truncation bias with survival package."),
+              h6("  Take care of left-truncation bias."),
+              plotOutput('figure_survival_CTx_2_2',
+                         height = "1000px",
+                         width = "1250px"),
+              hr(),
+              plotOutput('figure_survival_CTx_3_2',
+                         height = "3600px",
+                         width = "2000px"),
+              hr(),
+              DT::dataTableOutput("figure_survival_CTx_2_data_2")
+      ),
+      tabItem("Diagnosisandsurvivalforestplot2",
+              plotOutput('figure_survival_CTx_4_2',
+                         height = "1200px",
+                         width = "1000px"),
+              hr()
+      ),
+      tabItem("DiagnosisandsurvivalKM-curve2",
+              h6("  Take care of left-truncation bias."),
+              plotOutput('figure_survival_CTx_5_2',
+                         height = "1200px",
+                         width = "1000px"),
+              hr(),
+              h6("Figure. Overall survival after the first survival-prolonging chemotherapy after adjusting for left-truncation bias. To evaluate the association between oncogenic mutations and survival, a risk-set adjustment model was performed to adjust for left-truncation bias with survival package.")
+      ),
+      tabItem("ControlCustom",
+              h6("Figure. Overall survival after the first survival-prolonging chemotherapy after adjusting for left-truncation bias. To evaluate the association between prognostic factors and survival, a risk-set (number at risk) adjustment model was applied to adjust for left-truncation bias with survival package. Note that the analysis assumes quasi-independent left-truncation (conditional Kendall tau = 0)."),
+              plotOutput('figure_survival_CTx_interactive_1_control',
+                         height = "800px",
+                         width = "800px"),
+              hr(),
+              htmlOutput("select_stage4_survival_rate"),
+              hr(),
+              fluidRow(
+                column(3,
+                       h6("Group 1"),
+                       htmlOutput("select_gene_survival_interactive_1_P_1_control"),
+                       htmlOutput("select_gene_survival_interactive_1_P_2_control"),
+                       htmlOutput("select_gene_survival_interactive_1_W_control"),
+                       htmlOutput("select_gene_survival_interactive_1_D_control")
+                ),
+                column(3,
+                       h6("   "),
+                       htmlOutput("select_gene_survival_interactive_1_A_control"),
+                       htmlOutput("select_gene_survival_interactive_1_S_control"),
+                       htmlOutput("select_gene_survival_interactive_1_H_control")
+                ),
+                column(3,
+                       h6("Group 2"),
+                       htmlOutput("select_gene_survival_interactive_2_P_1_control"),
+                       htmlOutput("select_gene_survival_interactive_2_P_2_control"),
+                       htmlOutput("select_gene_survival_interactive_2_W_control"),
+                       htmlOutput("select_gene_survival_interactive_2_D_control")
+                ),
+                column(3,
+                       h6("   "),
+                       htmlOutput("select_gene_survival_interactive_2_A_control"),
+                       htmlOutput("select_gene_survival_interactive_2_S_control"),
+                       htmlOutput("select_gene_survival_interactive_2_H_control")
                 )
               ),
               br(),

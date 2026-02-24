@@ -180,6 +180,89 @@ output$select_year = renderUI({
               choices = sort(unique(as.POSIXlt(as.Date(Data_case_raw()$症例.管理情報.登録日))$year + 1900)),
               selected = sort(unique(as.POSIXlt(as.Date(Data_case_raw()$症例.管理情報.登録日))$year + 1900)), multiple = TRUE)
 })
+output$select_stage = renderUI({
+  pickerInput("stage", "Filter by stage at diagnosis",
+              choices = c("0", "1", "2", "3", "4", "Unknown"),
+              selected = c("0", "1", "2", "3", "4", "Unknown"), multiple = TRUE)
+})
+output$select_stage4_survival_rate = renderUI({
+  # Get cancer types from pre-loaded JSON list if it exists
+  registry_choices <- if(exists("Data_age_survival_5_year")) names(Data_age_survival_5_year) else c("No Registry Data Found")
+
+  tagList(
+    radioButtons(
+      inputId = "survival_data_source",
+      label = "Reference Survival Data Source for Left Truncation Bias Adjustment (IPTW)",
+      choices = c(
+        "Use Hospital-based Cancer Registry Data (Automatic)" = "registry",
+        "Manual Input (Overall cohort applied to all ages)" = "manual_all",
+        "Manual Input (Detailed by Age Group)" = "manual_age"
+      ),
+      selected = "registry"
+    ),
+
+    # UI for Registry Data
+    conditionalPanel(
+      condition = "input.survival_data_source == 'registry'",
+      selectInput("registry_cancer_type", "Select Cancer Type:", choices = registry_choices)
+    ),
+
+    # UI for Manual Input (Overall - Applied to all ages)
+    conditionalPanel(
+      condition = "input.survival_data_source == 'manual_all'",
+      tags$b("Enter reference survival rates (%) for the overall cohort:"),
+      fluidRow(
+        column(2, numericInput("surv_all_1y", "1-Year", value = 50.0, min = 0, max = 100)),
+        column(2, numericInput("surv_all_2y", "2-Year", value = 30.0, min = 0, max = 100)),
+        column(2, numericInput("surv_all_3y", "3-Year", value = 20.0, min = 0, max = 100)),
+        column(2, numericInput("surv_all_4y", "4-Year", value = 15.0, min = 0, max = 100)),
+        column(2, numericInput("surv_all_5y", "5-Year", value = 10.0, min = 0, max = 100))
+      )
+    ),
+
+    # UI for Manual Input (Detailed by Age Group)
+    conditionalPanel(
+      condition = "input.survival_data_source == 'manual_age'",
+      tags$b("Enter reference survival rates (%) by age group:"),
+      tags$p("Age <40:"),
+      fluidRow(
+        column(2, numericInput("surv_u40_1y", "1Y", value = 50)), column(2, numericInput("surv_u40_2y", "2Y", value = 30)),
+        column(2, numericInput("surv_u40_3y", "3Y", value = 20)), column(2, numericInput("surv_u40_4y", "4Y", value = 15)),
+        column(2, numericInput("surv_u40_5y", "5Y", value = 10))
+      ),
+      tags$p("Age 40s:"),
+      fluidRow(
+        column(2, numericInput("surv_40s_1y", "1Y", value = 50)), column(2, numericInput("surv_40s_2y", "2Y", value = 30)),
+        column(2, numericInput("surv_40s_3y", "3Y", value = 20)), column(2, numericInput("surv_40s_4y", "4Y", value = 15)),
+        column(2, numericInput("surv_40s_5y", "5Y", value = 10))
+      ),
+      tags$p("Age 50s:"),
+      fluidRow(
+        column(2, numericInput("surv_50s_1y", "1Y", value = 50)), column(2, numericInput("surv_50s_2y", "2Y", value = 30)),
+        column(2, numericInput("surv_50s_3y", "3Y", value = 20)), column(2, numericInput("surv_50s_4y", "4Y", value = 15)),
+        column(2, numericInput("surv_50s_5y", "5Y", value = 10))
+      ),
+      tags$p("Age 60s:"),
+      fluidRow(
+        column(2, numericInput("surv_60s_1y", "1Y", value = 50)), column(2, numericInput("surv_60s_2y", "2Y", value = 30)),
+        column(2, numericInput("surv_60s_3y", "3Y", value = 20)), column(2, numericInput("surv_60s_4y", "4Y", value = 15)),
+        column(2, numericInput("surv_60s_5y", "5Y", value = 10))
+      ),
+      tags$p("Age 70s:"),
+      fluidRow(
+        column(2, numericInput("surv_70s_1y", "1Y", value = 50)), column(2, numericInput("surv_70s_2y", "2Y", value = 30)),
+        column(2, numericInput("surv_70s_3y", "3Y", value = 20)), column(2, numericInput("surv_70s_4y", "4Y", value = 15)),
+        column(2, numericInput("surv_70s_5y", "5Y", value = 10))
+      ),
+      tags$p("Age >=80:"),
+      fluidRow(
+        column(2, numericInput("surv_80s_1y", "1Y", value = 50)), column(2, numericInput("surv_80s_2y", "2Y", value = 30)),
+        column(2, numericInput("surv_80s_3y", "3Y", value = 20)), column(2, numericInput("surv_80s_4y", "4Y", value = 15)),
+        column(2, numericInput("surv_80s_5y", "5Y", value = 10))
+      )
+    )
+  )
+})
 output$select_age = renderUI({
   sliderInput(inputId = "age", label = "Age for analysis",
               value = c(
@@ -2399,6 +2482,119 @@ output$select_gene_survival_drug_interactive_2_L = renderUI({
   req(OUTPUT_DATA$drug_analysis_candidate_lines)
   pickerInput("gene_survival_drug_interactive_2_L", "CTx line in which drugs used",
               OUTPUT_DATA$drug_analysis_candidate_lines,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+
+output$select_gene_survival_interactive_1_H_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_Histology_control)
+  pickerInput("gene_survival_interactive_1_H_control", "Histology",
+              OUTPUT_DATA$figure_surv_interactive_candidate_Histology_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_2_H_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_Histology_control)
+  pickerInput("gene_survival_interactive_2_H_control", "Histology",
+              OUTPUT_DATA$figure_surv_interactive_candidate_Histology_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_1_S_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_Sex_control)
+  pickerInput("gene_survival_interactive_1_S_control", "Sex",
+              OUTPUT_DATA$figure_surv_interactive_candidate_Sex_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_2_S_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_Sex_control)
+  pickerInput("gene_survival_interactive_2_S_control", "Sex",
+              OUTPUT_DATA$figure_surv_interactive_candidate_Sex_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_1_A_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_Age_control)
+  pickerInput("gene_survival_interactive_1_A_control", "Age",
+              OUTPUT_DATA$figure_surv_interactive_candidate_Age_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_2_A_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_Age_control)
+  pickerInput("gene_survival_interactive_2_A_control", "Age",
+              OUTPUT_DATA$figure_surv_interactive_candidate_Age_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_1_P_1_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_genes_control)
+  pickerInput("gene_survival_interactive_1_P_1_control", "Pathogenic variant in any genes",
+              OUTPUT_DATA$figure_surv_interactive_candidate_genes_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = OUTPUT_DATA$figure_surv_interactive_Top_gene[1],
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_1_P_2_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_genes_control)
+  pickerInput("gene_survival_interactive_1_P_2_control", "Pathogenic variant in any genes",
+              OUTPUT_DATA$figure_surv_interactive_candidate_genes_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_1_W_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_genes_control)
+  pickerInput("gene_survival_interactive_1_W_control", "Genes without pathogenic variant",
+              OUTPUT_DATA$figure_surv_interactive_candidate_genes_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_1_D_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control)
+  pickerInput("gene_survival_interactive_1_D_control", "Drugs used in any lines",
+              OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_2_P_1_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_genes_control)
+  pickerInput("gene_survival_interactive_2_P_1_control", "Pathogenic variant in any genes",
+              OUTPUT_DATA$figure_surv_interactive_candidate_genes_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_2_P_2_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_genes_control)
+  pickerInput("gene_survival_interactive_2_P_2_control", "Pathogenic variant in any genes",
+              OUTPUT_DATA$figure_surv_interactive_candidate_genes_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_2_W_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_genes_control)
+  pickerInput("gene_survival_interactive_2_W_control", "Genes without pathogenic variant",
+              OUTPUT_DATA$figure_surv_interactive_candidate_genes_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_2_D_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control)
+  pickerInput("gene_survival_interactive_2_D_control", "Drugs used in any lines",
+              OUTPUT_DATA$figure_surv_interactive_candidate_drugs,
               options = list(`actions-box` = TRUE, `live-search`=TRUE),
               selected = NULL,
               multiple = TRUE)

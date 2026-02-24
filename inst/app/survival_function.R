@@ -1262,32 +1262,53 @@ survival_compare_and_plot_CTx <- function(data,
                                           plot_title = "Survival curve",
                                           adjustment = TRUE,
                                           color_var_surv_CTx_1 = "CTx",
-                                          group_labels = NULL) {
-  if(adjustment){
-    surv_formula <- as.formula(paste0("Surv(", time_var1, ", ", time_var2, ", ", status_var, ") ~ ", group_var))
-    Xlab = paste0("Time from ", color_var_surv_CTx_1, ", risk-set adjusted (months)")
-  } else {
-    surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
-    Xlab = paste0("Time from ", color_var_surv_CTx_1, ", bias not adj (months)")
-  }
+                                          group_labels = NULL,
+                                          weights_var = NULL) { # <-- Added weights_var for backward compatibility
+
   data$time_pre = data[[time_var1]]
   data$time_all = data[[time_var2]]
+
+  # Check if valid weights are provided
+  use_weights <- !is.null(weights_var) && (weights_var %in% colnames(data))
+
+  if (use_weights) {
+    # If using IPTW, we avoid delayed entry to fix the dependent truncation error,
+    # and instead apply the calculated weights to the OS model.
+    surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
+    Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", IPTW adjusted (months)")
+    weight_vector <- data[[weights_var]]
+  } else {
+    # Traditional behavior (supports older function calls)
+    if (adjustment) {
+      surv_formula <- as.formula(paste0("Surv(", time_var1, ", ", time_var2, ", ", status_var, ") ~ ", group_var))
+      Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", risk-set adjusted (months)")
+    } else {
+      surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
+      Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", bias not adj (months)")
+    }
+    weight_vector <- rep(1, nrow(data))
+  }
+
+  # Fit model
   surv_fit <- eval(substitute(
-    survfit(formula = FORMULA, data = data, conf.type = "log-log"),
-    list(FORMULA = surv_formula)
+    survfit(formula = FORMULA, data = data, weights = WEIGHTS, conf.type = "log-log"),
+    list(FORMULA = surv_formula, WEIGHTS = weight_vector)
   ))
+
   if(group_var == "1"){
     surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
-  } else{
+  } else {
     group_vals <- unique(na.omit(data[[group_var]]))
     n_group <- length(group_vals)
     if (n_group == 1) {
       surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
     } else {
-      diff_0 = coxph(Surv(time = data[[time_var1]],
-                          time2 = data[[time_var2]],
-                          censor) ~ data[[group_var]], data=data)
-
+      # Use robust=TRUE when weights are applied
+      if (use_weights) {
+        diff_0 <- coxph(surv_formula, data = data, weights = weight_vector, robust = TRUE)
+      } else {
+        diff_0 <- coxph(surv_formula, data = data)
+      }
       surv_curv_CTx(surv_fit, data, plot_title, group_labels, diff_0, Xlab)
     }
   }
@@ -1932,4 +1953,67 @@ optimize_data_datatable <- function(Data_forest_tmp_, input) {
   }
 
   return(Data_forest_tmp_)
+}
+
+# Helper function to calculate age-stratified IPTW
+calculate_iptw_age <- function(data, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢") {
+  init_pop <- 10000
+
+  # Categorize age into 6 groups and discretize time into bins
+  data <- data %>%
+    dplyr::mutate(
+      age_num = as.numeric(!!sym(age_var)),
+      age_class = dplyr::case_when(
+        age_num < 40 ~ "40未満",
+        age_num < 50 ~ "40代",
+        age_num < 60 ~ "50代",
+        age_num < 70 ~ "60代",
+        age_num < 80 ~ "70代",
+        age_num >= 80 ~ "80以上",
+        TRUE ~ "Unknown"
+      ),
+      time_years = !!sym(time_var) / 365.25,
+      time_bin = dplyr::case_when(
+        time_years <= 1 ~ 1,
+        time_years <= 2 ~ 2,
+        time_years <= 3 ~ 3,
+        time_years <= 4 ~ 4,
+        time_years <= 5 ~ 5,
+        TRUE ~ 6
+      )
+    )
+
+  # Build Person-Time (PT) reference table for each age class
+  pt_table <- expand.grid(age_class = names(ref_surv_list), time_bin = 1:6, stringsAsFactors = FALSE)
+  pt_table$pt_ref <- 0
+
+  for(ag in names(ref_surv_list)) {
+    surv_rates <- ref_surv_list[[ag]]
+    s_probs <- c(1.0, surv_rates / 100)
+
+    pt_bins <- numeric(6)
+    for(i in 1:5) {
+      pt_bins[i] <- init_pop * (s_probs[i] + s_probs[i+1]) / 2
+    }
+    pt_bins[6] <- init_pop * s_probs[6] / 2
+
+    pt_table[pt_table$age_class == ag, "pt_ref"] <- pt_bins
+  }
+
+  # Count actual N in CGP data per age class and time bin
+  bin_counts <- data %>% dplyr::count(age_class, time_bin, name = "N_cgp")
+
+  # Calculate IPTW (Weight = PT / N_cgp)
+  data <- data %>%
+    dplyr::left_join(pt_table, by = c("age_class", "time_bin")) %>%
+    dplyr::left_join(bin_counts, by = c("age_class", "time_bin")) %>%
+    dplyr::mutate(
+      raw_weight = ifelse(!is.na(N_cgp) & N_cgp > 0 & !is.na(pt_ref), pt_ref / N_cgp, 0)
+    )
+
+  # Stabilize weights (mean = 1)
+  mean_w <- mean(data$raw_weight[data$raw_weight > 0], na.rm = TRUE)
+  data$iptw <- ifelse(data$raw_weight > 0, data$raw_weight / mean_w, 1.0) # Default to 1.0 if missing
+
+  return(data)
 }
