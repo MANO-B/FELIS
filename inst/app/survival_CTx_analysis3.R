@@ -216,6 +216,21 @@ survival_CTx_analysis2_logic_control <- function() {
 
         Data_survival_interactive = Data_survival
         OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control = Data_survival_interactive
+        candidate_genes = sort(unique(c(Data_MAF_target$Hugo_Symbol,
+                                        paste0(input$special_gene, "_", input$special_gene_mutation_1_name),
+                                        paste0(input$special_gene, "_", input$special_gene_mutation_2_name),
+                                        paste0(input$special_gene, "_NOS"))))
+        candidate_genes = candidate_genes[!candidate_genes %in% c("", "_", "_NOS", paste0(input$special_gene, "_"))]
+        candidate_genes = candidate_genes[!is.na(candidate_genes)]
+        Top_gene = unique(names(sort(table(Data_MAF_target$Hugo_Symbol), decreasing = T)))
+        Top_gene = Top_gene[Top_gene %in% candidate_genes]
+        candidate_drugs = sort(unique(c(Data_drug$Drug)))
+        OUTPUT_DATA$figure_surv_interactive_Top_gene_control = Top_gene
+        OUTPUT_DATA$figure_surv_interactive_candidate_genes_control = candidate_genes
+        OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control = candidate_drugs[!is.na(candidate_drugs)]
+        OUTPUT_DATA$figure_surv_interactive_candidate_Age_control = sort(unique(Data_survival_interactive$YoungOld))
+        OUTPUT_DATA$figure_surv_interactive_candidate_Sex_control = sort(unique(Data_survival_interactive$症例.基本情報.性別.名称.))
+        OUTPUT_DATA$figure_surv_interactive_candidate_Histology_control = sort(unique(Data_survival_interactive$Cancers))
       }
       incProgress(1 / 13)
     })
