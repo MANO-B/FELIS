@@ -326,7 +326,6 @@ survival_CTx_analysis2_logic_control <- function() {
 #   )
 # })
 
-R
 output$figure_survival_CTx_interactive_1_control = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
