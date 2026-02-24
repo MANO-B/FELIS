@@ -325,13 +325,14 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 
   # サバイバル解析実行
   survival_compare_and_plot_CTx(
-    data = Data_survival,
+    data = plot_data, # or Data_survival
     time_var1 = "time_pre",
     time_var2 = "time_all",
     status_var = "censor",
-    group_var = "Group",
-    plot_title = "Survival analisys based on variants and drugs",
-    adjustment = OUTPUT_DATA$figure_surv_CTx_adjustment_control,
-    color_var_surv_CTx_1 = input$color_var_surv_CTx_1
+    group_var = group_var,
+    plot_title = plot_title,
+    adjustment = OUTPUT_DATA$figure_surv_CTx_adjustment,
+    color_var_surv_CTx_1 = input$color_var_surv_CTx_1,
+    weights_var = if(OUTPUT_DATA$figure_surv_CTx_adjustment) "iptw" else NULL
   )
 })
