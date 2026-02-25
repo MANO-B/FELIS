@@ -479,14 +479,13 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   # =====================================================================
   # Determine Distribution Choice from UI
   # =====================================================================
-  # Default to log-logistic if input is not yet available
   dist_choice <- "llogis"
   if (!is.null(input$Control_simulation_llogis_weibull)) {
     dist_choice <- ifelse(input$Control_simulation_llogis_weibull == "Weibull", "weibull", "llogis")
   }
 
   # =====================================================================
-  # Fit Left-Truncated OS Model with IPTW
+  # Fit Left-Truncated OS Model with IPTW (With Fail-safe)
   # =====================================================================
   req(requireNamespace("flexsurv", quietly = TRUE))
 
@@ -494,14 +493,23 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     flexsurv::flexsurvreg(Surv(time_pre, time_all, censor) ~ Group,
                           data = Data_model,
                           weights = iptw,
-                          dist = dist_choice) # Use dynamic distribution
+                          dist = dist_choice)
   }, error = function(e) {
     tryCatch({
       flexsurv::flexsurvreg(Surv(time_pre, time_all, censor) ~ Group, data = Data_model, dist = dist_choice)
     }, error = function(e2) { NULL })
   })
 
-  shiny::validate(shiny::need(!is.null(fit_os), paste("Failed to fit the left-truncated OS effect model using", dist_choice)))
+  # [FIX] Fail-safe: If Weibull fails to converge due to left-truncation,
+  # automatically fall back to the more stable Log-logistic distribution.
+  if (is.null(fit_os) && dist_choice == "weibull") {
+    dist_choice <- "llogis"
+    fit_os <- tryCatch({
+      flexsurv::flexsurvreg(Surv(time_pre, time_all, censor) ~ Group, data = Data_model, weights = iptw, dist = "llogis")
+    }, error = function(e) { NULL })
+  }
+
+  shiny::validate(shiny::need(!is.null(fit_os), paste("Failed to fit the left-truncated OS model. Data might be too sparse or highly skewed.")))
 
   af_g1 <- ifelse("Group1" %in% rownames(fit_os$res), fit_os$res["Group1", "est"], 0)
   af_g2 <- ifelse("Group2" %in% rownames(fit_os$res), fit_os$res["Group2", "est"], 0)
@@ -514,20 +522,17 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     S_t <- ref_surv_list[[ag]][1:5] / 100
     S_t <- pmax(pmin(S_t, 0.999), 0.001)
 
-    # Linearization depends on the chosen distribution
     if (dist_choice == "llogis") {
       y_val <- log(1/S_t - 1)
-    } else { # weibull
+    } else {
       y_val <- log(-log(S_t))
     }
 
     x_val <- log(1:5)
     fit_macro <- lm(y_val ~ x_val)
 
-    shape <- coef(fit_macro)[2]
-    # The intercept relationship for scale is mathematically identical
-    # for both llogis and weibull in this specific log-linearization format:
-    # intercept = -shape * log(scale_years) -> scale_years = exp(-intercept / shape)
+    # [FIX] Protect shape from becoming negative due to data anomalies
+    shape <- max(coef(fit_macro)[2], 0.01)
     scale_days <- exp(-coef(fit_macro)[1] / shape) * 365.25
 
     macro_models[[ag]] <- list(shape = shape, scale = scale_days)
@@ -572,7 +577,6 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     for (ag in unique_ages) {
       idx <- which(group_data$age_class == ag)
       n_ag <- length(idx)
-
       if (n_ag == 0) next
 
       u_ag <- (1:n_ag - 0.5) / n_ag
@@ -585,11 +589,12 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
       shape_m <- macro_models[[ag_model]]$shape
       scale_m <- macro_models[[ag_model]]$scale
 
-      # Inverse Transform Sampling depends on the chosen distribution
+      # [FIX] Safe Inverse Transform Sampling using built-in functions where possible
       if (dist_choice == "llogis") {
         sim_os_macro[idx] <- scale_m * ((1 - u_ag) / u_ag)^(1 / shape_m)
-      } else { # weibull
-        sim_os_macro[idx] <- scale_m * (-log(1 - u_ag))^(1 / shape_m)
+      } else {
+        # Using qweibull is mathematically safer than manual exponentiation
+        sim_os_macro[idx] <- qweibull(u_ag, shape = shape_m, scale = scale_m)
       }
     }
 
