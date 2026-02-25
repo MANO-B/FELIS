@@ -501,7 +501,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   # Construct the multivariate formula: Surv(...) ~ Group + age_num + Cancers...
   formula_str <- paste("Surv(time_pre, time_all, censor) ~", paste(valid_covariates, collapse = " + "))
   os_formula <- as.formula(formula_str)
-
+  dist_choice <- "llogis"
   # 3. Fit the Doubly Robust AFT Model
   fit_os <- tryCatch({
     flexsurv::flexsurvreg(os_formula,
