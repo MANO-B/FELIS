@@ -1364,9 +1364,9 @@ ui <- dashboardPage(
               plotOutput('figure_survival_CTx_interactive_1_control',
                          height = "800px",
                          width = "800px"),
-              plotOutput("forest_plot_multivariate"),
               hr(),
               htmlOutput("select_stage4_survival_rate"),
+              htmlOutput("select_gene_survival_interactive_1_P_1_control_forest"),
               hr(),
               # htmlOutput("select_Control_simulation_llogis_weibull"),
               hr(),
@@ -1442,7 +1442,7 @@ ui <- dashboardPage(
                          "※ プロットの点は点推定値、エラーバーは95%信頼区間を示します。TRが1.0の点線を跨いでいなければ、統計的に有意な独立因子であることを意味します。")
                 )
               ),
-              htmlOutput("select_gene_survival_interactive_1_P_1_control_forest"),
+              plotOutput("forest_plot_multivariate"),
               br(),
               br(),
               br(),
