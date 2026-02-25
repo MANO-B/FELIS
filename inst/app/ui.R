@@ -1366,6 +1366,7 @@ ui <- dashboardPage(
                          width = "800px"),
               hr(),
               htmlOutput("select_stage4_survival_rate"),
+              htmlOutput("select_Control_simulation_llogis_weibull"),
               hr(),
               fluidRow(
                 column(3,

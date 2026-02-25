@@ -477,45 +477,57 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
                               "Not enough EP_treat == 0 patients to establish the reference baseline."))
 
   # =====================================================================
+  # Determine Distribution Choice from UI
+  # =====================================================================
+  # Default to log-logistic if input is not yet available
+  dist_choice <- "llogis"
+  if (!is.null(input$Control_simulation_llogis_weibull)) {
+    dist_choice <- ifelse(input$Control_simulation_llogis_weibull == "Weibull", "weibull", "llogis")
+  }
+
+  # =====================================================================
   # Fit Left-Truncated OS Model with IPTW
   # =====================================================================
-  # By fitting OS (time_pre, time_all) with IPTW, we extract the true Acceleration
-  # Factors (AF) for mutations/treatments that act on the ENTIRE survival timeline,
-  # while neutralizing left-truncation and survivorship bias.
   req(requireNamespace("flexsurv", quietly = TRUE))
 
   fit_os <- tryCatch({
     flexsurv::flexsurvreg(Surv(time_pre, time_all, censor) ~ Group,
                           data = Data_model,
                           weights = iptw,
-                          dist = "llogis")
+                          dist = dist_choice) # Use dynamic distribution
   }, error = function(e) {
-    # Fallback to unweighted if matrix is singular
     tryCatch({
-      flexsurv::flexsurvreg(Surv(time_pre, time_all, censor) ~ Group, data = Data_model, dist = "llogis")
+      flexsurv::flexsurvreg(Surv(time_pre, time_all, censor) ~ Group, data = Data_model, dist = dist_choice)
     }, error = function(e2) { NULL })
   })
 
-  shiny::validate(shiny::need(!is.null(fit_os), "Failed to fit the left-truncated OS effect model."))
+  shiny::validate(shiny::need(!is.null(fit_os), paste("Failed to fit the left-truncated OS effect model using", dist_choice)))
 
-  # Extract pure Acceleration Factors for Group 1 and Group 2
   af_g1 <- ifelse("Group1" %in% rownames(fit_os$res), fit_os$res["Group1", "est"], 0)
   af_g2 <- ifelse("Group2" %in% rownames(fit_os$res), fit_os$res["Group2", "est"], 0)
 
   # =====================================================================
   # Extract Age-Stratified Baseline Parameters from Macro Data (Registry)
   # =====================================================================
-  # [FIX] Instead of "全年齢" (All Ages), we calculate parameters for EACH age group
   macro_models <- list()
   for (ag in names(ref_surv_list)) {
     S_t <- ref_surv_list[[ag]][1:5] / 100
     S_t <- pmax(pmin(S_t, 0.999), 0.001)
 
-    y_llogis <- log(1/S_t - 1)
-    x_llogis <- log(1:5)
-    fit_macro <- lm(y_llogis ~ x_llogis)
+    # Linearization depends on the chosen distribution
+    if (dist_choice == "llogis") {
+      y_val <- log(1/S_t - 1)
+    } else { # weibull
+      y_val <- log(-log(S_t))
+    }
+
+    x_val <- log(1:5)
+    fit_macro <- lm(y_val ~ x_val)
 
     shape <- coef(fit_macro)[2]
+    # The intercept relationship for scale is mathematically identical
+    # for both llogis and weibull in this specific log-linearization format:
+    # intercept = -shape * log(scale_years) -> scale_years = exp(-intercept / shape)
     scale_days <- exp(-coef(fit_macro)[1] / shape) * 365.25
 
     macro_models[[ag]] <- list(shape = shape, scale = scale_days)
@@ -526,7 +538,6 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   # =====================================================================
   simulated_data <- list()
 
-  # Extract empirical data from EP0 (Using absolute OS matching for left-truncation)
   emp_ep0 <- Data_EP0 %>%
     dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre) %>%
     dplyr::mutate(
@@ -555,39 +566,40 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     if (n_sim == 0) next
 
     # 1. Generate Age-Stratified Baseline OS (Deterministic Quantile Sampling)
-    # [FIX] Replace 'runif' with evenly spaced quantiles to eliminate simulation variance
     sim_os_macro <- numeric(n_sim)
-
     unique_ages <- unique(group_data$age_class)
+
     for (ag in unique_ages) {
       idx <- which(group_data$age_class == ag)
       n_ag <- length(idx)
 
       if (n_ag == 0) next
 
-      # Generate evenly spaced probabilities: (0.5/n, 1.5/n, ..., (n-0.5)/n)
       u_ag <- (1:n_ag - 0.5) / n_ag
-      # Bound strictly to avoid Inf at absolute extremes if n_ag is very small
       u_ag <- pmax(pmin(u_ag, 0.999), 0.001)
 
       ag_model <- ag
       if (is.null(macro_models[[ag_model]])) ag_model <- "全年齢"
-      if (is.null(macro_models[[ag_model]])) ag_model <- names(macro_models)[1] # Fallback
+      if (is.null(macro_models[[ag_model]])) ag_model <- names(macro_models)[1]
 
       shape_m <- macro_models[[ag_model]]$shape
       scale_m <- macro_models[[ag_model]]$scale
 
-      # Calculate deterministic expected OS values directly from the CDF
-      sim_os_macro[idx] <- scale_m * ((1 - u_ag) / u_ag)^(1 / shape_m)
+      # Inverse Transform Sampling depends on the chosen distribution
+      if (dist_choice == "llogis") {
+        sim_os_macro[idx] <- scale_m * ((1 - u_ag) / u_ag)^(1 / shape_m)
+      } else { # weibull
+        sim_os_macro[idx] <- scale_m * (-log(1 - u_ag))^(1 / shape_m)
+      }
     }
 
     # 2. Nearest Neighbor Matching based on ABSOLUTE OS length
     pos <- findInterval(sim_os_macro, actual_os_array, all.inside = TRUE)
     diff1 <- abs(sim_os_macro - actual_os_array[pos])
     diff2 <- abs(sim_os_macro - actual_os_array[pos + 1])
-    idx <- ifelse(diff1 <= diff2, pos, pos + 1)
+    match_idx <- ifelse(diff1 <= diff2, pos, pos + 1)
 
-    matched_t2_ratio <- actual_t2_ratio_array[idx]
+    matched_t2_ratio <- actual_t2_ratio_array[match_idx]
     sim_t2_base <- sim_os_macro * matched_t2_ratio
 
     # 3. Apply Mutation/Treatment Effects (AF) to the ENTIRE OS

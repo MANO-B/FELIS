@@ -2599,3 +2599,11 @@ output$select_gene_survival_interactive_2_D_control = renderUI({
               selected = NULL,
               multiple = TRUE)
 })
+
+output$select_Control_simulation_llogis_weibull = renderUI({
+  radioButtons(
+    inputId = "Control_simulation_llogis_weibull",
+    label = "Overall survival estimation with",
+    choices = c("log logistic distribution", "Weibull"),
+    selected = "log logistic distribution")
+})
