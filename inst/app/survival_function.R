@@ -1285,6 +1285,9 @@ survival_compare_and_plot_CTx <- function(data,
     if (adjustment) {
       surv_formula <- as.formula(paste0("Surv(", time_var1, ", ", time_var2, ", ", status_var, ") ~ ", group_var))
       Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", risk-set adjusted (months)")
+    } else if (plot_title == "Unbiased OS Simulation (IPTW + Left-Truncated Llogis + Rank Match)") {
+      surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
+      Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", simulation (months)")
     } else {
       surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
       Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", bias not adj (months)")

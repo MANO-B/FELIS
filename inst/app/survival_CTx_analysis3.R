@@ -523,18 +523,33 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   scale_macro_days <- exp(-log_lambda_macro) * 365.25
 
   # =====================================================================
-  # Simulation: Actual T2 Rank Matching with Exact Patient Count
+  # Simulation: Absolute OS Nearest Neighbor Matching
   # =====================================================================
   simulated_data <- list()
 
-  # Extract empirical ACTUAL T2 distribution from EP0 (Baseline clinical reality)
-  emp_ep0_t2 <- Data_EP0$time_all - Data_EP0$time_pre
-  emp_ep0_t2 <- emp_ep0_t2[emp_ep0_t2 > 0]
-  if(length(emp_ep0_t2) < 5) {
-    emp_ep0_t2 <- Data_model$time_all - Data_model$time_pre
-    emp_ep0_t2 <- emp_ep0_t2[emp_ep0_t2 > 0]
+  # Extract empirical data from EP0
+  # We use the RATIO of T2 to OS, and map it based on Absolute OS length
+  # This corrects for the survivorship bias (left-truncation) difference between registry and CGP
+  emp_ep0 <- Data_EP0 %>%
+    dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre) %>%
+    dplyr::mutate(
+      actual_t2 = time_all - time_pre,
+      t2_ratio = actual_t2 / time_all
+    ) %>%
+    dplyr::arrange(time_all) # Sort by OS for fast searching
+
+  if(nrow(emp_ep0) < 5) {
+    emp_ep0 <- Data_model %>%
+      dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre) %>%
+      dplyr::mutate(
+        actual_t2 = time_all - time_pre,
+        t2_ratio = actual_t2 / time_all
+      ) %>%
+      dplyr::arrange(time_all)
   }
-  emp_ep0_t2 <- sort(emp_ep0_t2) # Sort for accurate percentile matching
+
+  actual_os_array <- emp_ep0$time_all
+  actual_t2_ratio_array <- emp_ep0$t2_ratio
 
   for (g in c("1", "2")) {
     group_data <- if(g == "1") Data_survival_1 else Data_survival_2
@@ -542,22 +557,24 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 
     if (n_sim == 0) next
 
-    # 1. Generate Baseline OS directly from Macro Data
+    # 1. Generate Baseline OS directly from Macro Data (General Population OS)
     u <- runif(n_sim, min = 0.001, max = 0.999)
     sim_os_macro <- scale_macro_days * ((1 - u) / u)^(1 / shape_macro)
-    sim_os_macro <- pmin(sim_os_macro, 365.25 * 20) # Cap at 20 years
 
-    # 2. Rank matching: assign actual T2 directly based on simulated OS percentile
-    sim_ranks <- rank(sim_os_macro, ties.method = "random")
-    percentiles <- sim_ranks / n_sim
-    idx <- round(percentiles * length(emp_ep0_t2))
-    idx <- pmax(pmin(idx, length(emp_ep0_t2)), 1)
+    # 2. Nearest Neighbor Matching based on ABSOLUTE OS length
+    # Find the actual patient whose OS is closest in days to the simulated OS
+    pos <- findInterval(sim_os_macro, actual_os_array, all.inside = TRUE)
+    diff1 <- abs(sim_os_macro - actual_os_array[pos])
+    diff2 <- abs(sim_os_macro - actual_os_array[pos + 1])
 
-    # Extract matched actual T2
-    sim_t2_base <- emp_ep0_t2[idx]
+    # Vectorized selection of the closest index
+    idx <- ifelse(diff1 <= diff2, pos, pos + 1)
 
-    # Ensure logical constraint: T1 must be strictly > 0 (OS > T2)
-    sim_t2_base <- pmin(sim_t2_base, sim_os_macro * 0.99)
+    # Extract the T2 ratio from the closest actual patient
+    matched_t2_ratio <- actual_t2_ratio_array[idx]
+
+    # Reconstruct T2 and T1 using the matched ratio
+    sim_t2_base <- sim_os_macro * matched_t2_ratio
 
     # 3. Apply Mutation/Treatment Effects (Acceleration Factor) to the ENTIRE OS
     af <- ifelse(g == "1", af_g1, af_g2)
@@ -567,15 +584,24 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     sim_t2_treated <- sim_t2_base * exp(af)
     sim_t1_treated <- sim_os_treated - sim_t2_treated
 
+    # =====================================================================
+    # 10-Year Administrative Censoring
+    # Prevent artificial hazard spikes by treating long-survivors as censored
+    # =====================================================================
+    cap_days <- 365.25 * 10
+
+    final_censor <- ifelse(sim_os_treated > cap_days, 0, 1)
+    final_os <- pmin(sim_os_treated, cap_days)
+    final_t1 <- pmin(sim_t1_treated, cap_days - 0.1)
+
     simulated_data[[length(simulated_data) + 1]] <- data.frame(
       C.CAT調査結果.基本項目.ハッシュID = group_data$C.CAT調査結果.基本項目.ハッシュID, # Keep real IDs
-      time_pre = sim_t1_treated,
-      time_all = sim_os_treated,
-      censor = 1, # Uncensored in baseline simulation
+      time_pre = final_t1,
+      time_all = final_os,
+      censor = final_censor,
       Group = g
     )
   }
-
   Data_survival_simulated <- do.call(rbind, simulated_data) %>%
     dplyr::filter(is.finite(time_all))
 
