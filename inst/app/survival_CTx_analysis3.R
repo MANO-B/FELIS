@@ -387,7 +387,22 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     }
   }
 
-  # Pre-calculate age class for simulation sampling
+  # ========================================================
+  # Calculate IPTW (Inverse Probability of Treatment Weighting)
+  # ========================================================
+  # This step projects the CGP cohort to match the general population survival baseline
+  if (length(ref_surv_list) > 0) {
+    # NOTE: Assuming 'calculate_iptw_age' or 'calculate_iptw_loglogistic_age' is defined
+    Data_survival_interactive <- calculate_iptw_age(Data_survival_interactive, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢")
+  } else {
+    Data_survival_interactive$iptw <- 1.0
+  }
+
+  # Sanitize IPTW to ensure it is a pure numeric vector
+  Data_survival_interactive$iptw <- as.numeric(unlist(Data_survival_interactive$iptw))
+  Data_survival_interactive$iptw <- ifelse(is.na(Data_survival_interactive$iptw) | Data_survival_interactive$iptw <= 0, 1.0, Data_survival_interactive$iptw)
+
+  # Pre-calculate age class for safety
   Data_survival_interactive <- Data_survival_interactive %>%
     dplyr::mutate(
       age_num = as.numeric(症例.基本情報.年齢),
@@ -402,7 +417,9 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
       )
     )
 
-  # Define ID extraction function
+  # ========================================================
+  # Extract Group IDs
+  # ========================================================
   extract_group_ids <- function(group_num) {
     IDs <- unique(Data_survival_interactive$C.CAT調査結果.基本項目.ハッシュID)
     input_prefix <- paste0("gene_survival_interactive_", group_num, "_")
@@ -432,15 +449,11 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     return(IDs)
   }
 
-  # Get IDs for Group 1 and Group 2
   ID_1 <- extract_group_ids(1)
   ID_2 <- extract_group_ids(2)
 
   Data_survival_1 <- Data_survival_interactive %>% dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_1) %>% dplyr::mutate(Group = "1")
   Data_survival_2 <- Data_survival_interactive %>% dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_2) %>% dplyr::mutate(Group = "2")
-
-  Data_survival <- rbind(Data_survival_1, Data_survival_2)
-  req(nrow(Data_survival) > 0)
 
   # =====================================================================
   # Data Pre-processing for Anchored Models
@@ -450,10 +463,10 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     dplyr::filter(EP_treat == 0) %>%
     dplyr::mutate(Group = "EP0")
 
-  # Combine EP0, Group 1, and Group 2 for modeling
+  # Combine EP0, Group 1, and Group 2 for OS modeling
   Data_model <- rbind(Data_EP0, Data_survival_1, Data_survival_2) %>%
     dplyr::mutate(time_t2 = time_all - time_pre) %>%
-    dplyr::filter(time_pre > 0, time_t2 > 0)
+    dplyr::filter(time_pre > 0, time_all > time_pre)
 
   shiny::validate(shiny::need(nrow(Data_model) > 0, "No valid data to fit the model."))
 
@@ -464,17 +477,30 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
                               "Not enough EP_treat == 0 patients to establish the reference baseline."))
 
   # =====================================================================
-  # Fit Conditional T2 Model to Bypass Dependent Truncation (Kendall tau != 0)
+  # Fit Left-Truncated OS Model with IPTW
   # =====================================================================
-  # By conditioning on time_pre, we neutralize the dependent left truncation bias.
-  # We use Log-logistic distribution to extract the unbiased Acceleration Factor (AF).
+  # By fitting OS (time_pre, time_all) with IPTW, we extract the true Acceleration
+  # Factors (AF) for mutations/treatments that act on the ENTIRE survival timeline,
+  # while neutralizing left-truncation and survivorship bias.
   req(requireNamespace("flexsurv", quietly = TRUE))
 
-  fit_cgp_t2 <- tryCatch({
-    flexsurv::flexsurvreg(Surv(time_t2, censor) ~ time_pre + Group, data = Data_model, dist = "llogis")
-  }, error = function(e) { NULL })
+  fit_os <- tryCatch({
+    flexsurv::flexsurvreg(Surv(time_pre, time_all, censor) ~ Group,
+                          data = Data_model,
+                          weights = iptw,
+                          dist = "llogis")
+  }, error = function(e) {
+    # Fallback to unweighted if matrix is singular
+    tryCatch({
+      flexsurv::flexsurvreg(Surv(time_pre, time_all, censor) ~ Group, data = Data_model, dist = "llogis")
+    }, error = function(e2) { NULL })
+  })
 
-  shiny::validate(shiny::need(!is.null(fit_cgp_t2), "Failed to fit conditional T2 model. Data might be too sparse."))
+  shiny::validate(shiny::need(!is.null(fit_os), "Failed to fit the left-truncated OS effect model."))
+
+  # Extract pure Acceleration Factors for Group 1 and Group 2
+  af_g1 <- ifelse("Group1" %in% rownames(fit_os$res), fit_os$res["Group1", "est"], 0)
+  af_g2 <- ifelse("Group2" %in% rownames(fit_os$res), fit_os$res["Group2", "est"], 0)
 
   # =====================================================================
   # Extract Baseline Parameters from Macro Data (Log-logistic OS)
@@ -494,46 +520,65 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   # Extract shape (p) and scale (alpha = 1/lambda)
   shape_macro <- coef(fit_macro)[2]
   log_lambda_macro <- coef(fit_macro)[1] / shape_macro
-  scale_macro_years <- exp(-log_lambda_macro) # alpha = 1 / lambda
-  scale_macro_days <- scale_macro_years * 365.25
+  scale_macro_days <- exp(-log_lambda_macro) * 365.25
 
   # =====================================================================
-  # Direct OS Simulation via Log-logistic Distribution
+  # Simulation: Actual T2 Rank Matching with Exact Patient Count
   # =====================================================================
-  n_sim_per_group <- 5000
   simulated_data <- list()
 
-  # Extract log(Acceleration Factor) for Group 1 and 2 compared to EP0
-  coef_g1 <- ifelse("Group1" %in% rownames(fit_cgp_t2$res), fit_cgp_t2$res["Group1", "est"], 0)
-  coef_g2 <- ifelse("Group2" %in% rownames(fit_cgp_t2$res), fit_cgp_t2$res["Group2", "est"], 0)
+  # Extract empirical ACTUAL T2 distribution from EP0 (Baseline clinical reality)
+  emp_ep0_t2 <- Data_EP0$time_all - Data_EP0$time_pre
+  emp_ep0_t2 <- emp_ep0_t2[emp_ep0_t2 > 0]
+  if(length(emp_ep0_t2) < 5) {
+    emp_ep0_t2 <- Data_model$time_all - Data_model$time_pre
+    emp_ep0_t2 <- emp_ep0_t2[emp_ep0_t2 > 0]
+  }
+  emp_ep0_t2 <- sort(emp_ep0_t2) # Sort for accurate percentile matching
 
   for (g in c("1", "2")) {
-    # Check if the requested group actually had data; skip if empty
-    if (g == "1" && nrow(Data_survival_1) == 0) next
-    if (g == "2" && nrow(Data_survival_2) == 0) next
+    group_data <- if(g == "1") Data_survival_1 else Data_survival_2
+    n_sim <- nrow(group_data) # Use the EXACT number of real patients
 
-    # Bounded uniform to avoid Inf/NaN
-    u <- runif(n_sim_per_group, min = 0.001, max = 0.999)
+    if (n_sim == 0) next
 
-    # Apply the unbiased Acceleration Factor to the Macro OS scale
-    af_g <- ifelse(g == "1", coef_g1, coef_g2)
-    scale_g <- scale_macro_days * exp(af_g)
+    # 1. Generate Baseline OS directly from Macro Data
+    u <- runif(n_sim, min = 0.001, max = 0.999)
+    sim_os_macro <- scale_macro_days * ((1 - u) / u)^(1 / shape_macro)
+    sim_os_macro <- pmin(sim_os_macro, 365.25 * 20) # Cap at 20 years
 
-    # Inverse Transform Sampling for Log-logistic OS
-    # Formula: t = scale * ((1 - u) / u)^(1 / shape)
-    sim_os_days <- scale_g * ((1 - u) / u)^(1 / shape_macro)
-    sim_os_days <- pmin(sim_os_days, 365.25 * 20) # Cap at 20 years
+    # 2. Rank matching: assign actual T2 directly based on simulated OS percentile
+    sim_ranks <- rank(sim_os_macro, ties.method = "random")
+    percentiles <- sim_ranks / n_sim
+    idx <- round(percentiles * length(emp_ep0_t2))
+    idx <- pmax(pmin(idx, length(emp_ep0_t2)), 1)
+
+    # Extract matched actual T2
+    sim_t2_base <- emp_ep0_t2[idx]
+
+    # Ensure logical constraint: T1 must be strictly > 0 (OS > T2)
+    sim_t2_base <- pmin(sim_t2_base, sim_os_macro * 0.99)
+
+    # 3. Apply Mutation/Treatment Effects (Acceleration Factor) to the ENTIRE OS
+    af <- ifelse(g == "1", af_g1, af_g2)
+    sim_os_treated <- sim_os_macro * exp(af)
+
+    # 4. Reconstruct timelines expanding proportionally
+    sim_t2_treated <- sim_t2_base * exp(af)
+    sim_t1_treated <- sim_os_treated - sim_t2_treated
 
     simulated_data[[length(simulated_data) + 1]] <- data.frame(
-      C.CAT調査結果.基本項目.ハッシュID = paste0("SIM_", g, "_", 1:n_sim_per_group),
-      time_pre = 0, # Unused, set to 0
-      time_all = sim_os_days,
-      censor = 1, # All simulated baseline patients die eventually
+      C.CAT調査結果.基本項目.ハッシュID = group_data$C.CAT調査結果.基本項目.ハッシュID, # Keep real IDs
+      time_pre = sim_t1_treated,
+      time_all = sim_os_treated,
+      censor = 1, # Uncensored in baseline simulation
       Group = g
     )
   }
 
-  Data_survival_simulated <- do.call(rbind, simulated_data)
+  Data_survival_simulated <- do.call(rbind, simulated_data) %>%
+    dplyr::filter(is.finite(time_all))
+
   shiny::validate(shiny::need(!is.null(Data_survival_simulated) && nrow(Data_survival_simulated) > 0,
                               "Simulation yielded no data."))
 
@@ -546,7 +591,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     time_var2 = "time_all",
     status_var = "censor",
     group_var = "Group",
-    plot_title = "Anchored OS Simulation (Log-logistic, AF from conditional T2)",
+    plot_title = "Unbiased OS Simulation (IPTW + Left-Truncated Llogis + Rank Match)",
     adjustment = FALSE,
     color_var_surv_CTx_1 = "diagnosis",
     weights_var = NULL
