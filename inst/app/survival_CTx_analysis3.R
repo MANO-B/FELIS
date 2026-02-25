@@ -503,40 +503,37 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   af_g2 <- ifelse("Group2" %in% rownames(fit_os$res), fit_os$res["Group2", "est"], 0)
 
   # =====================================================================
-  # Extract Baseline Parameters from Macro Data (Log-logistic OS)
+  # Extract Age-Stratified Baseline Parameters from Macro Data (Registry)
   # =====================================================================
-  macro_surv <- ref_surv_list[["全年齢"]]
-  if(is.null(macro_surv)) macro_surv <- ref_surv_list[[1]]
+  # [FIX] Instead of "全年齢" (All Ages), we calculate parameters for EACH age group
+  macro_models <- list()
+  for (ag in names(ref_surv_list)) {
+    S_t <- ref_surv_list[[ag]][1:5] / 100
+    S_t <- pmax(pmin(S_t, 0.999), 0.001)
 
-  S_t <- macro_surv[1:5] / 100
-  S_t <- pmax(pmin(S_t, 0.999), 0.001)
-  t_points <- 1:5
+    y_llogis <- log(1/S_t - 1)
+    x_llogis <- log(1:5)
+    fit_macro <- lm(y_llogis ~ x_llogis)
 
-  # Linearize Log-logistic: log(1/S(t) - 1) = p * log(lambda) + p * log(t)
-  y_llogis <- log(1/S_t - 1)
-  x_llogis <- log(t_points)
-  fit_macro <- lm(y_llogis ~ x_llogis)
+    shape <- coef(fit_macro)[2]
+    scale_days <- exp(-coef(fit_macro)[1] / shape) * 365.25
 
-  # Extract shape (p) and scale (alpha = 1/lambda)
-  shape_macro <- coef(fit_macro)[2]
-  log_lambda_macro <- coef(fit_macro)[1] / shape_macro
-  scale_macro_days <- exp(-log_lambda_macro) * 365.25
+    macro_models[[ag]] <- list(shape = shape, scale = scale_days)
+  }
 
   # =====================================================================
-  # Simulation: Absolute OS Nearest Neighbor Matching
+  # Simulation: Absolute OS Nearest Neighbor Matching (Age-Stratified)
   # =====================================================================
   simulated_data <- list()
 
-  # Extract empirical data from EP0
-  # We use the RATIO of T2 to OS, and map it based on Absolute OS length
-  # This corrects for the survivorship bias (left-truncation) difference between registry and CGP
+  # Extract empirical data from EP0 (Using absolute OS matching for left-truncation)
   emp_ep0 <- Data_EP0 %>%
     dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre) %>%
     dplyr::mutate(
       actual_t2 = time_all - time_pre,
       t2_ratio = actual_t2 / time_all
     ) %>%
-    dplyr::arrange(time_all) # Sort by OS for fast searching
+    dplyr::arrange(time_all)
 
   if(nrow(emp_ep0) < 5) {
     emp_ep0 <- Data_model %>%
@@ -553,30 +550,35 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 
   for (g in c("1", "2")) {
     group_data <- if(g == "1") Data_survival_1 else Data_survival_2
-    n_sim <- nrow(group_data) # Use the EXACT number of real patients
+    n_sim <- nrow(group_data)
 
     if (n_sim == 0) next
 
-    # 1. Generate Baseline OS directly from Macro Data (General Population OS)
+    # 1. Generate Age-Stratified Baseline OS
     u <- runif(n_sim, min = 0.001, max = 0.999)
-    sim_os_macro <- scale_macro_days * ((1 - u) / u)^(1 / shape_macro)
+    sim_os_macro <- numeric(n_sim)
+
+    for (i in 1:n_sim) {
+      ag <- group_data$age_class[i]
+      if (is.null(macro_models[[ag]])) ag <- "全年齢"
+      if (is.null(macro_models[[ag]])) ag <- names(macro_models)[1] # Ultimate fallback
+
+      shape_m <- macro_models[[ag]]$shape
+      scale_m <- macro_models[[ag]]$scale
+
+      sim_os_macro[i] <- scale_m * ((1 - u[i]) / u[i])^(1 / shape_m)
+    }
 
     # 2. Nearest Neighbor Matching based on ABSOLUTE OS length
-    # Find the actual patient whose OS is closest in days to the simulated OS
     pos <- findInterval(sim_os_macro, actual_os_array, all.inside = TRUE)
     diff1 <- abs(sim_os_macro - actual_os_array[pos])
     diff2 <- abs(sim_os_macro - actual_os_array[pos + 1])
-
-    # Vectorized selection of the closest index
     idx <- ifelse(diff1 <= diff2, pos, pos + 1)
 
-    # Extract the T2 ratio from the closest actual patient
     matched_t2_ratio <- actual_t2_ratio_array[idx]
-
-    # Reconstruct T2 and T1 using the matched ratio
     sim_t2_base <- sim_os_macro * matched_t2_ratio
 
-    # 3. Apply Mutation/Treatment Effects (Acceleration Factor) to the ENTIRE OS
+    # 3. Apply Mutation/Treatment Effects (AF) to the ENTIRE OS
     af <- ifelse(g == "1", af_g1, af_g2)
     sim_os_treated <- sim_os_macro * exp(af)
 
@@ -584,24 +586,21 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     sim_t2_treated <- sim_t2_base * exp(af)
     sim_t1_treated <- sim_os_treated - sim_t2_treated
 
-    # =====================================================================
     # 10-Year Administrative Censoring
-    # Prevent artificial hazard spikes by treating long-survivors as censored
-    # =====================================================================
     cap_days <- 365.25 * 10
-
     final_censor <- ifelse(sim_os_treated > cap_days, 0, 1)
     final_os <- pmin(sim_os_treated, cap_days)
     final_t1 <- pmin(sim_t1_treated, cap_days - 0.1)
 
     simulated_data[[length(simulated_data) + 1]] <- data.frame(
-      C.CAT調査結果.基本項目.ハッシュID = group_data$C.CAT調査結果.基本項目.ハッシュID, # Keep real IDs
+      C.CAT調査結果.基本項目.ハッシュID = group_data$C.CAT調査結果.基本項目.ハッシュID,
       time_pre = final_t1,
       time_all = final_os,
       censor = final_censor,
       Group = g
     )
   }
+
   Data_survival_simulated <- do.call(rbind, simulated_data) %>%
     dplyr::filter(is.finite(time_all))
 
