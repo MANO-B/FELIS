@@ -771,19 +771,17 @@ output$forest_plot_whole_cohort <- renderPlot({
     )
 })
 
+R
 output$forest_plot_multivariate = renderPlot({
   # =========================================================================
-  # Require necessary data and inputs
+  # Require necessary data
   # =========================================================================
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
-      OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
-      input$gene_survival_interactive_1_P_1_control_forest)
-
-  selected_genes <- input$gene_survival_interactive_1_P_1_control_forest
-  shiny::validate(shiny::need(length(selected_genes) > 0, "Please select at least one gene."))
+      OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control)
 
   Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
+  selected_genes <- input$gene_survival_interactive_1_P_1_control_forest # Can be NULL/empty
 
   # =========================================================================
   # Prepare Reference Survival Data (Macro Data) for IPTW
@@ -818,7 +816,6 @@ output$forest_plot_multivariate = renderPlot({
     }
   }
 
-  # Fallback generation for empty lists
   if (length(ref_surv_list) == 0) {
     for (ag in age_groups) ref_surv_list[[ag]] <- c(50, 30, 20, 15, 10)
   } else {
@@ -836,96 +833,174 @@ output$forest_plot_multivariate = renderPlot({
     Data_survival_interactive$iptw <- 1.0
   }
 
-  # Sanitize IPTW
   Data_survival_interactive$iptw <- as.numeric(unlist(Data_survival_interactive$iptw))
   Data_survival_interactive$iptw <- ifelse(is.na(Data_survival_interactive$iptw) | Data_survival_interactive$iptw <= 0, 1.0, Data_survival_interactive$iptw)
 
   # =========================================================================
   # Prepare the Whole Cohort for Multivariate Modeling
   # =========================================================================
-  # Filter left-truncated valid cases and define baseline covariates
   Data_forest <- Data_survival_interactive %>%
     dplyr::filter(time_pre > 0, time_all > time_pre) %>%
     dplyr::mutate(
       age_num = as.numeric(症例.基本情報.年齢),
-      Treatment = factor(ifelse(EP_treat == 1, "Received", "Not_Received"), levels = c("Not_Received", "Received")),
-      Sex = factor(`症例.基本情報.性別.名称.`)
+      Sex = factor(`症例.基本情報.性別.名称.`, levels = c("女性", "男性")), # Default to Female as reference if possible
+      Cancers = as.character(Cancers) # Convert to character for grouping
     )
 
   shiny::validate(shiny::need(nrow(Data_forest) > 50, "Not enough valid cases for multivariate analysis."))
-  req(requireNamespace("flexsurv", quietly = TRUE))
+
+  # [CRITICAL] Prevent Singular Matrix by lumping rare cancers (< 5 cases) into "Others"
+  cancer_counts <- table(Data_forest$Cancers)
+  rare_cancers <- names(cancer_counts)[cancer_counts < 5]
+  Data_forest$Cancers[Data_forest$Cancers %in% rare_cancers] <- "Others"
+
+  # Ensure the most frequent cancer type is the reference level for better interpretation
+  top_cancer <- names(sort(table(Data_forest$Cancers), decreasing = TRUE))[1]
+  Data_forest$Cancers <- as.factor(Data_forest$Cancers)
+  Data_forest$Cancers <- relevel(Data_forest$Cancers, ref = top_cancer)
 
   # =========================================================================
-  # Iterative Modeling: Fit a Doubly Robust AFT model for EACH selected gene
+  # Dynamically add selected genes as covariates
   # =========================================================================
-  plot_data_list <- list()
+  valid_gene_covariates <- c()
 
-  for (gene in selected_genes) {
-    # Find IDs of patients who have a pathogenic variant in the current gene
-    mutated_IDs <- (Data_MAF_target %>% dplyr::filter(Hugo_Symbol == gene))$Tumor_Sample_Barcode
+  if (length(selected_genes) > 0) {
+    for (gene in selected_genes) {
+      mutated_IDs <- (Data_MAF_target %>% dplyr::filter(Hugo_Symbol == gene))$Tumor_Sample_Barcode
 
-    # Create a dummy variable for the current gene's mutation status
-    Data_forest$Target_Mutation <- factor(
-      ifelse(Data_forest$C.CAT調査結果.基本項目.ハッシュID %in% mutated_IDs, "Mutated", "Wild-type"),
-      levels = c("Wild-type", "Mutated") # 'Wild-type' is the reference
-    )
+      # Create safe column name for the formula
+      col_name <- paste0("Gene_", make.names(gene))
 
-    # Skip if no patients have the mutation or all patients have the mutation
-    if (length(unique(Data_forest$Target_Mutation)) < 2) next
-
-    # Define the multivariate formula (adjusting for age, sex, and treatment)
-    formula_str <- "Surv(time_pre, time_all, censor) ~ Target_Mutation + Treatment + age_num + Sex"
-
-    # Fit the Left-Truncated Log-logistic AFT model with IPTW
-    fit_forest <- tryCatch({
-      flexsurv::flexsurvreg(as.formula(formula_str),
-                            data = Data_forest,
-                            weights = iptw,
-                            dist = "llogis")
-    }, error = function(e) { NULL })
-
-    # Extract the isolated Time Ratio (TR) for the gene mutation
-    if (!is.null(fit_forest) && "Target_MutationMutated" %in% rownames(fit_forest$res)) {
-      res <- fit_forest$res
-
-      plot_data_list[[gene]] <- data.frame(
-        Gene = gene,
-        Estimate = exp(res["Target_MutationMutated", "est"]),
-        Lower = exp(res["Target_MutationMutated", "L95%"]),
-        Upper = exp(res["Target_MutationMutated", "U95%"])
+      Data_forest[[col_name]] <- factor(
+        ifelse(Data_forest$C.CAT調査結果.基本項目.ハッシュID %in% mutated_IDs, "Mutated", "WT"),
+        levels = c("WT", "Mutated") # 'WT' is the reference
       )
+
+      # Only include the gene if there is variance (at least 1 WT and 1 Mutated)
+      if (length(unique(Data_forest[[col_name]])) > 1) {
+        valid_gene_covariates <- c(valid_gene_covariates, col_name)
+      }
     }
   }
 
-  shiny::validate(shiny::need(length(plot_data_list) > 0, "Models failed to converge for the selected genes. They might be too rare."))
+  # =========================================================================
+  # Build and Fit the Unified Multivariate AFT Model
+  # =========================================================================
+  # Base covariates (Age, Sex, Cancers) + Selected Genes
+  base_covariates <- c("age_num", "Sex", "Cancers")
+  all_covariates <- c()
 
-  # Combine all extracted effects into a single data frame
-  plot_data <- do.call(rbind, plot_data_list)
+  for(cov in base_covariates) {
+    if(length(unique(na.omit(Data_forest[[cov]]))) > 1) {
+      all_covariates <- c(all_covariates, cov)
+    }
+  }
+  all_covariates <- c(all_covariates, valid_gene_covariates)
+
+  shiny::validate(shiny::need(length(all_covariates) > 0, "No valid covariates with sufficient variance found."))
+
+  formula_str <- paste("Surv(time_pre, time_all, censor) ~", paste(all_covariates, collapse = " + "))
+
+  req(requireNamespace("flexsurv", quietly = TRUE))
+  fit_forest <- tryCatch({
+    flexsurv::flexsurvreg(as.formula(formula_str),
+                          data = Data_forest,
+                          weights = iptw,
+                          dist = "llogis")
+  }, error = function(e) {
+    tryCatch({
+      flexsurv::flexsurvreg(as.formula(formula_str), data = Data_forest, dist = "llogis")
+    }, error = function(e2) { NULL })
+  })
+
+  shiny::validate(shiny::need(!is.null(fit_forest), "Multivariate model failed to converge. The combination of variables might be too complex or highly correlated."))
+
+  # =====================================================================
+  # Extract and Format Data for the Forest Plot
+  # =====================================================================
+  res <- fit_forest$res
+  cov_names <- rownames(res)[!rownames(res) %in% c("shape", "scale")]
+
+  plot_data <- data.frame(
+    Variable_Raw = cov_names,
+    Estimate = exp(res[cov_names, "est"]),
+    Lower = exp(res[cov_names, "L95%"]),
+    Upper = exp(res[cov_names, "U95%"]),
+    Category = NA,
+    Label = NA
+  )
+
+  # Beautify labels and assign categories for coloring/grouping
+  for (i in 1:nrow(plot_data)) {
+    var <- plot_data$Variable_Raw[i]
+
+    if (grepl("^age_num", var)) {
+      plot_data$Label[i] <- "Age (per +1 year)"
+      plot_data$Category[i] <- "Demographics"
+    } else if (grepl("^Sex", var)) {
+      plot_data$Label[i] <- paste0("Sex (", gsub("Sex", "", var), " vs Ref)")
+      plot_data$Category[i] <- "Demographics"
+    } else if (grepl("^Cancers", var)) {
+      cancer_type <- gsub("Cancers", "", var)
+      plot_data$Label[i] <- paste0("Histology: ", cancer_type, " (vs ", top_cancer, ")")
+      plot_data$Category[i] <- "Histology"
+    } else if (grepl("^Gene_", var)) {
+      # Extract gene name. E.g., "Gene_TP53Mutated" -> "TP53"
+      gene_name <- gsub("^Gene_|Mutated$", "", var)
+      plot_data$Label[i] <- paste0("Gene: ", gene_name, " (Mutated vs WT)")
+      plot_data$Category[i] <- "Genomics"
+    } else {
+      plot_data$Label[i] <- var
+      plot_data$Category[i] <- "Others"
+    }
+  }
+
+  # Order the variables for a clean plot layout (Genomics first, then Histology, then Demographics)
+  plot_data$Category <- factor(plot_data$Category, levels = c("Genomics", "Demographics", "Histology", "Others"))
+  plot_data <- plot_data[order(plot_data$Category, plot_data$Estimate), ]
+  plot_data$Label <- factor(plot_data$Label, levels = plot_data$Label)
 
   # =====================================================================
   # Draw the Forest Plot using ggplot2
   # =====================================================================
   library(ggplot2)
 
-  ggplot(plot_data, aes(x = Estimate, y = reorder(Gene, Estimate))) +
-    # Draw error bars and points
-    geom_errorbarh(aes(xmin = Lower, xmax = Upper), height = 0.3, color = "#2c3e50", size = 0.8) +
-    geom_point(size = 4, color = "#e74c3c") +
-    # Vertical line at TR = 1.0 (No Effect)
+  p <- ggplot(plot_data, aes(x = Estimate, y = Label, color = Category)) +
+    geom_errorbarh(aes(xmin = Lower, xmax = Upper), height = 0.3, size = 0.8) +
+    geom_point(size = 4) +
     geom_vline(xintercept = 1, linetype = "dashed", color = "#7f8c8d", size = 1) +
-    # Log scale is mathematically appropriate for Time Ratios (AF)
     scale_x_log10(breaks = c(0.1, 0.2, 0.5, 1, 2, 5, 10)) +
+    scale_color_manual(values = c("Genomics" = "#e74c3c", "Demographics" = "#2980b9", "Histology" = "#27ae60", "Others" = "#8e44ad")) +
     theme_minimal(base_size = 14) +
     labs(
-      title = "Independent Prognostic Impact of Selected Genes",
-      subtitle = "Multivariate AFT Time Ratios (TR) adjusted for Age, Sex, and Treatment (IPTW applied)\nTR > 1: Prolonged Survival | TR < 1: Shortened Survival",
+      title = "Independent Prognostic Impact (Multivariate AFT Model)",
+      subtitle = "Time Ratio (TR) > 1: Prolonged Survival | TR < 1: Shortened Survival\nModel adjusted for Age, Sex, Histology, and concurrent Mutations (IPTW applied)",
       x = "Time Ratio (Log Scale, 95% CI)",
-      y = "Selected Genes (Mutated vs Wild-type)"
+      y = ""
     ) +
     theme(
       plot.title = element_text(face = "bold"),
       panel.grid.minor = element_blank(),
       axis.text.y = element_text(face = "bold", size = 12),
-      axis.title.x = element_text(margin = margin(t = 10))
+      axis.title.x = element_text(margin = margin(t = 10)),
+      legend.position = "bottom",
+      legend.title = element_blank()
     )
+
+  return(p)
+
+}, height = function() {
+  # =====================================================================
+  # [NEW] Dynamically calculate plot height based on the number of items
+  # =====================================================================
+  # Estimate the number of rows:
+  # Age(1) + Sex(1) + Cancers(approx 10-15 depending on lumping) + Genes(n)
+  n_genes <- length(input$gene_survival_interactive_1_P_1_control_forest)
+
+  # Base height is 300px. Add 25px for every variable plotted.
+  # We assume roughly 15 levels for histology to be safe.
+  estimated_items <- 1 + 1 + 15 + n_genes
+  calculated_height <- max(400, estimated_items * 25 + 150)
+
+  return(calculated_height)
 })
