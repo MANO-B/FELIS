@@ -784,7 +784,7 @@ output$forest_plot_multivariate = renderPlot({
   selected_genes <- input$gene_survival_interactive_1_P_1_control_forest # Can be NULL/empty
 
   # =========================================================================
-  # Prepare Reference Survival Data (Macro Data) for IPTW
+  # Prepare Reference Survival Data for IPTW
   # =========================================================================
   ref_surv_list <- list()
   age_groups <- c("40未満", "40代", "50代", "60代", "70代", "80以上")
@@ -837,24 +837,29 @@ output$forest_plot_multivariate = renderPlot({
   Data_survival_interactive$iptw <- ifelse(is.na(Data_survival_interactive$iptw) | Data_survival_interactive$iptw <= 0, 1.0, Data_survival_interactive$iptw)
 
   # =========================================================================
-  # Prepare the Whole Cohort for Multivariate Modeling
+  # Prepare Data for Multivariate Modeling
   # =========================================================================
   Data_forest <- Data_survival_interactive %>%
     dplyr::filter(time_pre > 0, time_all > time_pre) %>%
     dplyr::mutate(
       age_num = as.numeric(症例.基本情報.年齢),
-      Sex = factor(`症例.基本情報.性別.名称.`, levels = c("女性", "男性")), # Default to Female as reference if possible
-      Cancers = as.character(Cancers) # Convert to character for grouping
+      # Extract Sex and handle missing/unknown
+      Sex = as.character(`症例.基本情報.性別.名称.`),
+      Cancers = as.character(Cancers)
     )
+
+  # Clean up Sex variable
+  Data_forest$Sex[!Data_forest$Sex %in% c("男性", "女性")] <- NA
+  Data_forest$Sex <- factor(Data_forest$Sex, levels = c("女性", "男性")) # Female as reference
 
   shiny::validate(shiny::need(nrow(Data_forest) > 50, "Not enough valid cases for multivariate analysis."))
 
-  # [CRITICAL] Prevent Singular Matrix by lumping rare cancers (< 5 cases) into "Others"
+  # Lump rare cancers (< 5 cases) into "Others" to prevent Singular Matrix
   cancer_counts <- table(Data_forest$Cancers)
   rare_cancers <- names(cancer_counts)[cancer_counts < 5]
   Data_forest$Cancers[Data_forest$Cancers %in% rare_cancers] <- "Others"
 
-  # Ensure the most frequent cancer type is the reference level for better interpretation
+  # Ensure the most frequent cancer type is the reference level
   top_cancer <- names(sort(table(Data_forest$Cancers), decreasing = TRUE))[1]
   Data_forest$Cancers <- as.factor(Data_forest$Cancers)
   Data_forest$Cancers <- relevel(Data_forest$Cancers, ref = top_cancer)
@@ -867,16 +872,13 @@ output$forest_plot_multivariate = renderPlot({
   if (length(selected_genes) > 0) {
     for (gene in selected_genes) {
       mutated_IDs <- (Data_MAF_target %>% dplyr::filter(Hugo_Symbol == gene))$Tumor_Sample_Barcode
-
-      # Create safe column name for the formula
       col_name <- paste0("Gene_", make.names(gene))
 
       Data_forest[[col_name]] <- factor(
         ifelse(Data_forest$C.CAT調査結果.基本項目.ハッシュID %in% mutated_IDs, "Mutated", "WT"),
-        levels = c("WT", "Mutated") # 'WT' is the reference
+        levels = c("WT", "Mutated")
       )
 
-      # Only include the gene if there is variance (at least 1 WT and 1 Mutated)
       if (length(unique(Data_forest[[col_name]])) > 1) {
         valid_gene_covariates <- c(valid_gene_covariates, col_name)
       }
@@ -886,7 +888,6 @@ output$forest_plot_multivariate = renderPlot({
   # =========================================================================
   # Build and Fit the Unified Multivariate AFT Model
   # =========================================================================
-  # Base covariates (Age, Sex, Cancers) + Selected Genes
   base_covariates <- c("age_num", "Sex", "Cancers")
   all_covariates <- c()
 
@@ -913,10 +914,10 @@ output$forest_plot_multivariate = renderPlot({
     }, error = function(e2) { NULL })
   })
 
-  shiny::validate(shiny::need(!is.null(fit_forest), "Multivariate model failed to converge. The combination of variables might be too complex or highly correlated."))
+  shiny::validate(shiny::need(!is.null(fit_forest), "Multivariate model failed to converge."))
 
   # =====================================================================
-  # Extract and Format Data for the Forest Plot
+  # Extract and Format Data (Include N count and CI text)
   # =====================================================================
   res <- fit_forest$res
   cov_names <- rownames(res)[!rownames(res) %in% c("shape", "scale")]
@@ -927,80 +928,124 @@ output$forest_plot_multivariate = renderPlot({
     Lower = exp(res[cov_names, "L95%"]),
     Upper = exp(res[cov_names, "U95%"]),
     Category = NA,
-    Label = NA
+    Label = NA,
+    N_count = NA,
+    Text_CI = NA
   )
 
-  # Beautify labels and assign categories for coloring/grouping
+  # Format the text for CI
+  plot_data$Text_CI <- sprintf("%.2f (%.2f-%.2f)", plot_data$Estimate, plot_data$Lower, plot_data$Upper)
+
   for (i in 1:nrow(plot_data)) {
     var <- plot_data$Variable_Raw[i]
 
     if (grepl("^age_num", var)) {
       plot_data$Label[i] <- "Age (per +1 year)"
       plot_data$Category[i] <- "Demographics"
+      plot_data$N_count[i] <- NA # Age is continuous, no specific positive N
+
     } else if (grepl("^Sex", var)) {
-      plot_data$Label[i] <- paste0("Sex (", gsub("Sex", "", var), " vs Ref)")
+      level_name <- sub("^Sex", "", var)
+      plot_data$Label[i] <- paste0("Sex: ", level_name, " (vs ", levels(Data_forest$Sex)[1], ")")
       plot_data$Category[i] <- "Demographics"
+      plot_data$N_count[i] <- sum(Data_forest$Sex == level_name, na.rm = TRUE)
+
     } else if (grepl("^Cancers", var)) {
-      cancer_type <- gsub("Cancers", "", var)
+      cancer_type <- sub("^Cancers", "", var)
       plot_data$Label[i] <- paste0("Histology: ", cancer_type, " (vs ", top_cancer, ")")
       plot_data$Category[i] <- "Histology"
+      plot_data$N_count[i] <- sum(Data_forest$Cancers == cancer_type, na.rm = TRUE)
+
     } else if (grepl("^Gene_", var)) {
-      # Extract gene name. E.g., "Gene_TP53Mutated" -> "TP53"
-      gene_name <- gsub("^Gene_|Mutated$", "", var)
+      gene_name <- sub("^Gene_", "", var)
+      gene_name <- sub("Mutated$", "", gene_name)
+      col_name <- paste0("Gene_", gene_name)
       plot_data$Label[i] <- paste0("Gene: ", gene_name, " (Mutated vs WT)")
       plot_data$Category[i] <- "Genomics"
+      plot_data$N_count[i] <- sum(Data_forest[[col_name]] == "Mutated", na.rm = TRUE)
+
     } else {
       plot_data$Label[i] <- var
       plot_data$Category[i] <- "Others"
     }
   }
 
-  # Order the variables for a clean plot layout (Genomics first, then Histology, then Demographics)
   plot_data$Category <- factor(plot_data$Category, levels = c("Genomics", "Demographics", "Histology", "Others"))
   plot_data <- plot_data[order(plot_data$Category, plot_data$Estimate), ]
   plot_data$Label <- factor(plot_data$Label, levels = plot_data$Label)
 
   # =====================================================================
-  # Draw the Forest Plot using ggplot2
+  # Draw the Forest Plot with Embedded Text
   # =====================================================================
   library(ggplot2)
+
+  # Create text label for N (handle NA for Age)
+  plot_data$Text_N <- ifelse(is.na(plot_data$N_count), "", paste0("N = ", plot_data$N_count))
+
+  # Define positions for text annotations on the right side of the plot
+  # Multiply maximum upper bound to create space for text
+  max_val <- max(plot_data$Upper, na.rm = TRUE)
+  x_pos_N <- max_val * 2
+  x_pos_CI <- max_val * 6
+  x_limit <- max_val * 30 # Extend the plot limit to fit text
 
   p <- ggplot(plot_data, aes(x = Estimate, y = Label, color = Category)) +
     geom_errorbarh(aes(xmin = Lower, xmax = Upper), height = 0.3, size = 0.8) +
     geom_point(size = 4) +
     geom_vline(xintercept = 1, linetype = "dashed", color = "#7f8c8d", size = 1) +
-    scale_x_log10(breaks = c(0.1, 0.2, 0.5, 1, 2, 5, 10)) +
+
+    # Add text for N count
+    geom_text(aes(x = x_pos_N, label = Text_N), hjust = 0, color = "#2c3e50", size = 4.5, fontface = "plain") +
+    # Add text for TR and 95% CI
+    geom_text(aes(x = x_pos_CI, label = Text_CI), hjust = 0, color = "#2c3e50", size = 4.5, fontface = "plain") +
+
+    # Add column headers
+    annotate("text", x = x_pos_N, y = nrow(plot_data) + 0.8, label = "Positive N", hjust = 0, fontface = "bold", size = 4.5) +
+    annotate("text", x = x_pos_CI, y = nrow(plot_data) + 0.8, label = "TR (95% CI)", hjust = 0, fontface = "bold", size = 4.5) +
+
+    scale_x_log10(breaks = c(0.1, 0.2, 0.5, 1, 2, 5, 10), limits = c(NA, x_limit)) +
     scale_color_manual(values = c("Genomics" = "#e74c3c", "Demographics" = "#2980b9", "Histology" = "#27ae60", "Others" = "#8e44ad")) +
+
     theme_minimal(base_size = 14) +
     labs(
       title = "Independent Prognostic Impact (Multivariate AFT Model)",
-      subtitle = "Time Ratio (TR) > 1: Prolonged Survival | TR < 1: Shortened Survival\nModel adjusted for Age, Sex, Histology, and concurrent Mutations (IPTW applied)",
-      x = "Time Ratio (Log Scale, 95% CI)",
+      subtitle = paste0("Reference Histology: ", top_cancer, " | TR > 1: Prolonged Survival | TR < 1: Shortened Survival"),
+      x = "Time Ratio (Log Scale)",
       y = ""
     ) +
+    # Expand top margin to fit column headers
+    coord_cartesian(clip = "off", ylim = c(1, nrow(plot_data) + 1)) +
     theme(
       plot.title = element_text(face = "bold"),
       panel.grid.minor = element_blank(),
       axis.text.y = element_text(face = "bold", size = 12),
       axis.title.x = element_text(margin = margin(t = 10)),
       legend.position = "bottom",
-      legend.title = element_blank()
+      legend.title = element_blank(),
+      plot.margin = margin(t = 20, r = 20, b = 10, l = 10)
     )
 
   return(p)
 
 }, height = function() {
   # =====================================================================
-  # [NEW] Dynamically calculate plot height based on the number of items
+  # Dynamically calculate plot height based on unique data levels
   # =====================================================================
-  # Estimate the number of rows:
-  # Age(1) + Sex(1) + Cancers(approx 10-15 depending on lumping) + Genes(n)
+  Data_whole <- OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
+  if (is.null(Data_whole)) return(400)
+
   n_genes <- length(input$gene_survival_interactive_1_P_1_control_forest)
 
-  # Base height is 300px. Add 25px for every variable plotted.
-  # We assume roughly 15 levels for histology to be safe.
-  estimated_items <- 1 + 1 + 15 + n_genes
-  calculated_height <- max(400, estimated_items * 25 + 150)
+  # Accurately count histology levels (ignoring those with < 5 cases that get lumped)
+  cancer_counts <- table(Data_whole$Cancers)
+  n_cancers <- sum(cancer_counts >= 5)
+  if (n_cancers <= 1) n_cancers <- 1 # At least one line for 'Others' if all are rare
+
+  # Age(1) + Sex(1) + Histologies(n_cancers - 1 ref) + Genes(n_genes)
+  estimated_items <- 1 + 1 + (n_cancers - 1) + n_genes
+
+  # Calculate pixels dynamically: base padding + height per row
+  calculated_height <- max(450, estimated_items * 35 + 200)
 
   return(calculated_height)
 })
