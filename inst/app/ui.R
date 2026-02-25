@@ -1364,9 +1364,11 @@ ui <- dashboardPage(
               plotOutput('figure_survival_CTx_interactive_1_control',
                          height = "800px",
                          width = "800px"),
+              plotOutput("forest_plot_multivariate"),
               hr(),
               htmlOutput("select_stage4_survival_rate"),
-              htmlOutput("select_Control_simulation_llogis_weibull"),
+              htmlOutput("select_gene_survival_interactive_1_P_1_control_forest"),
+              # htmlOutput("select_Control_simulation_llogis_weibull"),
               hr(),
               fluidRow(
                 column(3,

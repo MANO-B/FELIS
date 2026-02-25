@@ -477,62 +477,74 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
                               "Not enough EP_treat == 0 patients to establish the reference baseline."))
 
   # =====================================================================
-  # Determine Distribution Choice from UI
-  # =====================================================================
-  dist_choice <- "llogis"
-  if (!is.null(input$Control_simulation_llogis_weibull)) {
-    dist_choice <- ifelse(input$Control_simulation_llogis_weibull == "Weibull", "weibull", "llogis")
-  }
-
-  # =====================================================================
-  # Fit Left-Truncated OS Model with IPTW (With Fail-safe)
+  # Fit Multivariate Left-Truncated OS Model with IPTW (Doubly Robust)
   # =====================================================================
   req(requireNamespace("flexsurv", quietly = TRUE))
 
+  # 1. Define potential confounding factors to include in the multivariate model
+  # Ensure the column names exactly match your dataset
+  potential_covariates <- c("age_num", "`症例.基本情報.性別.名称.`", "Cancers")
+
+  # 2. Dynamically build the formula by checking if columns exist and have sufficient variance
+  # (Prevents model crash if a variable has only 1 level in the filtered data)
+  valid_covariates <- c("Group")
+  for (cov in potential_covariates) {
+    clean_cov <- gsub("`", "", cov) # Remove backticks for checking
+    if (clean_cov %in% colnames(Data_model)) {
+      # Only add if there are at least 2 distinct values (to avoid singularity)
+      if (length(unique(na.omit(Data_model[[clean_cov]]))) > 1) {
+        valid_covariates <- c(valid_covariates, cov)
+      }
+    }
+  }
+
+  # Construct the multivariate formula: Surv(...) ~ Group + age_num + Cancers...
+  formula_str <- paste("Surv(time_pre, time_all, censor) ~", paste(valid_covariates, collapse = " + "))
+  os_formula <- as.formula(formula_str)
+
+  # 3. Fit the Doubly Robust AFT Model
   fit_os <- tryCatch({
-    flexsurv::flexsurvreg(Surv(time_pre, time_all, censor) ~ Group,
+    flexsurv::flexsurvreg(os_formula,
                           data = Data_model,
                           weights = iptw,
                           dist = dist_choice)
   }, error = function(e) {
+    # Fallback to unweighted if the multi-dimensional matrix is singular
     tryCatch({
-      flexsurv::flexsurvreg(Surv(time_pre, time_all, censor) ~ Group, data = Data_model, dist = dist_choice)
+      flexsurv::flexsurvreg(os_formula, data = Data_model, dist = dist_choice)
     }, error = function(e2) { NULL })
   })
 
-  # [FIX] Fail-safe: If Weibull fails to converge due to left-truncation,
-  # automatically fall back to the more stable Log-logistic distribution.
+  # Fail-safe: Fallback to Log-logistic if Weibull fails in multivariate space
   if (is.null(fit_os) && dist_choice == "weibull") {
     dist_choice <- "llogis"
     fit_os <- tryCatch({
-      flexsurv::flexsurvreg(Surv(time_pre, time_all, censor) ~ Group, data = Data_model, weights = iptw, dist = "llogis")
+      flexsurv::flexsurvreg(os_formula, data = Data_model, weights = iptw, dist = "llogis")
     }, error = function(e) { NULL })
   }
 
-  shiny::validate(shiny::need(!is.null(fit_os), paste("Failed to fit the left-truncated OS model. Data might be too sparse or highly skewed.")))
+  shiny::validate(shiny::need(!is.null(fit_os), paste("Failed to fit the multivariate left-truncated OS model. Too many rare cancer types might cause a singular matrix.")))
 
+  # 4. Extract the MULTIVARIATE-ADJUSTED pure Acceleration Factors
+  # These coefficients now represent the isolated effect of the group, independent of age/histology
   af_g1 <- ifelse("Group1" %in% rownames(fit_os$res), fit_os$res["Group1", "est"], 0)
   af_g2 <- ifelse("Group2" %in% rownames(fit_os$res), fit_os$res["Group2", "est"], 0)
+  OUTPUT_DATA$fit_os <- fit_os
 
   # =====================================================================
   # Extract Age-Stratified Baseline Parameters from Macro Data (Registry)
   # =====================================================================
+  # [FIX] Instead of "全年齢" (All Ages), we calculate parameters for EACH age group
   macro_models <- list()
   for (ag in names(ref_surv_list)) {
     S_t <- ref_surv_list[[ag]][1:5] / 100
     S_t <- pmax(pmin(S_t, 0.999), 0.001)
 
-    if (dist_choice == "llogis") {
-      y_val <- log(1/S_t - 1)
-    } else {
-      y_val <- log(-log(S_t))
-    }
+    y_llogis <- log(1/S_t - 1)
+    x_llogis <- log(1:5)
+    fit_macro <- lm(y_llogis ~ x_llogis)
 
-    x_val <- log(1:5)
-    fit_macro <- lm(y_val ~ x_val)
-
-    # [FIX] Protect shape from becoming negative due to data anomalies
-    shape <- max(coef(fit_macro)[2], 0.01)
+    shape <- coef(fit_macro)[2]
     scale_days <- exp(-coef(fit_macro)[1] / shape) * 365.25
 
     macro_models[[ag]] <- list(shape = shape, scale = scale_days)
@@ -543,6 +555,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   # =====================================================================
   simulated_data <- list()
 
+  # Extract empirical data from EP0 (Using absolute OS matching for left-truncation)
   emp_ep0 <- Data_EP0 %>%
     dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre) %>%
     dplyr::mutate(
@@ -571,40 +584,39 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     if (n_sim == 0) next
 
     # 1. Generate Age-Stratified Baseline OS (Deterministic Quantile Sampling)
+    # [FIX] Replace 'runif' with evenly spaced quantiles to eliminate simulation variance
     sim_os_macro <- numeric(n_sim)
-    unique_ages <- unique(group_data$age_class)
 
+    unique_ages <- unique(group_data$age_class)
     for (ag in unique_ages) {
       idx <- which(group_data$age_class == ag)
       n_ag <- length(idx)
+
       if (n_ag == 0) next
 
+      # Generate evenly spaced probabilities: (0.5/n, 1.5/n, ..., (n-0.5)/n)
       u_ag <- (1:n_ag - 0.5) / n_ag
+      # Bound strictly to avoid Inf at absolute extremes if n_ag is very small
       u_ag <- pmax(pmin(u_ag, 0.999), 0.001)
 
       ag_model <- ag
       if (is.null(macro_models[[ag_model]])) ag_model <- "全年齢"
-      if (is.null(macro_models[[ag_model]])) ag_model <- names(macro_models)[1]
+      if (is.null(macro_models[[ag_model]])) ag_model <- names(macro_models)[1] # Fallback
 
       shape_m <- macro_models[[ag_model]]$shape
       scale_m <- macro_models[[ag_model]]$scale
 
-      # [FIX] Safe Inverse Transform Sampling using built-in functions where possible
-      if (dist_choice == "llogis") {
-        sim_os_macro[idx] <- scale_m * ((1 - u_ag) / u_ag)^(1 / shape_m)
-      } else {
-        # Using qweibull is mathematically safer than manual exponentiation
-        sim_os_macro[idx] <- qweibull(u_ag, shape = shape_m, scale = scale_m)
-      }
+      # Calculate deterministic expected OS values directly from the CDF
+      sim_os_macro[idx] <- scale_m * ((1 - u_ag) / u_ag)^(1 / shape_m)
     }
 
     # 2. Nearest Neighbor Matching based on ABSOLUTE OS length
     pos <- findInterval(sim_os_macro, actual_os_array, all.inside = TRUE)
     diff1 <- abs(sim_os_macro - actual_os_array[pos])
     diff2 <- abs(sim_os_macro - actual_os_array[pos + 1])
-    match_idx <- ifelse(diff1 <= diff2, pos, pos + 1)
+    idx <- ifelse(diff1 <= diff2, pos, pos + 1)
 
-    matched_t2_ratio <- actual_t2_ratio_array[match_idx]
+    matched_t2_ratio <- actual_t2_ratio_array[idx]
     sim_t2_base <- sim_os_macro * matched_t2_ratio
 
     # 3. Apply Mutation/Treatment Effects (AF) to the ENTIRE OS
@@ -650,4 +662,270 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     color_var_surv_CTx_1 = "diagnosis",
     weights_var = NULL
   )
+})
+
+output$forest_plot_whole_cohort <- renderPlot({
+  # 必要なデータと入力変数が揃っているか確認
+  req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control)
+
+  Data_whole <- OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
+
+  # =====================================================================
+  # 1. データの前処理（全集団）
+  # =====================================================================
+  # 左側切断の条件（time_pre > 0, time_all > time_pre）を満たす全患者を抽出
+  Data_forest <- Data_whole %>%
+    dplyr::filter(time_pre > 0, time_all > time_pre) %>%
+    dplyr::mutate(
+      age_num = as.numeric(症例.基本情報.年齢),
+      # 推奨治療の有無をわかりやすいラベルに変換（リファレンスを"No"にするためfactor化）
+      Treatment = factor(ifelse(EP_treat == 1, "Received", "Not_Received"), levels = c("Not_Received", "Received")),
+      Sex = factor(`症例.基本情報.性別.名称.`)
+    )
+
+  shiny::validate(shiny::need(nrow(Data_forest) > 50, "Not enough valid cases for multivariate analysis."))
+
+  # =====================================================================
+  # 2. 注目する変異（G1条件）のフラグ立て
+  # =====================================================================
+  # G1の抽出条件（P1, P2, Wなど）に合致した患者IDのリスト（以前のextract_group_ids関数の結果など）を取得
+  # ※ ここでは 'ID_1' がスコープ内にあるか、再計算して取得する想定です
+  if (exists("ID_1")) {
+    Data_forest$Target_Mutation <- factor(
+      ifelse(Data_forest$C.CAT調査結果.基本項目.ハッシュID %in% ID_1, "Mutated", "Wild-type"),
+      levels = c("Wild-type", "Mutated") # Wild-typeをリファレンス（基準）にする
+    )
+  } else {
+    # ID_1が取得できない場合の安全装置
+    Data_forest$Target_Mutation <- factor("Wild-type", levels = c("Wild-type", "Mutated"))
+  }
+
+  # =====================================================================
+  # 3. 多変量モデルの構築（IPTW + 左側切断 + 対数ロジスティックAFT）
+  # =====================================================================
+  # IPTWが計算されていなければ 1.0 とする
+  if (!"iptw" %in% colnames(Data_forest)) Data_forest$iptw <- 1.0
+  Data_forest$iptw <- as.numeric(unlist(Data_forest$iptw))
+  Data_forest$iptw <- ifelse(is.na(Data_forest$iptw) | Data_forest$iptw <= 0, 1.0, Data_forest$iptw)
+
+  req(requireNamespace("flexsurv", quietly = TRUE))
+
+  # 組織型（Cancers）を含めると変数が多すぎてSingular matrixになる場合は外す
+  # formula_str <- "Surv(time_pre, time_all, censor) ~ Target_Mutation + Treatment + age_num + Sex + Cancers"
+  formula_str <- "Surv(time_pre, time_all, censor) ~ Target_Mutation + Treatment + age_num + Sex"
+
+  fit_forest <- tryCatch({
+    flexsurv::flexsurvreg(as.formula(formula_str),
+                          data = Data_forest,
+                          weights = iptw,
+                          dist = "llogis")
+  }, error = function(e) { NULL })
+
+  shiny::validate(shiny::need(!is.null(fit_forest), "Multivariate model failed to converge. Please check covariate variance."))
+
+  # =====================================================================
+  # 4. フォレストプロット用データの抽出と整形
+  # =====================================================================
+  res <- fit_forest$res
+  # 'shape' と 'scale' はベースラインハザードのパラメータなので除外
+  cov_names <- rownames(res)[!rownames(res) %in% c("shape", "scale")]
+
+  plot_data <- data.frame(
+    Variable = cov_names,
+    # AFTモデルの係数を指数変換して「時間比（Time Ratio: 加速係数）」に戻す
+    Estimate = exp(res[cov_names, "est"]),
+    Lower = exp(res[cov_names, "L95%"]),
+    Upper = exp(res[cov_names, "U95%"])
+  )
+
+  # 変数名をグラフ上で読みやすくリネーム（適宜変更してください）
+  plot_data$Variable <- gsub("Target_MutationMutated", "Target Mutation (Mutated vs WT)", plot_data$Variable)
+  plot_data$Variable <- gsub("TreatmentReceived", "Recommended Treatment (Recv vs Not)", plot_data$Variable)
+  plot_data$Variable <- gsub("age_num", "Age (per +1 year)", plot_data$Variable)
+  plot_data$Variable <- gsub("Sex男性", "Sex (Male vs Female)", plot_data$Variable)
+
+  # =====================================================================
+  # 5. ggplot2 による描画
+  # =====================================================================
+
+  ggplot(plot_data, aes(x = Estimate, y = reorder(Variable, Estimate))) +
+    # エラーバーとポイントの描画
+    geom_errorbarh(aes(xmin = Lower, xmax = Upper), height = 0.2, color = "#2c3e50", size = 0.8) +
+    geom_point(size = 4, color = "#e74c3c") +
+    # TR = 1.0 (影響なし) の垂直線
+    geom_vline(xintercept = 1, linetype = "dashed", color = "#7f8c8d", size = 1) +
+    # AFTの時間比（倍率）なので、対数スケールにすることで対称的な視覚表現になる
+    scale_x_log10(breaks = c(0.2, 0.5, 1, 2, 5)) +
+    theme_minimal(base_size = 14) +
+    labs(
+      title = "Multivariate Analysis of Overall Survival (Entire Cohort)",
+      subtitle = "Time Ratio (TR) > 1: Prolonged Survival | TR < 1: Shortened Survival",
+      x = "Time Ratio (Log Scale, 95% CI)",
+      y = ""
+    ) +
+    theme(
+      plot.title = element_text(face = "bold"),
+      panel.grid.minor = element_blank(),
+      axis.text.y = element_text(face = "bold", size = 12),
+      axis.title.x = element_text(margin = margin(t = 10))
+    )
+})
+
+output$forest_plot_multivariate = renderPlot({
+  # =========================================================================
+  # Require necessary data and inputs
+  # =========================================================================
+  req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
+      OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
+      input$gene_survival_interactive_1_P_1_control_forest)
+
+  selected_genes <- input$gene_survival_interactive_1_P_1_control_forest
+  shiny::validate(shiny::need(length(selected_genes) > 0, "Please select at least one gene."))
+
+  Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
+  Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
+
+  # =========================================================================
+  # Prepare Reference Survival Data (Macro Data) for IPTW
+  # =========================================================================
+  ref_surv_list <- list()
+  age_groups <- c("40未満", "40代", "50代", "60代", "70代", "80以上")
+
+  if (!is.null(input$survival_data_source)) {
+    if (input$survival_data_source == "registry") {
+      if(exists("Data_age_survival_5_year") && input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
+        cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
+        fallback_surv <- cancer_data[["全年齢"]]
+
+        for (ag in age_groups) {
+          if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
+            ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
+          } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
+            ref_surv_list[[ag]] <- as.numeric(fallback_surv)
+          }
+        }
+      }
+    } else if (input$survival_data_source == "manual_all") {
+      vals <- c(input$surv_all_1y, input$surv_all_2y, input$surv_all_3y, input$surv_all_4y, input$surv_all_5y)
+      for (ag in age_groups) ref_surv_list[[ag]] <- vals
+    } else if (input$survival_data_source == "manual_age") {
+      ref_surv_list[["40未満"]] <- c(input$surv_u40_1y, input$surv_u40_2y, input$surv_u40_3y, input$surv_u40_4y, input$surv_u40_5y)
+      ref_surv_list[["40代"]] <- c(input$surv_40s_1y, input$surv_40s_2y, input$surv_40s_3y, input$surv_40s_4y, input$surv_40s_5y)
+      ref_surv_list[["50代"]] <- c(input$surv_50s_1y, input$surv_50s_2y, input$surv_50s_3y, input$surv_50s_4y, input$surv_50s_5y)
+      ref_surv_list[["60代"]] <- c(input$surv_60s_1y, input$surv_60s_2y, input$surv_60s_3y, input$surv_60s_4y, input$surv_60s_5y)
+      ref_surv_list[["70代"]] <- c(input$surv_70s_1y, input$surv_70s_2y, input$surv_70s_3y, input$surv_70s_4y, input$surv_70s_5y)
+      ref_surv_list[["80以上"]] <- c(input$surv_80s_1y, input$surv_80s_2y, input$surv_80s_3y, input$surv_80s_4y, input$surv_80s_5y)
+    }
+  }
+
+  # Fallback generation for empty lists
+  if (length(ref_surv_list) == 0) {
+    for (ag in age_groups) ref_surv_list[[ag]] <- c(50, 30, 20, 15, 10)
+  } else {
+    for (ag in age_groups) {
+      if (is.null(ref_surv_list[[ag]])) ref_surv_list[[ag]] <- ref_surv_list[[1]]
+    }
+  }
+
+  # =========================================================================
+  # Calculate IPTW
+  # =========================================================================
+  if (length(ref_surv_list) > 0) {
+    Data_survival_interactive <- calculate_iptw_age(Data_survival_interactive, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢")
+  } else {
+    Data_survival_interactive$iptw <- 1.0
+  }
+
+  # Sanitize IPTW
+  Data_survival_interactive$iptw <- as.numeric(unlist(Data_survival_interactive$iptw))
+  Data_survival_interactive$iptw <- ifelse(is.na(Data_survival_interactive$iptw) | Data_survival_interactive$iptw <= 0, 1.0, Data_survival_interactive$iptw)
+
+  # =========================================================================
+  # Prepare the Whole Cohort for Multivariate Modeling
+  # =========================================================================
+  # Filter left-truncated valid cases and define baseline covariates
+  Data_forest <- Data_survival_interactive %>%
+    dplyr::filter(time_pre > 0, time_all > time_pre) %>%
+    dplyr::mutate(
+      age_num = as.numeric(症例.基本情報.年齢),
+      Treatment = factor(ifelse(EP_treat == 1, "Received", "Not_Received"), levels = c("Not_Received", "Received")),
+      Sex = factor(`症例.基本情報.性別.名称.`)
+    )
+
+  shiny::validate(shiny::need(nrow(Data_forest) > 50, "Not enough valid cases for multivariate analysis."))
+  req(requireNamespace("flexsurv", quietly = TRUE))
+
+  # =========================================================================
+  # Iterative Modeling: Fit a Doubly Robust AFT model for EACH selected gene
+  # =========================================================================
+  plot_data_list <- list()
+
+  for (gene in selected_genes) {
+    # Find IDs of patients who have a pathogenic variant in the current gene
+    mutated_IDs <- (Data_MAF_target %>% dplyr::filter(Hugo_Symbol == gene))$Tumor_Sample_Barcode
+
+    # Create a dummy variable for the current gene's mutation status
+    Data_forest$Target_Mutation <- factor(
+      ifelse(Data_forest$C.CAT調査結果.基本項目.ハッシュID %in% mutated_IDs, "Mutated", "Wild-type"),
+      levels = c("Wild-type", "Mutated") # 'Wild-type' is the reference
+    )
+
+    # Skip if no patients have the mutation or all patients have the mutation
+    if (length(unique(Data_forest$Target_Mutation)) < 2) next
+
+    # Define the multivariate formula (adjusting for age, sex, and treatment)
+    formula_str <- "Surv(time_pre, time_all, censor) ~ Target_Mutation + Treatment + age_num + Sex"
+
+    # Fit the Left-Truncated Log-logistic AFT model with IPTW
+    fit_forest <- tryCatch({
+      flexsurv::flexsurvreg(as.formula(formula_str),
+                            data = Data_forest,
+                            weights = iptw,
+                            dist = "llogis")
+    }, error = function(e) { NULL })
+
+    # Extract the isolated Time Ratio (TR) for the gene mutation
+    if (!is.null(fit_forest) && "Target_MutationMutated" %in% rownames(fit_forest$res)) {
+      res <- fit_forest$res
+
+      plot_data_list[[gene]] <- data.frame(
+        Gene = gene,
+        Estimate = exp(res["Target_MutationMutated", "est"]),
+        Lower = exp(res["Target_MutationMutated", "L95%"]),
+        Upper = exp(res["Target_MutationMutated", "U95%"])
+      )
+    }
+  }
+
+  shiny::validate(shiny::need(length(plot_data_list) > 0, "Models failed to converge for the selected genes. They might be too rare."))
+
+  # Combine all extracted effects into a single data frame
+  plot_data <- do.call(rbind, plot_data_list)
+
+  # =====================================================================
+  # Draw the Forest Plot using ggplot2
+  # =====================================================================
+  library(ggplot2)
+
+  ggplot(plot_data, aes(x = Estimate, y = reorder(Gene, Estimate))) +
+    # Draw error bars and points
+    geom_errorbarh(aes(xmin = Lower, xmax = Upper), height = 0.3, color = "#2c3e50", size = 0.8) +
+    geom_point(size = 4, color = "#e74c3c") +
+    # Vertical line at TR = 1.0 (No Effect)
+    geom_vline(xintercept = 1, linetype = "dashed", color = "#7f8c8d", size = 1) +
+    # Log scale is mathematically appropriate for Time Ratios (AF)
+    scale_x_log10(breaks = c(0.1, 0.2, 0.5, 1, 2, 5, 10)) +
+    theme_minimal(base_size = 14) +
+    labs(
+      title = "Independent Prognostic Impact of Selected Genes",
+      subtitle = "Multivariate AFT Time Ratios (TR) adjusted for Age, Sex, and Treatment (IPTW applied)\nTR > 1: Prolonged Survival | TR < 1: Shortened Survival",
+      x = "Time Ratio (Log Scale, 95% CI)",
+      y = "Selected Genes (Mutated vs Wild-type)"
+    ) +
+    theme(
+      plot.title = element_text(face = "bold"),
+      panel.grid.minor = element_blank(),
+      axis.text.y = element_text(face = "bold", size = 12),
+      axis.title.x = element_text(margin = margin(t = 10))
+    )
 })

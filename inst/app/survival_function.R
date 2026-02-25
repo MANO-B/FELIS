@@ -2039,6 +2039,19 @@ calculate_iptw_age <- function(data, ref_surv_list, time_var = "time_pre", age_v
       raw_weight = ifelse(!is.na(N_cgp) & N_cgp > 0 & !is.na(pt_ref), pt_ref / N_cgp, 0)
     )
 
+  # =========================================================================
+  # 極端な重み（外れ値）による分散の爆発を防ぐための2.5%〜97.5%トリミング
+  # =========================================================================
+  if (any(data$raw_weight > 0, na.rm = TRUE)) {
+    lower_bound <- quantile(data$raw_weight[data$raw_weight > 0], 0.025, na.rm = TRUE)
+    upper_bound <- quantile(data$raw_weight[data$raw_weight > 0], 0.975, na.rm = TRUE)
+
+    data <- data %>%
+      dplyr::mutate(
+        raw_weight = ifelse(raw_weight > 0 & raw_weight < lower_bound, lower_bound, raw_weight),
+        raw_weight = ifelse(raw_weight > upper_bound, upper_bound, raw_weight)
+      )
+  }
   # Stabilize weights (mean = 1)
   mean_w <- mean(data$raw_weight[data$raw_weight > 0], na.rm = TRUE)
   data$iptw <- ifelse(data$raw_weight > 0, data$raw_weight / mean_w, 1.0)
