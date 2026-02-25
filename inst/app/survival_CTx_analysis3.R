@@ -554,19 +554,31 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 
     if (n_sim == 0) next
 
-    # 1. Generate Age-Stratified Baseline OS
-    u <- runif(n_sim, min = 0.001, max = 0.999)
+    # 1. Generate Age-Stratified Baseline OS (Deterministic Quantile Sampling)
+    # [FIX] Replace 'runif' with evenly spaced quantiles to eliminate simulation variance
     sim_os_macro <- numeric(n_sim)
 
-    for (i in 1:n_sim) {
-      ag <- group_data$age_class[i]
-      if (is.null(macro_models[[ag]])) ag <- "全年齢"
-      if (is.null(macro_models[[ag]])) ag <- names(macro_models)[1] # Ultimate fallback
+    unique_ages <- unique(group_data$age_class)
+    for (ag in unique_ages) {
+      idx <- which(group_data$age_class == ag)
+      n_ag <- length(idx)
 
-      shape_m <- macro_models[[ag]]$shape
-      scale_m <- macro_models[[ag]]$scale
+      if (n_ag == 0) next
 
-      sim_os_macro[i] <- scale_m * ((1 - u[i]) / u[i])^(1 / shape_m)
+      # Generate evenly spaced probabilities: (0.5/n, 1.5/n, ..., (n-0.5)/n)
+      u_ag <- (1:n_ag - 0.5) / n_ag
+      # Bound strictly to avoid Inf at absolute extremes if n_ag is very small
+      u_ag <- pmax(pmin(u_ag, 0.999), 0.001)
+
+      ag_model <- ag
+      if (is.null(macro_models[[ag_model]])) ag_model <- "全年齢"
+      if (is.null(macro_models[[ag_model]])) ag_model <- names(macro_models)[1] # Fallback
+
+      shape_m <- macro_models[[ag_model]]$shape
+      scale_m <- macro_models[[ag_model]]$scale
+
+      # Calculate deterministic expected OS values directly from the CDF
+      sim_os_macro[idx] <- scale_m * ((1 - u_ag) / u_ag)^(1 / shape_m)
     }
 
     # 2. Nearest Neighbor Matching based on ABSOLUTE OS length
