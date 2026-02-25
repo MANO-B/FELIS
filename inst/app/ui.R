@@ -1367,6 +1367,7 @@ ui <- dashboardPage(
               plotOutput("forest_plot_multivariate"),
               hr(),
               htmlOutput("select_stage4_survival_rate"),
+              hr(),
               htmlOutput("select_gene_survival_interactive_1_P_1_control_forest"),
               # htmlOutput("select_Control_simulation_llogis_weibull"),
               hr(),

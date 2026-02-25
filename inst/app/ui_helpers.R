@@ -2608,7 +2608,7 @@ output$select_Control_simulation_llogis_weibull = renderUI({
     selected = "log logistic distribution")
 })
 output$select_gene_survival_interactive_1_P_1_control_forest = renderUI({
-  req(OUTPUT_DATA$figure_surv_interactive_candidate_genes_control_forest)
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_genes_control)
   pickerInput("gene_survival_interactive_1_P_1_control_forest", "Select genes w/ or w/o pathogenic varian for forest plot",
               OUTPUT_DATA$figure_surv_interactive_candidate_genes_control,
               options = list(`actions-box` = TRUE, `live-search`=TRUE),
