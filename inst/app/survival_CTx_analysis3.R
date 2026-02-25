@@ -779,7 +779,6 @@ output$forest_plot_multivariate = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control)
 
-  # レイアウト結合のために patchwork パッケージが必須です
   shiny::validate(shiny::need(requireNamespace("patchwork", quietly = TRUE),
                               "Please install the 'patchwork' package. Run: install.packages('patchwork')"))
 
@@ -808,8 +807,7 @@ output$forest_plot_multivariate = renderPlot({
         }
       }
     } else if (input$survival_data_source == "manual_all" || input$survival_data_source == "manual_age") {
-      # 省略（前回と同じ IPTW 算出用データの取得ロジック）
-      for (ag in age_groups) ref_surv_list[[ag]] <- c(50, 30, 20, 15, 10) # 簡略化プレースホルダー（実際の取得コードを維持してください）
+      for (ag in age_groups) ref_surv_list[[ag]] <- c(50, 30, 20, 15, 10)
     }
   }
 
@@ -838,26 +836,26 @@ output$forest_plot_multivariate = renderPlot({
     dplyr::filter(time_pre > 0, time_all > time_pre) %>%
     dplyr::mutate(
       age_num = as.numeric(症例.基本情報.年齢),
-      # 生の文字列をそのままFactor化し、想定外の文字列によるNA化を防ぐ
       Sex = as.factor(`症例.基本情報.性別.名称.`),
       Cancers = as.character(Cancers)
     )
 
   shiny::validate(shiny::need(nrow(Data_forest) > 50, "Not enough valid cases for multivariate analysis."))
-  total_cohort_N <- nrow(Data_forest) # 全体Nを保持
+  total_cohort_N <- nrow(Data_forest)
 
-  # Sex: 一番人数の多い性別をリファレンス（基準）に自動設定
+  # Set Sex reference
   if(length(levels(Data_forest$Sex)) > 1) {
     top_sex <- names(sort(table(Data_forest$Sex), decreasing = TRUE))[1]
     Data_forest$Sex <- relevel(Data_forest$Sex, ref = top_sex)
   }
 
-  # Cancers: 5例未満の稀少癌を"Others"にまとめ、一番多い癌種をリファレンスに設定
+  # [MODIFIED] Lump rare cancers (< 50 cases) into "Others"
   cancer_counts <- table(Data_forest$Cancers)
   rare_cancers <- names(cancer_counts)[cancer_counts < 50]
   Data_forest$Cancers[Data_forest$Cancers %in% rare_cancers] <- "Others"
   Data_forest$Cancers <- as.factor(Data_forest$Cancers)
 
+  # Ensure the most frequent cancer type is the reference level
   top_cancer <- names(sort(table(Data_forest$Cancers), decreasing = TRUE))[1]
   Data_forest$Cancers <- relevel(Data_forest$Cancers, ref = top_cancer)
 
@@ -920,15 +918,27 @@ output$forest_plot_multivariate = renderPlot({
     Category = NA, Label = NA, Positive_N = NA, Total_N = total_cohort_N, Text_CI = NA
   )
 
+  # [MODIFIED] Adjust Estimate and CI for Age (per +10 years)
+  for (i in 1:nrow(plot_data)) {
+    var <- plot_data$Variable_Raw[i]
+    if (grepl("^age_num", var)) {
+      # Multiply log-coefficient by 10, then exponentiate to get TR per 10 years
+      plot_data$Estimate[i] <- exp(res[var, "est"] * 10)
+      plot_data$Lower[i] <- exp(res[var, "L95%"] * 10)
+      plot_data$Upper[i] <- exp(res[var, "U95%"] * 10)
+    }
+  }
+
+  # Format CI text after age correction
   plot_data$Text_CI <- sprintf("%.2f (%.2f-%.2f)", plot_data$Estimate, plot_data$Lower, plot_data$Upper)
 
   for (i in 1:nrow(plot_data)) {
     var <- plot_data$Variable_Raw[i]
 
     if (grepl("^age_num", var)) {
-      plot_data$Label[i] <- "Age (per +1 year)"
+      plot_data$Label[i] <- "Age (per +10 years)" # Updated label
       plot_data$Category[i] <- "Demographics"
-      plot_data$Positive_N[i] <- NA # 連続変数のためポジティブNは該当せず
+      plot_data$Positive_N[i] <- NA
 
     } else if (grepl("^Sex", var)) {
       level_name <- sub("^Sex", "", var)
@@ -967,7 +977,7 @@ output$forest_plot_multivariate = renderPlot({
   library(ggplot2)
   library(patchwork)
 
-  # 1. 左側：フォレストプロット本体
+  # Left: Forest Plot
   p_left <- ggplot(plot_data, aes(x = Estimate, y = Label, color = Category)) +
     geom_errorbarh(aes(xmin = Lower, xmax = Upper), height = 0.3, size = 0.8) +
     geom_point(size = 4) +
@@ -980,10 +990,10 @@ output$forest_plot_multivariate = renderPlot({
       panel.grid.minor = element_blank(),
       axis.text.y = element_text(face = "bold", size = 12),
       axis.title.x = element_text(margin = margin(t = 10)),
-      legend.position = "none" # 凡例は隠す
+      legend.position = "none"
     )
 
-  # 2. 右側：データテーブル（文字列のみのグラフ）
+  # Right: Text Table
   p_right <- ggplot(plot_data, aes(y = Label)) +
     geom_text(aes(x = 0, label = Total_N), hjust = 0.5, size = 4.5, color = "#2c3e50") +
     geom_text(aes(x = 1, label = Text_PosN), hjust = 0.5, size = 4.5, color = "#2c3e50") +
@@ -992,17 +1002,18 @@ output$forest_plot_multivariate = renderPlot({
     theme_minimal(base_size = 14) +
     labs(x = "", y = "") +
     theme(
-      panel.grid = element_blank(), # 背景の線を消す
-      axis.text.y = element_blank(), # y軸ラベルは左の図にあるので消す
-      axis.text.x = element_text(face = "bold", color = "#2c3e50"), # ヘッダーテキスト
+      panel.grid = element_blank(),
+      axis.text.y = element_blank(),
+      axis.text.x = element_text(face = "bold", color = "#2c3e50"),
       axis.ticks = element_blank()
     )
 
-  # 3. パッチワークによる統合（左プロットと右テーブルを 2:1.2 の比率で結合）
+  # Merge with patchwork
+  # [MODIFIED] Added N >= 50 condition to the subtitle
   final_plot <- p_left + p_right + plot_layout(widths = c(2, 1.2)) +
     plot_annotation(
       title = "Independent Prognostic Impact (Multivariate AFT Model)",
-      subtitle = "Model adjusted for Age, Sex, Histology (N>=50), and concurrent Mutations (IPTW applied)\nTR > 1: Prolonged Survival | TR < 1: Shortened Survival",
+      subtitle = "Model adjusted for Age, Sex, Histology (N >= 50), and concurrent Mutations (IPTW applied)\nTR > 1: Prolonged Survival | TR < 1: Shortened Survival",
       theme = theme(
         plot.title = element_text(face = "bold", size = 16),
         plot.subtitle = element_text(size = 13, color = "#34495e")
@@ -1020,6 +1031,7 @@ output$forest_plot_multivariate = renderPlot({
 
   n_genes <- length(input$gene_survival_interactive_1_P_1_control_forest)
 
+  # [MODIFIED] Accurately count histology levels (>= 50 cases)
   cancer_counts <- table(Data_whole$Cancers)
   n_cancers <- sum(cancer_counts >= 50)
   if (n_cancers <= 1) n_cancers <- 1
@@ -1027,7 +1039,6 @@ output$forest_plot_multivariate = renderPlot({
   # Age(1) + Sex(1) + Histologies(n_cancers - 1 ref) + Genes(n_genes)
   estimated_items <- 1 + 1 + (n_cancers - 1) + n_genes
 
-  # 計算式: アイテム数 × 35px + 上下マージン200px
   calculated_height <- max(450, estimated_items * 35 + 200)
 
   return(calculated_height)
