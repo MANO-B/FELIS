@@ -771,7 +771,7 @@ output$forest_plot_whole_cohort <- renderPlot({
     )
 })
 
-R
+
 output$forest_plot_multivariate = renderPlot({
   # =========================================================================
   # Require necessary data
