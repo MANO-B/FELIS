@@ -854,7 +854,7 @@ output$forest_plot_multivariate = renderPlot({
 
   # Cancers: 5例未満の稀少癌を"Others"にまとめ、一番多い癌種をリファレンスに設定
   cancer_counts <- table(Data_forest$Cancers)
-  rare_cancers <- names(cancer_counts)[cancer_counts < 5]
+  rare_cancers <- names(cancer_counts)[cancer_counts < 50]
   Data_forest$Cancers[Data_forest$Cancers %in% rare_cancers] <- "Others"
   Data_forest$Cancers <- as.factor(Data_forest$Cancers)
 
@@ -1002,7 +1002,7 @@ output$forest_plot_multivariate = renderPlot({
   final_plot <- p_left + p_right + plot_layout(widths = c(2, 1.2)) +
     plot_annotation(
       title = "Independent Prognostic Impact (Multivariate AFT Model)",
-      subtitle = "Model adjusted for Age, Sex, Histology, and concurrent Mutations (IPTW applied)\nTR > 1: Prolonged Survival | TR < 1: Shortened Survival",
+      subtitle = "Model adjusted for Age, Sex, Histology (N>=50), and concurrent Mutations (IPTW applied)\nTR > 1: Prolonged Survival | TR < 1: Shortened Survival",
       theme = theme(
         plot.title = element_text(face = "bold", size = 16),
         plot.subtitle = element_text(size = 13, color = "#34495e")
@@ -1021,7 +1021,7 @@ output$forest_plot_multivariate = renderPlot({
   n_genes <- length(input$gene_survival_interactive_1_P_1_control_forest)
 
   cancer_counts <- table(Data_whole$Cancers)
-  n_cancers <- sum(cancer_counts >= 5)
+  n_cancers <- sum(cancer_counts >= 50)
   if (n_cancers <= 1) n_cancers <- 1
 
   # Age(1) + Sex(1) + Histologies(n_cancers - 1 ref) + Genes(n_genes)

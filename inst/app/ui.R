@@ -1368,7 +1368,6 @@ ui <- dashboardPage(
               hr(),
               htmlOutput("select_stage4_survival_rate"),
               hr(),
-              htmlOutput("select_gene_survival_interactive_1_P_1_control_forest"),
               # htmlOutput("select_Control_simulation_llogis_weibull"),
               hr(),
               fluidRow(
@@ -1399,6 +1398,57 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_interactive_2_H_control")
                 )
               ),
+              # プロット出力の近くに配置するUIコード
+              tags$details(
+                style = "background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-top: 15px; margin-bottom: 20px;",
+
+                tags$summary(
+                  style = "font-weight: bold; font-size: 16px; cursor: pointer; color: #2c3e50; outline: none;",
+                  icon("circle-info"), " 💡 この解析・シミュレーション手法について（クリックして詳細を表示）"
+                ),
+
+                tags$div(
+                  style = "margin-top: 15px; font-size: 14px; color: #333333; line-height: 1.6;",
+
+                  tags$p(
+                    "本アプリでは、リアルワールドデータ（RWD）であるCGP検査コホートから", tags$strong("「真の治療効果・遺伝子変異の予後インパクト」"),
+                    "を抽出するため、Accelerated failure time modelによる疫学的なバイアスを排除した因果推論シミュレーションを行っています。"
+                  ),
+
+                  tags$h4(style = "color: #2980b9; font-size: 15px; font-weight: bold; margin-top: 20px;", "克服している3つの重大なバイアス"),
+                  tags$ul(
+                    tags$li(tags$strong("生存者バイアス（左側切断）: "), "CGP検査を受けた患者は「検査に到達できるまで長生きできた」という特殊な集団です。そのまま一般集団（院内がん登録）と比較すると不当に予後が良く見えてしまいます。"),
+                    tags$li(tags$strong("患者背景のズレ: "), "CGPコホートは一般集団に比べて若年層が多いなどの偏りがあります。"),
+                    tags$li(tags$strong("進行スピードの相関: "), "診断からCGP検査までが短い（進行が早い）患者は、検査後の余命も短いという自然な生物学的相関があります。")
+                  ),
+
+                  tags$h4(style = "color: #2980b9; font-size: 15px; font-weight: bold; margin-top: 20px;", "解析のアプローチ（Doubly Robust Estimation）"),
+                  tags$ol(
+                    tags$li(tags$strong("IPTW（逆確率重み付け）による背景の標準化: "), "院内がん登録（マクロデータ）の生存率を基準に、CGP患者の「年齢」と「検査到達タイミング」を一般集団の分布に強制的に一致させる重み付けを行います。"),
+                    tags$li(tags$strong("多変量加速モデル（Multivariate AFT Model）: "), "年齢・性別・組織型という強力な交絡因子を多変量モデルで差し引き、「特定の遺伝子変異」が独立して生存期間に与える純粋な影響を抽出します。"),
+                    tags$li(tags$strong("絶対時間の再構築（シミュレーション）: "), "一般集団の期待生存日数をベースに、抽出した効果を掛け合わせ、臨床的な相関を保ちながら「もしこの患者たちが一般集団だったら」という仮想的なカプランマイヤー曲線を再構築します。")
+                  ),
+
+                  tags$h4(style = "color: #e74c3c; font-size: 15px; font-weight: bold; margin-top: 20px;", "📊 フォレストプロットの見方：Time Ratio (TR) とは？"),
+                  tags$p(
+                    "一般的なハザード比（HR）とは異なり、この解析では", tags$strong("「Time Ratio（時間比・加速係数）」"), "を算出しています。これは「本来生きられるはずだった寿命が、何倍に伸縮するか」を表す直感的な指標です。"
+                  ),
+                  tags$ul(
+                    tags$li(tags$strong("TR > 1.0 : 予後良好"), "（例：TR=1.5なら、生存期間が1.5倍に延びる）"),
+                    tags$li(tags$strong("TR < 1.0 : 予後不良"), "（例：TR=0.5なら、生存期間が半分に縮む）"),
+                    tags$li(tags$strong("TR = 1.0 : 影響なし"))
+                  ),
+                  tags$p(style = "font-size: 13px; color: #7f8c8d; margin-top: 10px;",
+                         "※ プロットの点は点推定値、エラーバーは95%信頼区間を示します。TRが1.0の点線を跨いでいなければ、統計的に有意な独立因子であることを意味します。")
+                )
+              ),
+              htmlOutput("select_gene_survival_interactive_1_P_1_control_forest"),
+              br(),
+              br(),
+              br(),
+              br(),
+              br(),
+              br(),
               br(),
               br(),
               br(),
