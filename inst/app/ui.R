@@ -99,7 +99,7 @@ ui <- dashboardPage(
                menuSubItem("Diagnosis and survival", tabName = "DiagnosisandsurvivalKM-curve", icon = icon("angle-right")),
                hr()
       ),
-      menuItem("Survival after CTx with control cohort data", icon = icon("th"),
+      menuItem("Survival after CTx with control cohort data (experimental)", icon = icon("th"),
                hr(),
                menuSubItem("Custom survival analysis", tabName = "ControlCustom", icon = icon("angle-right")),
                hr()
@@ -1295,6 +1295,7 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_interactive_1_P_2"),
                        htmlOutput("select_gene_survival_interactive_1_W"),
                        htmlOutput("select_gene_survival_interactive_1_D"),
+                       htmlOutput("select_gene_survival_interactive_1_ND"),
                        htmlOutput("select_gene_survival_interactive_1_L"),
                        htmlOutput("select_gene_survival_interactive_1_R")
                 ),
@@ -1313,6 +1314,7 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_interactive_2_P_2"),
                        htmlOutput("select_gene_survival_interactive_2_W"),
                        htmlOutput("select_gene_survival_interactive_2_D"),
+                       htmlOutput("select_gene_survival_interactive_2_ND"),
                        htmlOutput("select_gene_survival_interactive_2_L"),
                        htmlOutput("select_gene_survival_interactive_2_R")
                 ),
@@ -1376,7 +1378,8 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_interactive_1_P_1_control"),
                        htmlOutput("select_gene_survival_interactive_1_P_2_control"),
                        htmlOutput("select_gene_survival_interactive_1_W_control"),
-                       htmlOutput("select_gene_survival_interactive_1_D_control")
+                       htmlOutput("select_gene_survival_interactive_1_D_control"),
+                       htmlOutput("select_gene_survival_interactive_1_ND_control")
                 ),
                 column(3,
                        h6("   "),
@@ -1389,7 +1392,8 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_interactive_2_P_1_control"),
                        htmlOutput("select_gene_survival_interactive_2_P_2_control"),
                        htmlOutput("select_gene_survival_interactive_2_W_control"),
-                       htmlOutput("select_gene_survival_interactive_2_D_control")
+                       htmlOutput("select_gene_survival_interactive_2_D_control"),
+                       htmlOutput("select_gene_survival_interactive_2_ND_control")
                 ),
                 column(3,
                        h6("   "),
@@ -1527,6 +1531,7 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_interactive_1_P_2_Bayes"),
                        htmlOutput("select_gene_survival_interactive_1_W_Bayes"),
                        htmlOutput("select_gene_survival_interactive_1_D_Bayes"),
+                       htmlOutput("select_gene_survival_interactive_1_ND_Bayes"),
                        htmlOutput("select_gene_survival_interactive_1_L_Bayes"),
                        htmlOutput("select_gene_survival_interactive_1_R_Bayes")
                 ),
@@ -1545,6 +1550,7 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_interactive_2_P_2_Bayes"),
                        htmlOutput("select_gene_survival_interactive_2_W_Bayes"),
                        htmlOutput("select_gene_survival_interactive_2_D_Bayes"),
+                       htmlOutput("select_gene_survival_interactive_2_ND_Bayes"),
                        htmlOutput("select_gene_survival_interactive_2_L_Bayes"),
                        htmlOutput("select_gene_survival_interactive_2_R_Bayes")
                 ),

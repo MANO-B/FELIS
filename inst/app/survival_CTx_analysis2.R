@@ -473,6 +473,11 @@ output$figure_survival_CTx_interactive_1 = renderPlot({
       IDs <- intersect(IDs, (Data_drug %>%
                                dplyr::filter(Drug %in% d_input))$ID)
     }
+    nd_input <- input[[paste0(input_prefix, "ND")]]
+    if(!all(is.null(nd_input))) {
+      IDs <- setdiff(IDs, (Data_drug %>%
+                               dplyr::filter(Drug %in% nd_input))$ID)
+    }
 
     return(IDs)
   }

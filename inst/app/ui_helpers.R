@@ -1858,6 +1858,14 @@ output$select_gene_survival_interactive_1_D = renderUI({
               selected = NULL,
               multiple = TRUE)
 })
+output$select_gene_survival_interactive_1_ND = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs)
+  pickerInput("gene_survival_interactive_1_ND", "Drugs not used in any lines",
+              OUTPUT_DATA$figure_surv_interactive_candidate_drugs,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
 output$select_gene_survival_interactive_2_P_1 = renderUI({
   req(OUTPUT_DATA$figure_surv_interactive_candidate_genes)
   pickerInput("gene_survival_interactive_2_P_1", "Pathogenic variant in any genes",
@@ -1885,6 +1893,14 @@ output$select_gene_survival_interactive_2_W = renderUI({
 output$select_gene_survival_interactive_2_D = renderUI({
   req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs)
   pickerInput("gene_survival_interactive_2_D", "Drugs used in any lines",
+              OUTPUT_DATA$figure_surv_interactive_candidate_drugs,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_2_ND = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs)
+  pickerInput("gene_survival_interactive_2_ND", "Drugs not used in any lines",
               OUTPUT_DATA$figure_surv_interactive_candidate_drugs,
               options = list(`actions-box` = TRUE, `live-search`=TRUE),
               selected = NULL,
@@ -2038,6 +2054,14 @@ output$select_gene_survival_interactive_1_D_Bayes = renderUI({
               selected = NULL,
               multiple = TRUE)
 })
+output$select_gene_survival_interactive_1_ND_Bayes = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs_Bayes)
+  pickerInput("gene_survival_interactive_1_ND_Bayes", "Drugs not used in any lines",
+              OUTPUT_DATA$figure_surv_interactive_candidate_drugs_Bayes,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
 output$select_gene_survival_interactive_2_P_1_Bayes = renderUI({
   req(OUTPUT_DATA$figure_surv_interactive_candidate_genes_Bayes)
   pickerInput("gene_survival_interactive_2_P_1_Bayes", "Pathogenic variant in any genes",
@@ -2065,6 +2089,14 @@ output$select_gene_survival_interactive_2_W_Bayes = renderUI({
 output$select_gene_survival_interactive_2_D_Bayes = renderUI({
   req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs_Bayes)
   pickerInput("gene_survival_interactive_2_D_Bayes", "Drugs used in any lines",
+              OUTPUT_DATA$figure_surv_interactive_candidate_drugs_Bayes,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_2_ND_Bayes = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs_Bayes)
+  pickerInput("gene_survival_interactive_2_ND_Bayes", "Drugs not used in any lines",
               OUTPUT_DATA$figure_surv_interactive_candidate_drugs_Bayes,
               options = list(`actions-box` = TRUE, `live-search`=TRUE),
               selected = NULL,
@@ -2567,6 +2599,14 @@ output$select_gene_survival_interactive_1_D_control = renderUI({
               selected = NULL,
               multiple = TRUE)
 })
+output$select_gene_survival_interactive_1_ND_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control)
+  pickerInput("gene_survival_interactive_1_ND_control", "Drugs not used in any lines",
+              OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
 output$select_gene_survival_interactive_2_P_1_control = renderUI({
   req(OUTPUT_DATA$figure_surv_interactive_candidate_genes_control)
   pickerInput("gene_survival_interactive_2_P_1_control", "Pathogenic variant in any genes",
@@ -2594,6 +2634,14 @@ output$select_gene_survival_interactive_2_W_control = renderUI({
 output$select_gene_survival_interactive_2_D_control = renderUI({
   req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control)
   pickerInput("gene_survival_interactive_2_D_control", "Drugs used in any lines",
+              OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control,
+              options = list(`actions-box` = TRUE, `live-search`=TRUE),
+              selected = NULL,
+              multiple = TRUE)
+})
+output$select_gene_survival_interactive_2_ND_control = renderUI({
+  req(OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control)
+  pickerInput("gene_survival_interactive_2_ND_control", "Drugs not used in any lines",
               OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control,
               options = list(`actions-box` = TRUE, `live-search`=TRUE),
               selected = NULL,

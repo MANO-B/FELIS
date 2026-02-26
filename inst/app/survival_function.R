@@ -16,11 +16,9 @@ QS_READ <- function(nthreads, file, ...) {
     qs2::qs_read(file=file, nthreads=nthreads, ...)
   } else if(!file.exists("/.dockerenv")){
     # その他のアーキテクチャの場合、nthreadsを1に設定
-    # readRDS(file=file, ...)
     qs2::qs_read(file=file, nthreads = 1, ...)
   } else {
     qs2::qs_read(file=file, nthreads = 1, ...)
-    # print(1)
   }
 }
 QS_SAVE <- function(nthreads, object, file, ...) {
@@ -30,11 +28,9 @@ QS_SAVE <- function(nthreads, object, file, ...) {
     qs2::qs_save(nthreads=nthreads, object=object, file=file, ...)
   } else if(!file.exists("/.dockerenv")){
     # その他のアーキテクチャの場合、nthreadsを1に設定
-    # saveRDS(object=object, file=file, ...)
     qs2::qs_save(nthreads = 1, object=object, file=file, ...)
   } else {
     qs2::qs_save(nthreads = 1, object=object, file=file, ...)
-    # print(1)
   }
 }
 Abs = function(x){
@@ -277,102 +273,6 @@ surv_curv_entry <- function(fit, data, title, legend_, diff_0, diff_1, diff_2=NU
                              plot.subtitle = element_blank())
   return(g)
 }
-# surv_curv_entry <- function(fit, data, title, legend_, diff_0, diff_1, diff_2=NULL){
-#   g = ggsurvplot(
-#     fit = fit,
-#     combine = TRUE,
-#     data = data,
-#     xlab = "Time from enrollment (months)",
-#     ylab = "Survival Probability",
-#     censor = TRUE,
-#     conf.int = FALSE,
-#     surv.scale = "percent",
-#     font.title = 8,
-#     font.subtitle = 8,
-#     font.main = 8,
-#     font.submain = 8,
-#     font.caption = 8,
-#     font.legend = 8,
-#     pval = FALSE,
-#     surv.median.line = "v",
-#     palette = "Dark2",
-#     risk.table = TRUE,
-#     risk.table.y.text = FALSE,
-#     cumevents = FALSE,
-#     cumcensor = FALSE,
-#     tables.theme = clean_theme(),
-#     legend = c(0.8,0.8),
-#     xlim = c(0, min(365.25*10, max(data$time_enroll_final, na.rm = T)) * 1.05),
-#     xscale = "d_m",
-#     # break.x.by = 6 * 365.25 / 12,
-#     break.x.by = max(6 * 365.25 / 12, ceiling(max(data$time_enroll_final) / 365.25 / 6) * 365.25 / 2),
-#     legend.labs = legend_
-#   )
-#   if(is.null(diff_0)){
-#     tmp = summary(fit)$table
-#     legends = paste0(
-#       format_p(digits = 1, tmp[[7]] / 365.25 * 12),
-#       " (",
-#       format_p(digits = 1, tmp[[8]] / 365.25 * 12),
-#       "-",
-#       format_p(digits = 1, tmp[[9]] / 365.25 * 12),
-#       ")"
-#     )
-#     g$plot <- g$plot +
-#       labs(title = title,
-#            subtitle = paste0("Median OS, ", legends, " months"))
-#   } else{
-#     tmp = data.frame(summary(fit)$table)
-#     legends = paste0(
-#       format_p(digits = 1, tmp$median[1] / 365.25 * 12),
-#       " (",
-#       format_p(digits = 1, tmp$X0.95LCL[1] / 365.25 * 12),
-#       "-",
-#       format_p(digits = 1, tmp$X0.95UCL[1] / 365.25 * 12),
-#       ")"
-#     )
-#     for(i in 2:nrow(tmp)){
-#       legends = paste(
-#         legends,
-#         paste0(
-#           format_p(digits = 1, tmp$median[i] / 365.25 * 12),
-#           " (",
-#           format_p(digits = 1, tmp$X0.95LCL[i] / 365.25 * 12),
-#           "-",
-#           format_p(digits = 1, tmp$X0.95UCL[i] / 365.25 * 12),
-#           ")"
-#         ),
-#         sep = ", "
-#       )
-#     }
-#     title_HR = NULL
-#     if(!is.null(diff_2)){
-#       data_tmp = tidy(diff_2, exponentiate=TRUE, conf.int=TRUE)
-#       if(nrow(data_tmp) > 0){
-#         for(i in 1:nrow(data_tmp)){
-#           title_HR = c(title_HR,
-#                        paste0(format_p(data_tmp$estimate[i],digits=2), " (",
-#                               format_p(data_tmp$conf.low[i],digits=2), "-",
-#                               format_p(data_tmp$conf.high[i],digits=2), ") ",
-#                               "p=", format_p(data_tmp$p.value[i],digits=2)))
-#         }
-#       }
-#     }
-#     g$plot <- g$plot +
-#       labs(title = paste0(title, ": \nhazard ratio (vs 1st group)=", paste(title_HR, collapse = "/")),
-#            subtitle = paste0("Median OS, ", legends, " months"))
-#     g$plot <- g$plot +
-#       labs(title = paste0(title, ": log-rank, p=", format_p(
-#         1 - pchisq(diff_0$chisq, length(diff_0$n)-1, lower.tail = TRUE),digits=3),
-#         "/Wilcoxon, p=", format_p(
-#           1 - pchisq(diff_1$chisq, length(diff_1$n)-1, lower.tail = TRUE),digits=3),
-#         "\nhazard ratio (vs 1st group)=", paste(title_HR, collapse = "/")),
-#         subtitle = paste0("Median OS, ", legends, " months"))
-#   }
-#   g$table <- g$table + theme(plot.title = element_blank(),
-#                              plot.subtitle = element_blank())
-#   return(g)
-# }
 
 weighted_survdiff_like <- function(time, status, group, weights, rho = 0) {
   # group: 2群想定（factor/character ok）
