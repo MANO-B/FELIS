@@ -204,7 +204,7 @@ output$select_stage4_survival_rate = renderUI({
     # UI for Registry Data
     conditionalPanel(
       condition = "input.survival_data_source == 'registry'",
-      selectInput("registry_cancer_type", "Select Cancer Type:", choices = registry_choices)
+      selectInput("registry_cancer_type", "Select Cancer Type, https://hbcr-survival.ganjoho.jp:", choices = registry_choices)
     ),
 
     # UI for Manual Input (Overall - Applied to all ages)
