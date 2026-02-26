@@ -102,6 +102,7 @@ ui <- dashboardPage(
       menuItem("Survival after CTx with control cohort data (experimental)", icon = icon("th"),
                hr(),
                menuSubItem("Custom survival analysis", tabName = "ControlCustom", icon = icon("angle-right")),
+               menuSubItem("Simulation Study", tabName = "Simulation_Study", icon = icon("angle-right")),
                hr()
       ),
       menuItem("Bias correction simulation", tabName = "SurvivalSimurationKMCurve", icon = icon("th")),
@@ -1461,6 +1462,56 @@ ui <- dashboardPage(
               br(),
               br(),
               hr()
+      ),
+      tabItem("Simulation_Study",
+              fluidPage(
+                titlePanel("Simulation Study: Multivariate Robust Estimation with Covariates"),
+
+                sidebarLayout(
+                  sidebarPanel(
+                    h4("Population & Target Gene Settings"),
+                    numericInput("sim_n", "CGP Sample Size (N):", 1000, min = 500, max = 5000),
+                    numericInput("sim_mut_freq", "Target Gene (e.g., KRAS) Mutation Frequency (%):", 20, min = 1, max = 100, step = 1),
+                    numericInput("sim_true_af", "True Target Gene AF (Time Ratio):", 1.5, min = 0.1, max = 5.0, step = 0.1),
+
+                    h4("Left-Truncation (T1) Pattern"),
+                    radioButtons("sim_t1_pattern", "Timing of CGP test (T1):",
+                                 choices = c("Quasi-independent (Random timing)" = "indep",
+                                             "Realistic dependent (Slower progression -> Later CGP)" = "real",
+                                             "Reverse dependent (Faster progression -> Earlier CGP)" = "rev")),
+
+                    h4("Censoring Pattern (after CGP)"),
+                    radioButtons("sim_cens_pattern", "Timing of Censoring (C2):",
+                                 choices = c("Independent (Constant rate)" = "indep",
+                                             "Early censoring (Soon after CGP)" = "early",
+                                             "Late censoring (Just before death)" = "late",
+                                             "U-shape (Early & Late censoring)" = "ushape")),
+                    numericInput("sim_cens_rate", "Target Censoring Rate (%):", 30, min = 10, max = 80, step = 5),
+
+                    hr(),
+                    actionButton("run_sim", "Run Simulation", class = "btn-primary", width = "100%")
+                  ),
+
+                  mainPanel(
+                    h4("Simulation Results: Multivariate Acceleration Factors (Time Ratios)"),
+                    p("Comparison of the True AFs incorporated into the data generation process versus the Estimated AFs recovered by our Doubly Robust AFT model."),
+                    tableOutput("sim_result_table"),
+
+                    h4("Reconstructed Marginal Survival Curves (Target Gene)"),
+                    plotOutput("sim_survival_plot", height = "400px"),
+
+                    tags$details(
+                      style = "margin-top: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 5px;",
+                      tags$summary(tags$b("ℹ️ Methodological Notes (Simulation Design)")),
+                      tags$p("1. A macro population (N=100,000) is generated with realistic baseline survival. Covariates are assigned based on actual registry distributions: Histology (COAD 60%, READ 30%, COADREAD 10%), Sex (Male 55%, Female 45%), and Age (40-80)."),
+                      tags$p("2. True Time Ratios (AFs) are applied: READ (AF=0.90), COADREAD (AF=0.95), Female (AF=1.10), Age (+10 yrs AF=0.85)."),
+                      tags$p("3. T1 (Time to CGP) is generated based on the selected pattern, introducing Left-truncation and Dependent truncation."),
+                      tags$p("4. C2 (Censoring time) is generated using specific distributions to simulate Informative censoring."),
+                      tags$p("5. Our Proposed Method (Left-truncated Log-logistic AFT with IPTW) simultaneously estimates the independent effects of the Target Gene and all covariates.")
+                    )
+                  )
+                )
+              )
       ),
       tabItem("Geneticvariantsandsurvivalforestplot2",
               h6("Figure. Overall survival after the first survival-prolonging chemotherapy after adjusting for left-truncation bias. To evaluate the association between oncogenic mutations and survival, a risk-set adjustment model was performed to adjust for left-truncation bias with survival package."),

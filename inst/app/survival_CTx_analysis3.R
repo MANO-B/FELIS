@@ -1058,3 +1058,239 @@ output$forest_plot_multivariate = renderPlot({
 
   return(calculated_height)
 })
+
+# =========================================================================
+# Server Logic for Simulation Study
+# =========================================================================
+
+# Helper function for censoring
+find_censoring_scale <- function(T2, target_rate, pattern) {
+  obj_func <- function(scale_param) {
+    if (pattern == "indep") {
+      C2 <- rexp(length(T2), rate = 1 / scale_param)
+    } else if (pattern == "early") {
+      C2 <- rweibull(length(T2), shape = 0.5, scale = scale_param)
+    } else if (pattern == "late") {
+      C2 <- rweibull(length(T2), shape = 3.0, scale = scale_param)
+    } else if (pattern == "ushape") {
+      u <- runif(length(T2))
+      C2 <- ifelse(u < 0.5,
+                   rweibull(length(T2), shape = 0.5, scale = scale_param),
+                   rweibull(length(T2), shape = 3.0, scale = scale_param * 2))
+    }
+    censored <- sum(C2 < T2) / length(T2)
+    return(censored - target_rate)
+  }
+
+  optimal <- tryCatch({ uniroot(obj_func, interval = c(0.01, 100))$root }, error = function(e) { 10 })
+  return(optimal)
+}
+
+observeEvent(input$run_sim, {
+  req(input$sim_n, input$sim_true_af, input$sim_cens_rate, input$sim_mut_freq)
+
+  showNotification("Running multivariate simulation...", type = "message", duration = 3)
+
+  N_target <- input$sim_n
+  True_AF_X <- input$sim_true_af
+  Mut_Freq <- input$sim_mut_freq / 100
+  t1_pat <- input$sim_t1_pattern
+  cens_pat <- input$sim_cens_pattern
+  cens_rate <- input$sim_cens_rate / 100
+
+  # =========================================================================
+  # 1. Generate Macro Population with Covariates
+  # =========================================================================
+  N_macro <- 100000
+  Age <- round(runif(N_macro, 40, 80))
+  Sex <- sample(c("Male", "Female"), N_macro, replace = TRUE, prob = c(0.55, 0.45))
+  Histology <- sample(c("COAD", "READ", "COADREAD"), N_macro, replace = TRUE, prob = c(0.60, 0.30, 0.10))
+  X <- rbinom(N_macro, 1, Mut_Freq) # Target Gene
+
+  # Set True AFs based on Registry insights
+  True_AF_Age_10yr <- 0.85
+  True_AF_Sex_Female <- 1.10
+  True_AF_Hist_READ <- 0.90
+  True_AF_Hist_COADREAD <- 0.95
+
+  # Calculate cumulative background AF for each patient
+  AF_bg <- 1.0 * (True_AF_Age_10yr ^ ((Age - 60) / 10)) * # Centered at 60 years
+    ifelse(Sex == "Female", True_AF_Sex_Female, 1.0) *
+    ifelse(Histology == "READ", True_AF_Hist_READ,
+           ifelse(Histology == "COADREAD", True_AF_Hist_COADREAD, 1.0))
+
+  # Baseline OS generated from Log-logistic (Base: 60yo Male COAD)
+  shape_base <- 1.5
+  scale_base <- 3.0 * 365.25 # 3 years median for base profile
+
+  u <- runif(N_macro)
+  T_base <- scale_base * ((1 - u) / u)^(1 / shape_base)
+
+  # Final True OS combining background AF and Target Gene AF
+  T_true <- T_base * AF_bg * ifelse(X == 1, True_AF_X, 1.0)
+
+  # =========================================================================
+  # 2. Generate T1 (Time to CGP) and Sample Cohort
+  # =========================================================================
+  if (t1_pat == "indep") {
+    T1 <- runif(N_macro, 30, 365.25 * 3)
+  } else if (t1_pat == "real") {
+    T1 <- T_true * runif(N_macro, 0.3, 0.8)
+  } else if (t1_pat == "rev") {
+    ratio <- pmax(0.1, 1 - exp(-T_true / 365.25)) * runif(N_macro, 0.2, 0.9)
+    T1 <- T_true * ratio
+  }
+
+  cgp_indices <- which(T_true > T1)
+
+  # Selection bias (Younger patients are slightly more likely to enter CGP)
+  prob_select <- ifelse(Age[cgp_indices] < 60, 0.8, 0.4)
+  selected_indices <- sample(cgp_indices, size = min(N_target, length(cgp_indices)), prob = prob_select, replace = FALSE)
+
+  Data_cgp <- data.frame(
+    ID = 1:length(selected_indices),
+    Age = Age[selected_indices],
+    Sex = factor(Sex[selected_indices], levels = c("Male", "Female")),
+    Histology = factor(Histology[selected_indices], levels = c("COAD", "READ", "COADREAD")),
+    X = factor(ifelse(X[selected_indices] == 1, "Mutated", "WT"), levels = c("WT", "Mutated")),
+    T_true = T_true[selected_indices],
+    T1 = T1[selected_indices]
+  )
+  Data_cgp$T2_true <- Data_cgp$T_true - Data_cgp$T1
+
+  # =========================================================================
+  # 3. Apply Informative Censoring (C2)
+  # =========================================================================
+  scale_opt <- find_censoring_scale(Data_cgp$T2_true, cens_rate, cens_pat)
+
+  if (cens_pat == "indep") { C2 <- rexp(nrow(Data_cgp), rate = 1 / scale_opt)
+  } else if (cens_pat == "early") { C2 <- rweibull(nrow(Data_cgp), shape = 0.5, scale = scale_opt)
+  } else if (cens_pat == "late") { C2 <- rweibull(nrow(Data_cgp), shape = 3.0, scale = scale_opt)
+  } else if (cens_pat == "ushape") {
+    u_c <- runif(nrow(Data_cgp))
+    C2 <- ifelse(u_c < 0.5, rweibull(nrow(Data_cgp), shape = 0.5, scale = scale_opt), rweibull(nrow(Data_cgp), shape = 3.0, scale = scale_opt * 2))
+  }
+
+  Data_cgp$T2_obs <- pmin(Data_cgp$T2_true, C2)
+  Data_cgp$Censor <- ifelse(Data_cgp$T2_true <= C2, 1, 0)
+  Data_cgp$T_obs <- Data_cgp$T1 + Data_cgp$T2_obs
+
+  # =========================================================================
+  # 4. Simplified IPTW based on Age
+  # =========================================================================
+  Age_class_macro <- ifelse(Age < 60, "Young", "Old")
+  pt_young <- sum(T_true[Age_class_macro == "Young"])
+  pt_old <- sum(T_true[Age_class_macro == "Old"])
+
+  Data_cgp$Age_class <- ifelse(Data_cgp$Age < 60, "Young", "Old")
+  weight_young <- pt_young / sum(Data_cgp$Age_class == "Young")
+  weight_old <- pt_old / sum(Data_cgp$Age_class == "Old")
+
+  Data_cgp$iptw <- ifelse(Data_cgp$Age_class == "Young", weight_young, weight_old)
+  Data_cgp$iptw <- Data_cgp$iptw / mean(Data_cgp$iptw)
+
+  # =========================================================================
+  # 5. Fit Proposed Multivariate Left-Truncated AFT Model
+  # =========================================================================
+  library(flexsurv)
+  # Model: T ~ Target Gene + Age + Sex + Histology
+  fit_prop <- tryCatch({
+    flexsurvreg(Surv(T1, T_obs, Censor) ~ X + Age + Sex + Histology, data = Data_cgp, weights = iptw, dist = "llogis")
+  }, error = function(e) { NULL })
+
+  # =========================================================================
+  # 6. Render Multivariate Results Table
+  # =========================================================================
+  output$sim_result_table <- renderTable({
+    req(fit_prop)
+    res <- fit_prop$res
+
+    # Extract Estimated AFs (exponentiate coefficients)
+    # Note: For Age, we multiply the log-coef by 10 before exp() to get "per 10 years"
+    est_X <- exp(res["XMutated", "est"])
+    est_Age <- exp(res["Age", "est"] * 10)
+    est_Sex <- exp(res["SexFemale", "est"])
+    est_READ <- exp(res["HistologyREAD", "est"])
+    est_COADREAD <- exp(res["HistologyCOADREAD", "est"])
+
+    ci_X <- sprintf("%.2f - %.2f", exp(res["XMutated", "L95%"]), exp(res["XMutated", "U95%"]))
+    ci_Age <- sprintf("%.2f - %.2f", exp(res["Age", "L95%"]*10), exp(res["Age", "U95%"]*10))
+    ci_Sex <- sprintf("%.2f - %.2f", exp(res["SexFemale", "L95%"]), exp(res["SexFemale", "U95%"]))
+    ci_READ <- sprintf("%.2f - %.2f", exp(res["HistologyREAD", "L95%"]), exp(res["HistologyREAD", "U95%"]))
+    ci_COADREAD <- sprintf("%.2f - %.2f", exp(res["HistologyCOADREAD", "L95%"]), exp(res["HistologyCOADREAD", "U95%"]))
+
+    res_df <- data.frame(
+      Covariate = c("Target Gene (Mutated vs WT)",
+                    "Age (per +10 years)",
+                    "Sex (Female vs Male)",
+                    "Histology: READ (vs COAD)",
+                    "Histology: COADREAD (vs COAD)"),
+      True_AF = c(sprintf("%.2f", True_AF_X),
+                  sprintf("%.2f", True_AF_Age_10yr),
+                  sprintf("%.2f", True_AF_Sex_Female),
+                  sprintf("%.2f", True_AF_Hist_READ),
+                  sprintf("%.2f", True_AF_Hist_COADREAD)),
+      Estimated_AF = c(sprintf("%.2f", est_X),
+                       sprintf("%.2f", est_Age),
+                       sprintf("%.2f", est_Sex),
+                       sprintf("%.2f", est_READ),
+                       sprintf("%.2f", est_COADREAD)),
+      `95%_CI` = c(ci_X, ci_Age, ci_Sex, ci_READ, ci_COADREAD),
+      Bias = c(sprintf("%+.3f", est_X - True_AF_X),
+               sprintf("%+.3f", est_Age - True_AF_Age_10yr),
+               sprintf("%+.3f", est_Sex - True_AF_Sex_Female),
+               sprintf("%+.3f", est_READ - True_AF_Hist_READ),
+               sprintf("%+.3f", est_COADREAD - True_AF_Hist_COADREAD))
+    )
+    return(res_df)
+  }, bordered = TRUE, striped = TRUE, hover = TRUE, width = "100%", align = "c")
+
+  # =========================================================================
+  # 7. Render Reconstructed Survival Plot
+  # =========================================================================
+  output$sim_survival_plot <- renderPlot({
+    req(fit_prop)
+    library(ggplot2)
+
+    # We plot the marginal effect of the Target Gene at baseline covariates
+    # (Age=60, Sex=Male, Histology=COAD)
+    shape_val <- fit_prop$res["shape", "est"]
+
+    # The 'scale' parameter in the model corresponds to Baseline (WT, Age=0, Male, COAD).
+    # We must adjust it to Age=60.
+    log_scale_base <- fit_prop$res["scale", "est"] + (fit_prop$res["Age", "est"] * 60)
+    scale_wt <- exp(log_scale_base)
+
+    # Apply Target Gene effect
+    af_X <- exp(fit_prop$res["XMutated", "est"])
+    scale_mut <- scale_wt * af_X
+
+    t_seq <- seq(0, 365.25 * 5, length.out = 100)
+
+    S_wt <- 1 / (1 + (t_seq / scale_wt)^shape_val)
+    S_mut <- 1 / (1 + (t_seq / scale_mut)^shape_val)
+
+    plot_df <- data.frame(
+      Time_Years = rep(t_seq / 365.25, 2),
+      Survival = c(S_wt, S_mut),
+      Group = rep(c("Wild-type", "Mutated (Target Gene)"), each = length(t_seq))
+    )
+
+    ggplot(plot_df, aes(x = Time_Years, y = Survival, color = Group)) +
+      geom_line(size = 1.2) +
+      scale_color_manual(values = c("Wild-type" = "#2980b9", "Mutated (Target Gene)" = "#e74c3c")) +
+      scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
+      theme_minimal(base_size = 15) +
+      labs(
+        title = paste0("Reconstructed Survival for Target Gene (True AF = ", True_AF_X, ")"),
+        subtitle = "Curves represent a 60-year-old Male patient with COAD (Reference profile)",
+        x = "Time from Diagnosis (Years)",
+        y = "Overall Survival Probability"
+      ) +
+      theme(
+        plot.title = element_text(face = "bold"),
+        legend.position = "bottom",
+        legend.title = element_blank()
+      )
+  })
+})
