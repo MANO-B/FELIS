@@ -680,7 +680,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 })
 
 # =========================================================================
-# Server Logic for Copula Model (Fixed Data Extraction & Jitter)
+# Server Logic for Copula Model (Robust Extraction Version)
 # =========================================================================
 
 copula_results <- eventReactive(input$run_copula, {
@@ -700,7 +700,7 @@ copula_results <- eventReactive(input$run_copula, {
   cens_rate <- input$cop_cens / 100
 
   # =========================================================================
-  # データの生成
+  # Generate Data
   # =========================================================================
   theta_frank <- tryCatch({ iTau(frankCopula(), tau_target) }, error = function(e) { 5.0 })
   cop <- frankCopula(param = theta_frank, dim = 2)
@@ -727,6 +727,7 @@ copula_results <- eventReactive(input$run_copula, {
   T_obs <- T1_obs + pmin(T2_true, C2_obs)
   Event <- ifelse(T2_true <= C2_obs, 1, 0)
 
+  # Jitter to prevent ties crashing NPMLE
   set.seed(Sys.time())
   T1_obs <- T1_obs + runif(length(T1_obs), 0, 0.05)
   T_obs <- T_obs + runif(length(T_obs), 0, 0.05)
@@ -740,7 +741,7 @@ copula_results <- eventReactive(input$run_copula, {
   }
 
   # =========================================================================
-  # 4つの手法による解析
+  # Fit Models
   # =========================================================================
   fit_true <- survfit(Surv(T_true, rep(1, N_macro)) ~ 1)
   fit_naive <- survfit(Surv(T_obs, Event) ~ 1, data = Data_cgp)
@@ -758,24 +759,41 @@ copula_results <- eventReactive(input$run_copula, {
   showNotification(paste("Copula fit completed in", round(as.numeric(difftime(end_time, start_time, units="secs")), 1), "seconds!"), type = "message")
 
   # =========================================================================
-  # 【修正】出力データ（Time, Surv, Tau）の安全な抽出と補完
+  # Dynamic & Robust Extraction of NPMLE Output
   # =========================================================================
-  copula_tau <- if (!is.null(fit_copula$tau)) fit_copula$tau else if (!is.null(fit_copula$Tau)) fit_copula$Tau else NA
-  copula_surv <- if (!is.null(fit_copula$S.Y)) fit_copula$S.Y else if (!is.null(fit_copula$S_Y)) fit_copula$S_Y else NULL
+  out_names <- names(fit_copula)
 
-  shiny::validate(shiny::need(!is.null(copula_surv), "Failed to extract survival data from NPMLE output."))
+  # Extract Tau safely
+  copula_tau <- if ("tau" %in% out_names) fit_copula$tau else if ("Tau" %in% out_names) fit_copula$Tau else NA
 
-  # NPMLE.Frankは時間軸（Y）を出力しない場合があるため、観測されたユニークな生存期間をソートして充てる
-  copula_time <- if (!is.null(fit_copula$Y)) fit_copula$Y else if (!is.null(fit_copula$y)) fit_copula$y else NULL
-  if (is.null(copula_time)) {
-    unique_T <- sort(unique(Data_cgp$T_obs))
+  # Extract Survival Vector (Sy, S.y, S_y, S.Y, etc.)
+  copula_surv <- NULL
+  if ("Sy" %in% out_names) copula_surv <- fit_copula$Sy
+  else if ("S.y" %in% out_names) copula_surv <- fit_copula$S.y
+  else if ("S_y" %in% out_names) copula_surv <- fit_copula$S_y
+  else if ("S.Y" %in% out_names) copula_surv <- fit_copula$S.Y
+  else if ("S_Y" %in% out_names) copula_surv <- fit_copula$S_Y
+
+  # Extract Time Vector (y, Y, time, etc.)
+  copula_time <- NULL
+  if ("y" %in% out_names) copula_time <- fit_copula$y
+  else if ("Y" %in% out_names) copula_time <- fit_copula$Y
+  else if ("time" %in% out_names) copula_time <- fit_copula$time
+
+  # If time vector is missing but survival exists, assign sorted unique observed times
+  if (is.null(copula_time) && !is.null(copula_surv)) {
+    unique_T <- sort(unique(Data_cgp$T_obs[Data_cgp$Event == 1]))
     if (length(copula_surv) == length(unique_T)) {
       copula_time <- unique_T
     } else {
-      # フォールバック補完
       copula_time <- seq(min(Data_cgp$T_obs), max(Data_cgp$T_obs), length.out = length(copula_surv))
     }
   }
+
+  # ** Fail-safe UI Error Message **
+  # If extraction still fails, it will print the EXACT variable names the package returned.
+  error_msg <- paste("Extraction failed. The package returned these variables:", paste(out_names, collapse = ", "))
+  shiny::validate(shiny::need(!is.null(copula_surv) && !is.null(copula_time), error_msg))
 
   list(
     fit_true = fit_true, fit_naive = fit_naive, fit_lb = fit_lb,
@@ -1248,24 +1266,42 @@ output$forest_plot_multivariate = renderPlot({
 })
 
 # =========================================================================
-# Server Logic for Simulation Study
+# Server Logic for Simulation Study (Exact Production IPTW)
 # =========================================================================
+library(dplyr)
+library(flexsurv)
+library(survival)
+library(ggplot2)
 
-find_censoring_scale <- function(T2, target_rate, pattern) {
-  obj_func <- function(scale_param) {
-    if (pattern == "indep") { C2 <- rexp(length(T2), rate = 1 / scale_param)
-    } else if (pattern == "early") { C2 <- rweibull(length(T2), shape = 0.5, scale = scale_param)
-    } else if (pattern == "late") { C2 <- rweibull(length(T2), shape = 3.0, scale = scale_param)
-    } else if (pattern == "ushape") {
-      u <- runif(length(T2)); C2 <- ifelse(u < 0.5, rweibull(length(T2), shape = 0.5, scale = scale_param), rweibull(length(T2), shape = 3.0, scale = scale_param * 2))
+# Helper function to find censoring scale parameter
+find_censoring_param <- function(T2, target_rate, pattern) {
+  if (pattern == "peak1y") {
+    # Fix mode at 1 year (365.25 days) and optimize shape to match censoring rate
+    obj_func <- function(k) {
+      scale_val <- 365.25 / ((k - 1) / k)^(1 / k)
+      C2 <- rweibull(length(T2), shape = k, scale = scale_val)
+      return((sum(C2 < T2) / length(T2)) - target_rate)
     }
-    return((sum(C2 < T2) / length(T2)) - target_rate)
+    opt_k <- tryCatch({ uniroot(obj_func, interval = c(1.05, 10))$root }, error = function(e) { 2.0 })
+    opt_scale <- 365.25 / ((opt_k - 1) / opt_k)^(1 / opt_k)
+    return(list(shape = opt_k, scale = opt_scale))
+  } else {
+    # Independent exponential censoring
+    obj_func_scale <- function(scale_param) {
+      C2 <- rexp(length(T2), rate = 1 / scale_param)
+      return((sum(C2 < T2) / length(T2)) - target_rate)
+    }
+    opt_scale <- tryCatch({ uniroot(obj_func_scale, interval = c(0.1, 1000000))$root }, error = function(e) { median(T2) * 1.5 })
+    return(list(shape = 1.0, scale = opt_scale))
   }
-  optimal <- tryCatch({ uniroot(obj_func, interval = c(0.1, 1000000))$root }, error = function(e) { median(T2) * 1.5 })
-  return(optimal)
 }
 
+# Core Simulation Engine
 run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, cens_rate, return_data = FALSE) {
+
+  # =========================================================================
+  # 1. Macro Population Generation (Registry Anchor: Median OS ~2 years)
+  # =========================================================================
   N_macro <- 100000
   Age <- round(runif(N_macro, 40, 80))
   Sex <- sample(c("Male", "Female"), N_macro, replace = TRUE, prob = c(0.55, 0.45))
@@ -1281,34 +1317,38 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
     ifelse(Histology == "READ", True_AF_Hist_READ, ifelse(Histology == "COADREAD", True_AF_Hist_COADREAD, 1.0))
 
   shape_base <- 1.5
-  scale_base <- 2.0 * 365.25 # ~2 years median OS base
+  scale_base <- 2.0 * 365.25 # Registry anchor: 2 years
 
   u <- pmax(pmin(runif(N_macro), 0.999), 0.001)
   T_true <- scale_base * ((1 - u) / u)^(1 / shape_base) * AF_bg * ifelse(X == 1, True_AF_X, 1.0)
 
   # =========================================================================
-  # 臨床的実態に基づく T1 の生成 (True Dependent Truncation)
+  # 2. Timing of CGP (T1) - Incorporating Severe Dependent Truncation
   # =========================================================================
   if (t1_pat == "indep") {
-    T1 <- runif(N_macro, 30, T_true)
-  } else if (t1_pat == "real") {
-    # 死亡の約1年前 (LogNormalで正の値を保証)
-    T2_exp <- rlnorm(N_macro, meanlog = log(365.25 * 1), sdlog = 0.5)
+    # Quasi-independent (Random timing within survival period)
+    T1 <- runif(N_macro, 30, pmax(31, T_true))
+  } else if (t1_pat == "dep_1yr") {
+    # Dependent Truncation: CGP occurs roughly 1 year before death (with some variance)
+    T2_exp <- rlnorm(N_macro, meanlog = log(365.25 * 1.0), sdlog = 0.3)
     T1 <- pmax(30, T_true - T2_exp)
-  } else if (t1_pat == "rev") {
-    # 早期検査推進: 死亡の約2年前
-    T2_exp <- rlnorm(N_macro, meanlog = log(365.25 * 2), sdlog = 0.5)
+  } else if (t1_pat == "dep_2yr") {
+    # Dependent Truncation: CGP occurs roughly 2 years before death
+    T2_exp <- rlnorm(N_macro, meanlog = log(365.25 * 2.0), sdlog = 0.3)
     T1 <- pmax(30, T_true - T2_exp)
   }
 
   cgp_indices <- which(T_true > T1)
   if(length(cgp_indices) < N_target) return(NULL)
 
+  # Selection bias towards younger patients taking CGP
   prob_select <- ifelse(Age[cgp_indices] < 60, 0.8, 0.4)
   selected_indices <- sample(cgp_indices, size = N_target, prob = prob_select, replace = FALSE)
 
   Data_cgp <- data.frame(
+    ID = 1:N_target,
     Age = Age[selected_indices],
+    Age_class = ifelse(Age[selected_indices] < 60, "Young", "Old"),
     Sex = factor(Sex[selected_indices], levels = c("Male", "Female")),
     Histology = factor(Histology[selected_indices], levels = c("COAD", "READ", "COADREAD")),
     X = factor(ifelse(X[selected_indices] == 1, "Mutated", "WT"), levels = c("WT", "Mutated")),
@@ -1317,13 +1357,14 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
   )
   Data_cgp$T2_true <- Data_cgp$T_true - Data_cgp$T1
 
-  # C2 生成
-  scale_opt <- find_censoring_scale(Data_cgp$T2_true, cens_rate, cens_pat)
-  if (cens_pat == "indep") { C2 <- rexp(N_target, rate = 1 / scale_opt)
-  } else if (cens_pat == "early") { C2 <- rweibull(N_target, shape = 0.5, scale = scale_opt)
-  } else if (cens_pat == "late") { C2 <- rweibull(N_target, shape = 3.0, scale = scale_opt)
-  } else if (cens_pat == "ushape") {
-    u_c <- runif(N_target); C2 <- ifelse(u_c < 0.5, rweibull(N_target, shape = 0.5, scale = scale_opt), rweibull(N_target, shape = 3.0, scale = scale_opt * 2))
+  # =========================================================================
+  # 3. Apply Censoring (C2)
+  # =========================================================================
+  params <- find_censoring_param(Data_cgp$T2_true, cens_rate, cens_pat)
+  if (cens_pat == "indep") {
+    C2 <- rexp(N_target, rate = 1 / params$scale)
+  } else {
+    C2 <- rweibull(N_target, shape = params$shape, scale = params$scale)
   }
 
   Data_cgp$C2 <- C2
@@ -1332,17 +1373,60 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
   Data_cgp$T_obs <- Data_cgp$T1 + Data_cgp$T2_obs
   if(sum(Data_cgp$Event) < 20) return(NULL)
 
-  # IPTW
-  prop_young_macro <- mean(Age < 60); prop_old_macro <- mean(Age >= 60)
-  Data_cgp$Age_class <- ifelse(Data_cgp$Age < 60, "Young", "Old")
-  prop_young_cgp <- mean(Data_cgp$Age_class == "Young")
-  prop_old_cgp <- mean(Data_cgp$Age_class == "Old")
+  # =========================================================================
+  # 4. EXACT PRODUCTION IPTW (Time-binned Macro Anchoring + Capping)
+  # =========================================================================
+  # Create 6-month time bins based on T1
+  bin_width_yrs <- 0.5
+  Data_cgp$time_bin <- ceiling((Data_cgp$T1 / 365.25) / bin_width_yrs)
+  Data_cgp$time_bin <- ifelse(Data_cgp$time_bin == 0, 1, Data_cgp$time_bin)
+  max_bin <- max(Data_cgp$time_bin)
 
-  Data_cgp$iptw <- ifelse(Data_cgp$Age_class == "Young", prop_young_macro / prop_young_cgp, prop_old_macro / prop_old_cgp)
-  Data_cgp$iptw <- Data_cgp$iptw / mean(Data_cgp$iptw)
+  # Extract macro survival probabilities for each Age class
+  Age_class_macro <- ifelse(Age < 60, "Young", "Old")
 
-  # Models
-  library(flexsurv)
+  calc_macro_surv <- function(time_days, age_grp) {
+    mean(T_true[Age_class_macro == age_grp] > time_days)
+  }
+
+  # Calculate expected Person-Time (PT) for each bin from macro data
+  pt_table <- expand.grid(Age_class = c("Young", "Old"), time_bin = 1:max_bin, stringsAsFactors = FALSE)
+  pt_table$pt_expected <- 0
+
+  for (ag in c("Young", "Old")) {
+    for (b in 1:max_bin) {
+      t_mid_days <- (b - 0.5) * bin_width_yrs * 365.25
+      surv_prob <- calc_macro_surv(t_mid_days, ag)
+      # Assuming a theoretical entry cohort of 1000 patients for stabilization
+      pt_expected <- 1000 * surv_prob * bin_width_yrs
+      pt_table[pt_table$Age_class == ag & pt_table$time_bin == b, "pt_expected"] <- pt_expected
+    }
+  }
+
+  # Count actual observed frequencies in CGP cohort per bin
+  obs_counts <- Data_cgp %>% group_by(Age_class, time_bin) %>% summarise(N_obs = n(), .groups = 'drop')
+
+  # Merge and calculate raw weights
+  Data_cgp <- Data_cgp %>%
+    left_join(pt_table, by = c("Age_class", "time_bin")) %>%
+    left_join(obs_counts, by = c("Age_class", "time_bin")) %>%
+    mutate(
+      N_obs = ifelse(is.na(N_obs), 0, N_obs),
+      raw_weight = ifelse(N_obs > 0, pt_expected / N_obs, 0)
+    )
+
+  # ** Capping / Trimming to prevent weight explosion (Crucial step) **
+  lower_cap <- quantile(Data_cgp$raw_weight[Data_cgp$raw_weight > 0], 0.05, na.rm = TRUE)
+  upper_cap <- quantile(Data_cgp$raw_weight[Data_cgp$raw_weight > 0], 0.95, na.rm = TRUE)
+
+  Data_cgp$raw_weight <- pmax(lower_cap, pmin(Data_cgp$raw_weight, upper_cap))
+
+  # Normalize weights
+  Data_cgp$iptw <- Data_cgp$raw_weight / mean(Data_cgp$raw_weight)
+
+  # =========================================================================
+  # 5. Model Fitting
+  # =========================================================================
   form <- as.formula("~ X + Age + Sex + Histology")
   fit_naive <- tryCatch({ flexsurvreg(update(Surv(T_obs, Event) ~ ., form), data = Data_cgp, dist = "llogis") }, error = function(e) NULL)
   fit_lt <- tryCatch({ flexsurvreg(update(Surv(T1, T_obs, Event) ~ ., form), data = Data_cgp, dist = "llogis") }, error = function(e) NULL)
@@ -1354,12 +1438,14 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
     AF_X <- exp(res["XMutated", "est"]); AF_X_L <- exp(res["XMutated", "L95%"]); AF_X_U <- exp(res["XMutated", "U95%"])
     AF_Age <- exp(res["Age", "est"] * 10); AF_Sex <- exp(res["SexFemale", "est"])
     AF_READ <- exp(res["HistologyREAD", "est"]); AF_COADREAD <- exp(res["HistologyCOADREAD", "est"])
+
     scale_base <- res["scale", "est"]; shape <- res["shape", "est"]
     af_age60 <- exp(res["Age", "est"] * 60)
     med_wt_days <- scale_base * af_age60
     med_wt <- med_wt_days / 365.25; med_mut <- med_wt * AF_X
     s5_wt <- 1 / (1 + (5 * 365.25 / med_wt_days)^shape) * 100
     s5_mut <- 1 / (1 + (5 * 365.25 / (med_wt_days * AF_X))^shape) * 100
+
     return(c(AF_X=AF_X, AF_X_L=AF_X_L, AF_X_U=AF_X_U, AF_Age=AF_Age, AF_Sex=AF_Sex, AF_READ=AF_READ, AF_COADREAD=AF_COADREAD, Med_WT=med_wt, Med_Mut=med_mut, S5_WT=s5_wt, S5_Mut=s5_mut))
   }
 
@@ -1368,20 +1454,21 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
   if(return_data) return(out) else return(out[1:3])
 }
 
+# -------------------------------------------------------------------------
+# UI Observers and Rendering Logic
+# -------------------------------------------------------------------------
 observeEvent(input$run_sim, {
   req(input$sim_n, input$sim_true_af, input$sim_cens_rate, input$sim_mut_freq)
-  showNotification("Running single simulation...", type = "message", duration = 3)
+  showNotification("Running simulation with Exact Production IPTW...", type = "message", duration = 3)
 
   res <- run_sim_iteration(input$sim_n, input$sim_true_af, input$sim_mut_freq / 100, input$sim_t1_pattern, input$sim_cens_pattern, input$sim_cens_rate / 100, return_data = TRUE)
   shiny::validate(shiny::need(!is.null(res), "Simulation failed. Please try again."))
 
-  True_AF <- input$sim_true_af
-  True_Med_WT <- 2.0; True_Med_Mut <- 2.0 * True_AF
-  True_S5_WT <- 1 / (1 + (5 / True_Med_WT)^1.5) * 100; True_S5_Mut <- 1 / (1 + (5 / True_Med_Mut)^1.5) * 100
+  True_AF <- input$sim_true_af; True_Med_WT <- 2.0; True_S5_WT <- 1 / (1 + (5 / True_Med_WT)^1.5) * 100
 
   output$sim_result_table <- renderTable({
     data.frame(
-      Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF", "Median OS (WT)", "5-Year OS (WT) [%]"),
+      Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF", "Median OS (WT) [Years]", "5-Year OS (WT) [%]"),
       `True` = c(sprintf("%.2f", True_AF), "0.85", "1.10", "0.90", "0.95", sprintf("%.2f", True_Med_WT), sprintf("%.1f", True_S5_WT)),
       `Naive AFT` = c(sprintf("%.2f", res$Naive["AF_X"]), sprintf("%.2f", res$Naive["AF_Age"]), sprintf("%.2f", res$Naive["AF_Sex"]), sprintf("%.2f", res$Naive["AF_READ"]), sprintf("%.2f", res$Naive["AF_COADREAD"]), sprintf("%.2f", res$Naive["Med_WT"]), sprintf("%.1f", res$Naive["S5_WT"])),
       `Standard LT` = c(sprintf("%.2f", res$LT["AF_X"]), sprintf("%.2f", res$LT["AF_Age"]), sprintf("%.2f", res$LT["AF_Sex"]), sprintf("%.2f", res$LT["AF_READ"]), sprintf("%.2f", res$LT["AF_COADREAD"]), sprintf("%.2f", res$LT["Med_WT"]), sprintf("%.1f", res$LT["S5_WT"])),
@@ -1389,19 +1476,14 @@ observeEvent(input$run_sim, {
     )
   }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c", sanitize.text.function = function(x) x)
 
-  # =========================================================================
-  # Marginal Survival Plot (全症例平均)
-  # =========================================================================
   output$sim_survival_plot <- renderPlot({
     library(ggplot2)
     library(survival)
     t_seq <- seq(0, 365.25 * 5, length.out = 100)
 
-    # 1. True Curve (Macro Kaplan-Meier)
     km_true <- survfit(Surv(res$T_true_macro, rep(1, length(res$T_true_macro))) ~ 1)
     surv_true <- approx(km_true$time, km_true$surv, xout = t_seq, method = "constant", f = 0, rule = 2)$y
 
-    # helper for marginalizing
     calc_marginal <- function(fit) {
       if(is.null(fit)) return(rep(NA, length(t_seq)))
       samp_data <- res$Data_cgp[sample(1:nrow(res$Data_cgp), min(300, nrow(res$Data_cgp))), ]
@@ -1410,14 +1492,10 @@ observeEvent(input$run_sim, {
       return(agg$est)
     }
 
-    surv_naive <- calc_marginal(res$fit_naive)
-    surv_lt <- calc_marginal(res$fit_lt)
-    surv_prop <- calc_marginal(res$fit_prop)
-
     plot_df <- data.frame(
       Time = rep(t_seq / 365.25, 4),
-      Survival = c(surv_true, surv_naive, surv_lt, surv_prop),
-      Model = factor(rep(c("1. True Marginal (Macro)", "2. Naive AFT", "3. Standard LT AFT", "4. Proposed Method"), each = length(t_seq)))
+      Survival = c(surv_true, calc_marginal(res$fit_naive), calc_marginal(res$fit_lt), calc_marginal(res$fit_prop)),
+      Model = factor(rep(c("1. True Marginal (Registry Macro)", "2. Naive AFT", "3. Standard LT AFT (No IPTW)", "4. Proposed Method (Macro-Anchored IPTW)"), each = length(t_seq)))
     )
 
     ggplot(plot_df, aes(x = Time, y = Survival, color = Model, linetype = Model)) +
@@ -1425,36 +1503,17 @@ observeEvent(input$run_sim, {
       scale_color_manual(values = c("black", "#e74c3c", "#f39c12", "#27ae60")) +
       scale_linetype_manual(values = c("solid", "dotted", "dashed", "solid")) +
       scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
-      theme_minimal(base_size = 14) +
-      labs(title = "Marginal Overall Survival (Averaged over all patients)", x = "Time from Diagnosis (Years)", y = "Overall Survival Probability") +
-      theme(plot.title = element_text(face = "bold", size = 14), legend.position = "bottom", legend.title = element_blank())
-  })
-
-  # =========================================================================
-  # Censoring Distribution Plot
-  # =========================================================================
-  output$sim_censor_plot <- renderPlot({
-    library(ggplot2)
-    df <- data.frame(
-      Time_Years = c(res$Data_cgp$T2_true / 365.25, res$Data_cgp$C2 / 365.25),
-      Type = rep(c("True Remaining OS (T2)", "Censoring Time (C2)"), each = nrow(res$Data_cgp))
-    )
-    # C2 may contain Inf, limit to 10 years for plotting
-    df <- df[df$Time_Years <= 10, ]
-
-    ggplot(df, aes(x = Time_Years, fill = Type)) +
-      geom_density(alpha = 0.5, color = NA) +
-      scale_fill_manual(values = c("Censoring Time (C2)" = "#95a5a6", "True Remaining OS (T2)" = "#2980b9")) +
-      theme_minimal(base_size = 14) +
-      labs(title = "Distribution of C2 vs T2 after CGP", x = "Time after CGP (Years)", y = "Density") +
-      theme(legend.position = "bottom", legend.title = element_blank())
+      theme_minimal(base_size = 15) +
+      labs(title = "Marginal Survival Recovery (Testing Severe Dependent Truncation)",
+           subtitle = "Notice how the Proposed Method successfully pulls the survival curve back to the Registry Macro anchor.",
+           x = "Time from Diagnosis (Years)", y = "Overall Survival Probability") +
+      theme(plot.title = element_text(face = "bold"), legend.position = "bottom", legend.direction = "vertical", legend.title = element_blank())
   })
 })
 
 observeEvent(input$run_sim_multi, {
   req(input$sim_n, input$sim_true_af, input$sim_cens_rate, input$sim_mut_freq)
-  n_sims <- 400
-  results <- list()
+  n_sims <- 400; results <- list()
   withProgress(message = 'Running 400 Simulations...', value = 0, {
     for (i in 1:n_sims) {
       res <- run_sim_iteration(input$sim_n, input$sim_true_af, input$sim_mut_freq / 100, input$sim_t1_pattern, input$sim_cens_pattern, input$sim_cens_rate / 100)

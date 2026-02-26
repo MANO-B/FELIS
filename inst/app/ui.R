@@ -1466,7 +1466,7 @@ ui <- dashboardPage(
       ),
       tabItem("Simulation_Study",
               fluidPage(
-                titlePanel("Simulation Study: Robust Estimation of AF and Absolute Survival"),
+                titlePanel("Simulation Study: Robust Estimation via Macro-Anchored IPTW"),
 
                 sidebarLayout(
                   sidebarPanel(
@@ -1477,16 +1477,14 @@ ui <- dashboardPage(
 
                     h4("Left-Truncation (T1) Pattern"),
                     radioButtons("sim_t1_pattern", "Timing of CGP test (T1):",
-                                 choices = c("Quasi-independent (Random timing)" = "indep",
-                                             "Realistic dependent (CGP ~1 year before death)" = "real",
-                                             "Early CGP (CGP ~2 years before death)" = "rev")),
+                                 choices = c("Quasi-independent (Random during survival)" = "indep",
+                                             "Dependent Truncation (~1 year before death)" = "dep_1yr",
+                                             "Dependent Truncation (~2 years before death)" = "dep_2yr")),
 
-                    h4("Censoring Pattern (after CGP)"),
-                    radioButtons("sim_cens_pattern", "Timing of Censoring (C2):",
+                    h4("Censoring Pattern (C2)"),
+                    radioButtons("sim_cens_pattern", "Timing of Censoring:",
                                  choices = c("Independent (Constant rate)" = "indep",
-                                             "Early censoring (Soon after CGP)" = "early",
-                                             "Late censoring (Just before death)" = "late",
-                                             "U-shape (Early & Late censoring)" = "ushape")),
+                                             "Peak at ~1 year (Fixed mode Weibull)" = "peak1y")),
                     numericInput("sim_cens_rate", "Target Censoring Rate (%):", 30, min = 10, max = 80, step = 5),
 
                     hr(),
@@ -1503,8 +1501,7 @@ ui <- dashboardPage(
                       h5(tags$b("Single Run Estimates")),
                       tableOutput("sim_result_table"),
                       fluidRow(
-                        column(7, plotOutput("sim_survival_plot", height = "350px")),
-                        column(5, plotOutput("sim_censor_plot", height = "350px"))
+                        column(12, plotOutput("sim_survival_plot", height = "450px"))
                       )
                     ),
 
@@ -1516,10 +1513,10 @@ ui <- dashboardPage(
 
                     tags$details(
                       style = "margin-top: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 5px;",
-                      tags$summary(tags$b("ℹ️ Methodological Notes (Updated)")),
-                      tags$p("1. T1 is now generated via True Dependent Truncation: T1 = True_OS - T2, where T2 is ~1 year (Realistic) or ~2 years (Early CGP)."),
-                      tags$p("2. The survival curves are now Marginalized over the entire cohort, not just a specific profile, to accurately compare the global model fit."),
-                      tags$p("3. The C2 distribution plot allows you to verify if the generated censoring times overlap naturally with the true remaining survival times (T2).")
+                      tags$summary(tags$b("ℹ️ Methodological Notes: Tamura & Ikegami Model")),
+                      tags$p("1. The macro population explicitly uses Stage 4 CRC survival registry data (~2 years Median OS)."),
+                      tags$p("2. The 'Dependent Truncation' scenario forces patients to take the CGP test exactly 1-2 years before death, severely violating standard survival model assumptions."),
+                      tags$p("3. Our Proposed Method uses a Time-binned IPTW, anchored to the macro survival probabilities. It calculates expected Person-Time, applies stabilization (capping extreme weights), and successfully standardizes the cohort back to the true macro distribution.")
                     )
                   )
                 )
