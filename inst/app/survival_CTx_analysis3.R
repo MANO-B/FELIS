@@ -1060,40 +1060,31 @@ output$forest_plot_multivariate = renderPlot({
 })
 
 # =========================================================================
-# Server Logic for Simulation Study (Fixed Version)
+# Server Logic for Simulation Study (Fixed Curve & Added Comparisons)
 # =========================================================================
 
-# Helper function for censoring scale estimation (Fixed interval for 'Days' scale)
+# Helper function for censoring scale estimation
 find_censoring_scale <- function(T2, target_rate, pattern) {
   obj_func <- function(scale_param) {
-    if (pattern == "indep") {
-      C2 <- rexp(length(T2), rate = 1 / scale_param)
-    } else if (pattern == "early") {
-      C2 <- rweibull(length(T2), shape = 0.5, scale = scale_param)
-    } else if (pattern == "late") {
-      C2 <- rweibull(length(T2), shape = 3.0, scale = scale_param)
+    if (pattern == "indep") { C2 <- rexp(length(T2), rate = 1 / scale_param)
+    } else if (pattern == "early") { C2 <- rweibull(length(T2), shape = 0.5, scale = scale_param)
+    } else if (pattern == "late") { C2 <- rweibull(length(T2), shape = 3.0, scale = scale_param)
     } else if (pattern == "ushape") {
       u <- runif(length(T2))
-      C2 <- ifelse(u < 0.5,
-                   rweibull(length(T2), shape = 0.5, scale = scale_param),
-                   rweibull(length(T2), shape = 3.0, scale = scale_param * 2))
+      C2 <- ifelse(u < 0.5, rweibull(length(T2), shape = 0.5, scale = scale_param), rweibull(length(T2), shape = 3.0, scale = scale_param * 2))
     }
     censored <- sum(C2 < T2) / length(T2)
     return(censored - target_rate)
   }
 
-  # [FIX] Expanded the interval to accommodate 'Days' (e.g., up to 1,000,000 days)
-  optimal <- tryCatch({
-    uniroot(obj_func, interval = c(1, 1000000))$root
-  }, error = function(e) { 365.25 * 5 }) # Fallback to 5 years
-
+  optimal <- tryCatch({ uniroot(obj_func, interval = c(1, 1000000))$root }, error = function(e) { 365.25 * 5 })
   return(optimal)
 }
 
 observeEvent(input$run_sim, {
   req(input$sim_n, input$sim_true_af, input$sim_cens_rate, input$sim_mut_freq)
 
-  showNotification("Running multivariate simulation...", type = "message", duration = 3)
+  showNotification("Running comparative multivariate simulation...", type = "message", duration = 4)
 
   N_target <- input$sim_n
   True_AF_X <- input$sim_true_af
@@ -1103,7 +1094,7 @@ observeEvent(input$run_sim, {
   cens_rate <- input$sim_cens_rate / 100
 
   # =========================================================================
-  # 1. Generate Macro Population with Covariates
+  # 1. Generate Macro Population
   # =========================================================================
   N_macro <- 100000
   Age <- round(runif(N_macro, 40, 80))
@@ -1117,33 +1108,23 @@ observeEvent(input$run_sim, {
   True_AF_Hist_COADREAD <- 0.95
 
   AF_bg <- 1.0 * (True_AF_Age_10yr ^ ((Age - 60) / 10)) * ifelse(Sex == "Female", True_AF_Sex_Female, 1.0) *
-    ifelse(Histology == "READ", True_AF_Hist_READ,
-           ifelse(Histology == "COADREAD", True_AF_Hist_COADREAD, 1.0))
+    ifelse(Histology == "READ", True_AF_Hist_READ, ifelse(Histology == "COADREAD", True_AF_Hist_COADREAD, 1.0))
 
   shape_base <- 1.5
   scale_base <- 3.0 * 365.25
 
-  u <- runif(N_macro)
-  # [FIX] Bound 'u' to prevent infinite survival times
-  u <- pmax(pmin(u, 0.999), 0.001)
-
+  u <- pmax(pmin(runif(N_macro), 0.999), 0.001)
   T_base <- scale_base * ((1 - u) / u)^(1 / shape_base)
   T_true <- T_base * AF_bg * ifelse(X == 1, True_AF_X, 1.0)
 
   # =========================================================================
-  # 2. Generate T1 (Time to CGP) and Sample Cohort
+  # 2. Generate T1 and Sample
   # =========================================================================
-  if (t1_pat == "indep") {
-    T1 <- runif(N_macro, 30, 365.25 * 3)
-  } else if (t1_pat == "real") {
-    T1 <- T_true * runif(N_macro, 0.3, 0.8)
-  } else if (t1_pat == "rev") {
-    ratio <- pmax(0.1, 1 - exp(-T_true / 365.25)) * runif(N_macro, 0.2, 0.9)
-    T1 <- T_true * ratio
-  }
+  if (t1_pat == "indep") { T1 <- runif(N_macro, 30, 365.25 * 3)
+  } else if (t1_pat == "real") { T1 <- T_true * runif(N_macro, 0.3, 0.8)
+  } else if (t1_pat == "rev") { ratio <- pmax(0.1, 1 - exp(-T_true / 365.25)) * runif(N_macro, 0.2, 0.9); T1 <- T_true * ratio }
 
   cgp_indices <- which(T_true > T1)
-
   prob_select <- ifelse(Age[cgp_indices] < 60, 0.8, 0.4)
   selected_indices <- sample(cgp_indices, size = min(N_target, length(cgp_indices)), prob = prob_select, replace = FALSE)
 
@@ -1159,7 +1140,7 @@ observeEvent(input$run_sim, {
   Data_cgp$T2_true <- Data_cgp$T_true - Data_cgp$T1
 
   # =========================================================================
-  # 3. Apply Informative Censoring (C2)
+  # 3. Apply Censoring
   # =========================================================================
   scale_opt <- find_censoring_scale(Data_cgp$T2_true, cens_rate, cens_pat)
 
@@ -1167,21 +1148,17 @@ observeEvent(input$run_sim, {
   } else if (cens_pat == "early") { C2 <- rweibull(nrow(Data_cgp), shape = 0.5, scale = scale_opt)
   } else if (cens_pat == "late") { C2 <- rweibull(nrow(Data_cgp), shape = 3.0, scale = scale_opt)
   } else if (cens_pat == "ushape") {
-    u_c <- runif(nrow(Data_cgp))
-    C2 <- ifelse(u_c < 0.5, rweibull(nrow(Data_cgp), shape = 0.5, scale = scale_opt), rweibull(nrow(Data_cgp), shape = 3.0, scale = scale_opt * 2))
+    u_c <- runif(nrow(Data_cgp)); C2 <- ifelse(u_c < 0.5, rweibull(nrow(Data_cgp), shape = 0.5, scale = scale_opt), rweibull(nrow(Data_cgp), shape = 3.0, scale = scale_opt * 2))
   }
 
   Data_cgp$T2_obs <- pmin(Data_cgp$T2_true, C2)
-
-  # [FIX] Renamed to 'Event' to clarify 1 = Death, 0 = Censored
   Data_cgp$Event <- ifelse(Data_cgp$T2_true <= C2, 1, 0)
   Data_cgp$T_obs <- Data_cgp$T1 + Data_cgp$T2_obs
 
-  # Check if events exist to prevent model explosion
-  shiny::validate(shiny::need(sum(Data_cgp$Event) > 20, "Simulation generated too few events (deaths). The model cannot be fitted."))
+  shiny::validate(shiny::need(sum(Data_cgp$Event) > 20, "Too few events generated. Please increase sample size or reduce censoring."))
 
   # =========================================================================
-  # 4. Simplified IPTW based on Age
+  # 4. Calculate IPTW
   # =========================================================================
   Age_class_macro <- ifelse(Age < 60, "Young", "Old")
   pt_young <- sum(T_true[Age_class_macro == "Young"])
@@ -1195,83 +1172,75 @@ observeEvent(input$run_sim, {
   Data_cgp$iptw <- Data_cgp$iptw / mean(Data_cgp$iptw)
 
   # =========================================================================
-  # 5. Fit Proposed Multivariate Left-Truncated AFT Model
+  # 5. Fit 3 Comparative Models
   # =========================================================================
   library(flexsurv)
-  # [FIX] using 'Event' instead of 'Censor'
-  fit_prop <- tryCatch({
-    flexsurvreg(Surv(T1, T_obs, Event) ~ X + Age + Sex + Histology, data = Data_cgp, weights = iptw, dist = "llogis")
-  }, error = function(e) { NULL })
+  form <- as.formula("~ X + Age + Sex + Histology")
 
-  shiny::validate(shiny::need(!is.null(fit_prop), "The survival model failed to converge. Please try running the simulation again."))
+  # Model 1: Naive AFT (Ignores Left-Truncation entirely)
+  fit_naive <- tryCatch({ flexsurvreg(update(Surv(T_obs, Event) ~ ., form), data = Data_cgp, dist = "llogis") }, error = function(e) { NULL })
+
+  # Model 2: Standard Left-Truncated AFT (survival package equivalent, no IPTW)
+  fit_lt <- tryCatch({ flexsurvreg(update(Surv(T1, T_obs, Event) ~ ., form), data = Data_cgp, dist = "llogis") }, error = function(e) { NULL })
+
+  # Model 3: Proposed Method (Left-Truncated AFT + IPTW)
+  fit_prop <- tryCatch({ flexsurvreg(update(Surv(T1, T_obs, Event) ~ ., form), data = Data_cgp, weights = iptw, dist = "llogis") }, error = function(e) { NULL })
+
+  shiny::validate(shiny::need(!is.null(fit_prop), "The proposed model failed to converge."))
 
   # =========================================================================
-  # 6. Render Multivariate Results Table
+  # 6. Render Comparative Table
   # =========================================================================
   output$sim_result_table <- renderTable({
-    req(fit_prop)
-    res <- fit_prop$res
+    req(fit_prop, fit_lt, fit_naive)
 
-    est_X <- exp(res["XMutated", "est"])
-    est_Age <- exp(res["Age", "est"] * 10)
-    est_Sex <- exp(res["SexFemale", "est"])
-    est_READ <- exp(res["HistologyREAD", "est"])
-    est_COADREAD <- exp(res["HistologyCOADREAD", "est"])
-
-    ci_X <- sprintf("%.2f - %.2f", exp(res["XMutated", "L95%"]), exp(res["XMutated", "U95%"]))
-    ci_Age <- sprintf("%.2f - %.2f", exp(res["Age", "L95%"]*10), exp(res["Age", "U95%"]*10))
-    ci_Sex <- sprintf("%.2f - %.2f", exp(res["SexFemale", "L95%"]), exp(res["SexFemale", "U95%"]))
-    ci_READ <- sprintf("%.2f - %.2f", exp(res["HistologyREAD", "L95%"]), exp(res["HistologyREAD", "U95%"]))
-    ci_COADREAD <- sprintf("%.2f - %.2f", exp(res["HistologyCOADREAD", "L95%"]), exp(res["HistologyCOADREAD", "U95%"]))
+    extract_af <- function(fit, var_name, is_age = FALSE) {
+      if(is_age) return(exp(fit$res[var_name, "est"] * 10))
+      return(exp(fit$res[var_name, "est"]))
+    }
 
     res_df <- data.frame(
-      Covariate = c("Target Gene (Mutated vs WT)",
-                    "Age (per +10 years)",
-                    "Sex (Female vs Male)",
-                    "Histology: READ (vs COAD)",
-                    "Histology: COADREAD (vs COAD)"),
-      True_AF = c(sprintf("%.2f", True_AF_X),
-                  sprintf("%.2f", True_AF_Age_10yr),
-                  sprintf("%.2f", True_AF_Sex_Female),
-                  sprintf("%.2f", True_AF_Hist_READ),
-                  sprintf("%.2f", True_AF_Hist_COADREAD)),
-      Estimated_AF = c(sprintf("%.2f", est_X),
-                       sprintf("%.2f", est_Age),
-                       sprintf("%.2f", est_Sex),
-                       sprintf("%.2f", est_READ),
-                       sprintf("%.2f", est_COADREAD)),
-      `95%_CI` = c(ci_X, ci_Age, ci_Sex, ci_READ, ci_COADREAD),
-      Bias = c(sprintf("%+.3f", est_X - True_AF_X),
-               sprintf("%+.3f", est_Age - True_AF_Age_10yr),
-               sprintf("%+.3f", est_Sex - True_AF_Sex_Female),
-               sprintf("%+.3f", est_READ - True_AF_Hist_READ),
-               sprintf("%+.3f", est_COADREAD - True_AF_Hist_COADREAD))
+      Covariate = c("Target Gene (Mutated)", "Age (per +10 yrs)", "Sex (Female)", "Histology (READ)", "Histology (COADREAD)"),
+      True_AF = c(True_AF_X, True_AF_Age_10yr, True_AF_Sex_Female, True_AF_Hist_READ, True_AF_Hist_COADREAD),
+      Naive_AFT = c(extract_af(fit_naive, "XMutated"), extract_af(fit_naive, "Age", TRUE), extract_af(fit_naive, "SexFemale"), extract_af(fit_naive, "HistologyREAD"), extract_af(fit_naive, "HistologyCOADREAD")),
+      Standard_LT_AFT = c(extract_af(fit_lt, "XMutated"), extract_af(fit_lt, "Age", TRUE), extract_af(fit_lt, "SexFemale"), extract_af(fit_lt, "HistologyREAD"), extract_af(fit_lt, "HistologyCOADREAD")),
+      Proposed_IPTW_AFT = c(extract_af(fit_prop, "XMutated"), extract_af(fit_prop, "Age", TRUE), extract_af(fit_prop, "SexFemale"), extract_af(fit_prop, "HistologyREAD"), extract_af(fit_prop, "HistologyCOADREAD"))
     )
+
+    # Format the dataframe
+    res_df$True_AF <- sprintf("%.2f", res_df$True_AF)
+    res_df$Naive_AFT <- sprintf("%.2f", res_df$Naive_AFT)
+    res_df$Standard_LT_AFT <- sprintf("%.2f", res_df$Standard_LT_AFT)
+    res_df$Proposed_IPTW_AFT <- sprintf("<b>%.2f</b>", res_df$Proposed_IPTW_AFT) # Highlight proposed
+
+    colnames(res_df) <- c("Covariate", "True AF", "1. Naive AFT", "2. Standard LT AFT", "3. Proposed Method")
     return(res_df)
-  }, bordered = TRUE, striped = TRUE, hover = TRUE, width = "100%", align = "c")
+  }, bordered = TRUE, striped = TRUE, hover = TRUE, width = "100%", align = "c", sanitize.text.function = function(x) x)
 
   # =========================================================================
-  # 7. Render Reconstructed Survival Plot
+  # 7. Render Fixed Survival Plot using summary.flexsurvreg
   # =========================================================================
   output$sim_survival_plot <- renderPlot({
     req(fit_prop)
     library(ggplot2)
 
-    shape_val <- fit_prop$res["shape", "est"]
-    log_scale_base <- fit_prop$res["scale", "est"] + (fit_prop$res["Age", "est"] * 60)
-    scale_wt <- exp(log_scale_base)
+    # [FIX] Use the built-in summary function to strictly calculate predictions
+    # Define a clinical profile (60yo Male COAD) for WT and Mutated
+    new_data <- data.frame(
+      X = factor(c("WT", "Mutated"), levels = c("WT", "Mutated")),
+      Age = c(60, 60),
+      Sex = factor(c("Male", "Male"), levels = c("Male", "Female")),
+      Histology = factor(c("COAD", "COAD"), levels = c("COAD", "READ", "COADREAD"))
+    )
 
-    af_X <- exp(fit_prop$res["XMutated", "est"])
-    scale_mut <- scale_wt * af_X
+    t_seq <- seq(0, 365.25 * 5, length.out = 100) # 5 Years in days
 
-    t_seq <- seq(0, 365.25 * 5, length.out = 100)
-
-    S_wt <- 1 / (1 + (t_seq / scale_wt)^shape_val)
-    S_mut <- 1 / (1 + (t_seq / scale_mut)^shape_val)
+    # summary.flexsurvreg calculates exact survival probabilities safely
+    surv_res <- summary(fit_prop, newdata = new_data, t = t_seq, type = "survival", ci = FALSE)
 
     plot_df <- data.frame(
       Time_Years = rep(t_seq / 365.25, 2),
-      Survival = c(S_wt, S_mut),
+      Survival = c(surv_res[[1]]$est, surv_res[[2]]$est),
       Group = rep(c("Wild-type", "Mutated (Target Gene)"), each = length(t_seq))
     )
 
@@ -1282,7 +1251,7 @@ observeEvent(input$run_sim, {
       theme_minimal(base_size = 15) +
       labs(
         title = paste0("Reconstructed Survival for Target Gene (True AF = ", True_AF_X, ")"),
-        subtitle = "Curves represent a 60-year-old Male patient with COAD (Reference profile)",
+        subtitle = "Curves for 60-year-old Male with COAD, computed natively via flexsurv",
         x = "Time from Diagnosis (Years)",
         y = "Overall Survival Probability"
       ) +
