@@ -97,6 +97,7 @@ server <- function(input, output, session) {
   source_app("survival_CGP_analysis.R")
   source_app("survival_CTx_analysis2.R")
   source_app("survival_CTx_analysis3.R")
+  source_app("MacroAnchoredIPTW.R")
   source_app("MCMC_function.R")
   source_app("survival_CTx_analysis.R")
   source_app("drug_table.R")
