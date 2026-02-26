@@ -1466,7 +1466,7 @@ ui <- dashboardPage(
       ),
       tabItem("Simulation_Study",
               fluidPage(
-                titlePanel("Simulation Study: Robust Estimation via Macro-Anchored IPTW"),
+                titlePanel("Simulation Study: Robust Estimation via T1-based IPTW"),
 
                 sidebarLayout(
                   sidebarPanel(
@@ -1478,12 +1478,16 @@ ui <- dashboardPage(
                     h4("Left-Truncation (T1) Pattern"),
                     radioButtons("sim_t1_pattern", "Timing of CGP test (T1):",
                                  choices = c("Quasi-independent (Random during survival)" = "indep",
+                                             "Early phase of survival" = "early",
                                              "Dependent Truncation (~1 year before death)" = "dep_1yr",
                                              "Dependent Truncation (~2 years before death)" = "dep_2yr")),
 
                     h4("Censoring Pattern (C2)"),
                     radioButtons("sim_cens_pattern", "Timing of Censoring:",
-                                 choices = c("Independent (Constant rate)" = "indep", "Early phase" = "early", "Dep 1yr" = "dep_1yr")),
+                                 choices = c("Independent (Constant rate)" = "indep",
+                                             "Early dropout (Hazard decreases)" = "early",
+                                             "U-shape (Early & Late censoring)" = "ushape",
+                                             "Peak at ~1 year (Fixed mode Weibull)" = "peak1y")),
                     numericInput("sim_cens_rate", "Target Censoring Rate (%):", 30, min = 10, max = 80, step = 5),
 
                     hr(),
@@ -1508,14 +1512,6 @@ ui <- dashboardPage(
                       condition = "input.run_sim_multi > 0 && input.run_sim_multi >= input.run_sim",
                       h5(tags$b("400 Iterations Summary (Mean, MSE, and CP)")),
                       tableOutput("sim_multi_result_table")
-                    ),
-
-                    tags$details(
-                      style = "margin-top: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 5px;",
-                      tags$summary(tags$b("ℹ️ Methodological Notes: Tamura & Ikegami Model")),
-                      tags$p("1. The macro population explicitly uses Stage 4 CRC survival registry data (~2 years Median OS)."),
-                      tags$p("2. The 'Dependent Truncation' scenario forces patients to take the CGP test exactly 1-2 years before death, severely violating standard survival model assumptions."),
-                      tags$p("3. Our Proposed Method uses a Time-binned IPTW, anchored to the macro survival probabilities. It calculates expected Person-Time, applies stabilization (capping extreme weights), and successfully standardizes the cohort back to the true macro distribution.")
                     )
                   )
                 )

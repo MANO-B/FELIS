@@ -1,5 +1,5 @@
 # =========================================================================
-# Server Logic for Simulation Study (Original T1-based IPTW Method Validation)
+# Server Logic for Simulation Study (Crash-Proof T1-IPTW Validation)
 # =========================================================================
 library(dplyr)
 library(flexsurv)
@@ -34,9 +34,6 @@ find_censoring_param <- function(T2, target_rate, pattern) {
   }
 }
 
-# -------------------------------------------------------------------------
-# 真の解: 先生のオリジナル T1-based IPTW (Person-Time Ratio)
-# -------------------------------------------------------------------------
 calculate_iptw_sim <- function(data, ref_surv_list) {
   init_pop <- 10000
   max_years <- 10
@@ -46,7 +43,7 @@ calculate_iptw_sim <- function(data, ref_surv_list) {
 
   data <- data %>%
     dplyr::mutate(
-      time_years = T1 / 365.25, # ★ ここが T1 ベースであることが最大の正解 ★
+      time_years = T1 / 365.25,
       time_bin = ceiling(time_years / bin_width),
       time_bin = ifelse(time_bin > n_bins, n_bins, time_bin),
       time_bin = ifelse(time_bin == 0, 1, time_bin)
@@ -86,7 +83,6 @@ calculate_iptw_sim <- function(data, ref_surv_list) {
       raw_weight = ifelse(!is.na(N_cgp) & N_cgp > 0 & !is.na(pt_ref), pt_ref / N_cgp, 0)
     )
 
-  # トリミング
   if (any(data$raw_weight > 0, na.rm = TRUE)) {
     lower_bound <- quantile(data$raw_weight[data$raw_weight > 0], 0.025, na.rm = TRUE)
     upper_bound <- quantile(data$raw_weight[data$raw_weight > 0], 0.975, na.rm = TRUE)
@@ -102,12 +98,8 @@ calculate_iptw_sim <- function(data, ref_surv_list) {
   return(data)
 }
 
-# -------------------------------------------------------------------------
-# Core Simulation Engine
-# -------------------------------------------------------------------------
 run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, cens_rate, return_data = FALSE) {
 
-  # 1. Macro Population
   N_macro <- 100000
   Age <- round(runif(N_macro, 40, 80))
   Sex <- sample(c("Male", "Female"), N_macro, replace = TRUE, prob = c(0.55, 0.45))
@@ -119,16 +111,22 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
 
   T_true <- (2.0 * 365.25) * ((1 - pmax(pmin(runif(N_macro), 0.999), 0.001)) / pmax(pmin(runif(N_macro), 0.999), 0.001))^(1 / 1.5) * AF_bg * ifelse(X == 1, True_AF_X, 1.0)
 
-  # 2. Timing of CGP (T1) & Selection Bias
-  if (t1_pat == "indep") { T1 <- runif(N_macro, 30, pmax(31, T_true))
-  } else if (t1_pat == "early") { T1 <- runif(N_macro, 30, pmax(31, T_true * 0.3))
-  } else if (t1_pat == "dep_1yr") { T1 <- pmax(30, T_true - rlnorm(N_macro, log(365.25 * 1.0), 0.4))
-  } else if (t1_pat == "dep_2yr") { T1 <- pmax(30, T_true - rlnorm(N_macro, log(365.25 * 2.0), 0.4)) }
+  # [安全装置] T1パターンがUIから正しく渡されなかった場合のフォールバックを完備
+  if (is.null(t1_pat)) t1_pat <- "indep"
+
+  if (t1_pat == "early") {
+    T1 <- runif(N_macro, 30, pmax(31, T_true * 0.3))
+  } else if (t1_pat == "dep_1yr" || t1_pat == "real") {
+    T1 <- pmax(30, T_true - rlnorm(N_macro, log(365.25 * 1.0), 0.4))
+  } else if (t1_pat == "dep_2yr" || t1_pat == "rev") {
+    T1 <- pmax(30, T_true - rlnorm(N_macro, log(365.25 * 2.0), 0.4))
+  } else {
+    T1 <- runif(N_macro, 30, pmax(31, T_true))
+  }
 
   cgp_indices <- which(T_true > T1)
   if(length(cgp_indices) < N_target) return(NULL)
 
-  # 年齢による強力な選択バイアス（若年層ほど受けやすい）
   prob_select <- ifelse(Age[cgp_indices] < 60, 0.9, 0.1)
   selected_indices <- sample(cgp_indices, size = N_target, prob = prob_select, replace = FALSE)
 
@@ -139,7 +137,6 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
   )
   Data_cgp$T2_true <- Data_cgp$T_true - Data_cgp$T1
 
-  # 3. Censoring (C2)
   params <- find_censoring_param(Data_cgp$T2_true, cens_rate, cens_pat)
   if (isTRUE(params$is_ushape)) {
     u <- runif(N_target)
@@ -153,31 +150,47 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
   Data_cgp$T_obs <- Data_cgp$T1 + Data_cgp$T2_obs
   if(sum(Data_cgp$Event) < 20) return(NULL)
 
-  # 4. T1-based IPTW
   ref_surv_list <- list()
   for (ag in c("Young", "Old")) {
     ref_surv_list[[ag]] <- sapply(1:5, function(y) mean(T_true[ifelse(Age < 60, "Young", "Old") == ag] > y * 365.25) * 100)
   }
   Data_cgp <- calculate_iptw_sim(Data_cgp, ref_surv_list)
 
-  # 5. Model Fitting (★ 左側切断モデル Surv(T1, T_obs) を使用)
-  form <- as.formula("~ X + Age + Sex + Histology")
+  # 変数のレベルが足りない場合にモデルがクラッシュするのを防ぐ動的フォーミュラ
+  valid_covs <- c("X", "Age")
+  if (length(unique(Data_cgp$Sex)) > 1) valid_covs <- c(valid_covs, "Sex")
+  if (length(unique(Data_cgp$Histology)) > 1) valid_covs <- c(valid_covs, "Histology")
+  form <- as.formula(paste("~", paste(valid_covs, collapse=" + ")))
 
   fit_naive <- tryCatch({ flexsurvreg(update(Surv(T_obs, Event) ~ ., form), data = Data_cgp, dist = "llogis") }, error = function(e) NULL)
   fit_lt <- tryCatch({ flexsurvreg(update(Surv(T1, T_obs, Event) ~ ., form), data = Data_cgp, dist = "llogis") }, error = function(e) NULL)
   fit_prop <- tryCatch({ flexsurvreg(update(Surv(T1, T_obs, Event) ~ ., form), data = Data_cgp, weights = iptw, dist = "llogis") }, error = function(e) NULL)
 
+  # [安全装置] NAや変数落ちによる抽出クラッシュを完全に防ぐラッパー
   extract_metrics <- function(fit) {
-    if (is.null(fit)) return(rep(NA, 11))
+    blank_res <- c(AF_X=NA, AF_X_L=NA, AF_X_U=NA, AF_Age=NA, AF_Sex=NA, AF_READ=NA, AF_COADREAD=NA, Med_WT=NA, Med_Mut=NA, S5_WT=NA, S5_Mut=NA)
+    if (is.null(fit)) return(blank_res)
     res <- fit$res
-    AF_X <- exp(res["XMutated", "est"]); AF_X_L <- exp(res["XMutated", "L95%"]); AF_X_U <- exp(res["XMutated", "U95%"])
-    AF_Age <- exp(res["Age", "est"] * 10); AF_Sex <- exp(res["SexFemale", "est"])
-    AF_READ <- exp(res["HistologyREAD", "est"]); AF_COADREAD <- exp(res["HistologyCOADREAD", "est"])
 
-    scale_base <- res["scale", "est"]; shape <- res["shape", "est"]
-    af_age60 <- exp(res["Age", "est"] * 60)
+    get_val <- function(rname, cname) {
+      if (rname %in% rownames(res) && cname %in% colnames(res)) res[rname, cname] else NA
+    }
+
+    AF_X <- exp(get_val("XMutated", "est"))
+    AF_X_L <- exp(get_val("XMutated", "L95%"))
+    AF_X_U <- exp(get_val("XMutated", "U95%"))
+    AF_Age <- exp(get_val("Age", "est") * 10)
+    AF_Sex <- exp(get_val("SexFemale", "est"))
+    AF_READ <- exp(get_val("HistologyREAD", "est"))
+    AF_COADREAD <- exp(get_val("HistologyCOADREAD", "est"))
+
+    scale_base <- get_val("scale", "est")
+    shape <- get_val("shape", "est")
+    af_age60 <- exp(get_val("Age", "est") * 60)
+
     med_wt_days <- scale_base * af_age60
-    med_wt <- med_wt_days / 365.25; med_mut <- med_wt * AF_X
+    med_wt <- med_wt_days / 365.25
+    med_mut <- med_wt * AF_X
     s5_wt <- 1 / (1 + (5 * 365.25 / med_wt_days)^shape) * 100
     s5_mut <- 1 / (1 + (5 * 365.25 / (med_wt_days * AF_X))^shape) * 100
 
@@ -192,22 +205,36 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
 # -------------------------------------------------------------------------
 # UI Observers and Rendering Logic
 # -------------------------------------------------------------------------
+
+# [安全装置] NAを検知して"N/A"を返し、sprintfのクラッシュを防ぐフォーマッター
+safe_fmt <- function(x, digits=2) {
+  sapply(x, function(v) if(is.na(v) || !is.numeric(v)) "N/A" else sprintf(paste0("%.", digits, "f"), v))
+}
+
 observeEvent(input$run_sim, {
   req(input$sim_n, input$sim_true_af, input$sim_cens_rate, input$sim_mut_freq)
-  showNotification("Running simulation with T1-based Original IPTW...", type = "message", duration = 3)
+  showNotification("Running simulation (Original T1-based IPTW)...", type = "message", duration = 3)
 
   res <- run_sim_iteration(input$sim_n, input$sim_true_af, input$sim_mut_freq / 100, input$sim_t1_pattern, input$sim_cens_pattern, input$sim_cens_rate / 100, return_data = TRUE)
-  shiny::validate(shiny::need(!is.null(res), "Simulation failed. Please try again."))
+  shiny::validate(shiny::need(!is.null(res), "Simulation generated insufficient events. Please try again or reduce censoring rate."))
 
   True_AF <- input$sim_true_af; True_Med_WT <- 2.0; True_S5_WT <- 1 / (1 + (5 / True_Med_WT)^1.5) * 100
 
   output$sim_result_table <- renderTable({
     data.frame(
       Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF", "Median OS (WT) [Years]", "5-Year OS (WT) [%]"),
-      `True` = c(sprintf("%.2f", True_AF), "0.85", "1.10", "0.90", "0.95", sprintf("%.2f", True_Med_WT), sprintf("%.1f", True_S5_WT)),
-      `Naive AFT` = c(sprintf("%.2f", res$Naive["AF_X"]), sprintf("%.2f", res$Naive["AF_Age"]), sprintf("%.2f", res$Naive["AF_Sex"]), sprintf("%.2f", res$Naive["AF_READ"]), sprintf("%.2f", res$Naive["AF_COADREAD"]), sprintf("%.2f", res$Naive["Med_WT"]), sprintf("%.1f", res$Naive["S5_WT"])),
-      `Standard LT` = c(sprintf("%.2f", res$LT["AF_X"]), sprintf("%.2f", res$LT["AF_Age"]), sprintf("%.2f", res$LT["AF_Sex"]), sprintf("%.2f", res$LT["AF_READ"]), sprintf("%.2f", res$LT["AF_COADREAD"]), sprintf("%.2f", res$LT["Med_WT"]), sprintf("%.1f", res$LT["S5_WT"])),
-      `Proposed Method` = c(sprintf("<b>%.2f</b>", res$Prop["AF_X"]), sprintf("<b>%.2f</b>", res$Prop["AF_Age"]), sprintf("<b>%.2f</b>", res$Prop["AF_Sex"]), sprintf("<b>%.2f</b>", res$Prop["AF_READ"]), sprintf("<b>%.2f</b>", res$Prop["AF_COADREAD"]), sprintf("<b>%.2f</b>", res$Prop["Med_WT"]), sprintf("<b>%.1f</b>", res$Prop["S5_WT"]))
+      `True` = c(safe_fmt(True_AF), "0.85", "1.10", "0.90", "0.95", safe_fmt(True_Med_WT), safe_fmt(True_S5_WT, 1)),
+      `Naive AFT` = c(safe_fmt(res$Naive["AF_X"]), safe_fmt(res$Naive["AF_Age"]), safe_fmt(res$Naive["AF_Sex"]), safe_fmt(res$Naive["AF_READ"]), safe_fmt(res$Naive["AF_COADREAD"]), safe_fmt(res$Naive["Med_WT"]), safe_fmt(res$Naive["S5_WT"], 1)),
+      `Standard LT` = c(safe_fmt(res$LT["AF_X"]), safe_fmt(res$LT["AF_Age"]), safe_fmt(res$LT["AF_Sex"]), safe_fmt(res$LT["AF_READ"]), safe_fmt(res$LT["AF_COADREAD"]), safe_fmt(res$LT["Med_WT"]), safe_fmt(res$LT["S5_WT"], 1)),
+      `Proposed Method` = c(
+        paste0("<b>", safe_fmt(res$Prop["AF_X"]), "</b>"),
+        paste0("<b>", safe_fmt(res$Prop["AF_Age"]), "</b>"),
+        paste0("<b>", safe_fmt(res$Prop["AF_Sex"]), "</b>"),
+        paste0("<b>", safe_fmt(res$Prop["AF_READ"]), "</b>"),
+        paste0("<b>", safe_fmt(res$Prop["AF_COADREAD"]), "</b>"),
+        paste0("<b>", safe_fmt(res$Prop["Med_WT"]), "</b>"),
+        paste0("<b>", safe_fmt(res$Prop["S5_WT"], 1), "</b>")
+      )
     )
   }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c", sanitize.text.function = function(x) x)
 
@@ -259,22 +286,27 @@ observeEvent(input$run_sim_multi, {
   shiny::validate(shiny::need(length(results) > 0, "All simulations failed."))
 
   True_AF <- input$sim_true_af; True_Med_WT <- 2.0; True_S5_WT <- 1 / (1 + (5 / True_Med_WT)^1.5) * 100
+
   calc_stats <- function(model_name, metric_name, true_val) {
     vals <- sapply(results, function(x) x[[model_name]][metric_name])
-    mean_val <- mean(vals, na.rm = TRUE); mse_val <- mean((vals - true_val)^2, na.rm = TRUE)
+    vals <- vals[!is.na(vals)]
+    if(length(vals) == 0) return("N/A")
+    mean_val <- mean(vals)
+    mse_val <- mean((vals - true_val)^2)
     return(sprintf("%.2f (MSE: %.3f)", mean_val, mse_val))
   }
 
-  af_l <- sapply(results, function(x) x$Prop["AF_X_L"]); af_u <- sapply(results, function(x) x$Prop["AF_X_U"])
+  af_l <- sapply(results, function(x) x$Prop["AF_X_L"])
+  af_u <- sapply(results, function(x) x$Prop["AF_X_U"])
   cp_val <- mean(af_l <= True_AF & True_AF <= af_u, na.rm = TRUE) * 100
 
   output$sim_multi_result_table <- renderTable({
     data.frame(
       Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF", "Median OS (WT)", "5-Year OS (WT) [%]"),
-      `True Value` = c(sprintf("%.2f", True_AF), "0.85", "1.10", "0.90", "0.95", sprintf("%.2f", True_Med_WT), sprintf("%.1f", True_S5_WT)),
+      `True Value` = c(safe_fmt(True_AF), "0.85", "1.10", "0.90", "0.95", safe_fmt(True_Med_WT), safe_fmt(True_S5_WT, 1)),
       `Naive AFT` = c(calc_stats("Naive", "AF_X", True_AF), calc_stats("Naive", "AF_Age", 0.85), calc_stats("Naive", "AF_Sex", 1.10), calc_stats("Naive", "AF_READ", 0.90), calc_stats("Naive", "AF_COADREAD", 0.95), calc_stats("Naive", "Med_WT", True_Med_WT), calc_stats("Naive", "S5_WT", True_S5_WT)),
       `Standard LT AFT` = c(calc_stats("LT", "AF_X", True_AF), calc_stats("LT", "AF_Age", 0.85), calc_stats("LT", "AF_Sex", 1.10), calc_stats("LT", "AF_READ", 0.90), calc_stats("LT", "AF_COADREAD", 0.95), calc_stats("LT", "Med_WT", True_Med_WT), calc_stats("LT", "S5_WT", True_S5_WT)),
-      `Proposed Method` = c(paste0("<b>", calc_stats("Prop", "AF_X", True_AF), " [CP: ", sprintf("%.1f", cp_val), "%]</b>"), sprintf("<b>%s</b>", calc_stats("Prop", "AF_Age", 0.85)), sprintf("<b>%s</b>", calc_stats("Prop", "AF_Sex", 1.10)), sprintf("<b>%s</b>", calc_stats("Prop", "AF_READ", 0.90)), sprintf("<b>%s</b>", calc_stats("Prop", "AF_COADREAD", 0.95)), sprintf("<b>%s</b>", calc_stats("Prop", "Med_WT", True_Med_WT)), sprintf("<b>%s</b>", calc_stats("Prop", "S5_WT", True_S5_WT)))
+      `Proposed Method` = c(paste0("<b>", calc_stats("Prop", "AF_X", True_AF), " [CP: ", safe_fmt(cp_val, 1), "%]</b>"), paste0("<b>", calc_stats("Prop", "AF_Age", 0.85), "</b>"), paste0("<b>", calc_stats("Prop", "AF_Sex", 1.10), "</b>"), paste0("<b>", calc_stats("Prop", "AF_READ", 0.90), "</b>"), paste0("<b>", calc_stats("Prop", "AF_COADREAD", 0.95), "</b>"), paste0("<b>", calc_stats("Prop", "Med_WT", True_Med_WT), "</b>"), paste0("<b>", calc_stats("Prop", "S5_WT", True_S5_WT), "</b>"))
     )
   }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c", sanitize.text.function = function(x) x)
 })
