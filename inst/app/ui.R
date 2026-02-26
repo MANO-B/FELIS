@@ -103,6 +103,7 @@ ui <- dashboardPage(
                hr(),
                menuSubItem("Custom survival analysis", tabName = "ControlCustom", icon = icon("angle-right")),
                menuSubItem("Simulation Study", tabName = "Simulation_Study", icon = icon("angle-right")),
+               menuSubItem("Copula model", tabName = "Copula_Model", icon = icon("angle-right")),
                hr()
       ),
       menuItem("Bias correction simulation", tabName = "SurvivalSimurationKMCurve", icon = icon("th")),
@@ -1512,6 +1513,34 @@ ui <- dashboardPage(
                   )
                 )
               )
+      ),
+      tabItem("Copula_Model",
+               fluidPage(
+                 titlePanel("Univariate Dependent Truncation: Copula vs Lynden-Bell"),
+
+                 sidebarLayout(
+                   sidebarPanel(
+                     h4("Simulation Parameters"),
+                     numericInput("cop_n", "Initial Cohort Size (Macro N):", 2000, min = 500, max = 5000),
+                     sliderInput("cop_tau", "Kendall's Tau (Dependence between T and T1):", min = 0.1, max = 0.8, value = 0.5, step = 0.1),
+                     numericInput("cop_cens", "Censoring Rate (%):", 30, min = 0, max = 80, step = 5),
+
+                     hr(),
+                     actionButton("run_copula", "Run Copula Simulation", class = "btn-success", width = "100%"),
+
+                     tags$p(style = "margin-top: 20px; font-size: 13px; color: #7f8c8d;",
+                            "※ 依存性切断（Dependent Truncation）を解決するコピュラモデル（Frank Copula）の威力を確認するシンプルな単変量シミュレーションです。計算に数秒〜十数秒かかります。")
+                   ),
+
+                   mainPanel(
+                     h4("Estimated Median Survival Times"),
+                     tableOutput("copula_result_table"),
+
+                     h4("Reconstructed Marginal Survival Curves"),
+                     plotOutput("copula_survival_plot", height = "500px")
+                   )
+                 )
+               )
       ),
       tabItem("Geneticvariantsandsurvivalforestplot2",
               h6("Figure. Overall survival after the first survival-prolonging chemotherapy after adjusting for left-truncation bias. To evaluate the association between oncogenic mutations and survival, a risk-set adjustment model was performed to adjust for left-truncation bias with survival package."),
