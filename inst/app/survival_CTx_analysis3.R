@@ -678,7 +678,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     weights_var = NULL
   )
 })
-R
+
 # =========================================================================
 # Server Logic for Copula Model (Fixed Function Name NPMLE.Frank)
 # =========================================================================
