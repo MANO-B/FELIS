@@ -173,152 +173,6 @@ survival_CTx_analysis2_logic_control <- function() {
 }
 
 
-# output$figure_survival_CTx_interactive_1_control = renderPlot({
-#   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
-#       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
-#       OUTPUT_DATA$figure_surv_CTx_Data_drug_control)
-#
-#   Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
-#   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
-#   Data_drug = OUTPUT_DATA$figure_surv_CTx_Data_drug_control
-#   # ========================================================
-#   # IPTW calculation for left truncation bias adjustment
-#   # ========================================================
-#   ref_surv_list <- list()
-#   age_groups <- c("40未満", "40代", "50代", "60代", "70代", "80以上")
-#
-#   if (!is.null(input$survival_data_source)) {
-#     if (input$survival_data_source == "registry") {
-#       # Load from JSON data
-#       if(exists("Data_age_survival_5_year") && input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
-#
-#         cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
-#
-#         # Extract the overall survival rates as fallback
-#         fallback_surv <- cancer_data[["全年齢"]]
-#
-#         for (ag in age_groups) {
-#           # Check if age-specific data exists and has exactly 5 years of data
-#           if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
-#             ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
-#           } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
-#             # Fallback to "全年齢" (overall) survival rates if age-specific is missing
-#             ref_surv_list[[ag]] <- as.numeric(fallback_surv)
-#           }
-#         }
-#       }
-#     } else if (input$survival_data_source == "manual_all") {
-#       # Apply overall inputs to all age groups
-#       vals <- c(input$surv_all_1y, input$surv_all_2y, input$surv_all_3y, input$surv_all_4y, input$surv_all_5y)
-#       for (ag in age_groups) ref_surv_list[[ag]] <- vals
-#     } else if (input$survival_data_source == "manual_age") {
-#       # Apply detailed inputs by age group
-#       ref_surv_list[["40未満"]] <- c(input$surv_u40_1y, input$surv_u40_2y, input$surv_u40_3y, input$surv_u40_4y, input$surv_u40_5y)
-#       ref_surv_list[["40代"]] <- c(input$surv_40s_1y, input$surv_40s_2y, input$surv_40s_3y, input$surv_40s_4y, input$surv_40s_5y)
-#       ref_surv_list[["50代"]] <- c(input$surv_50s_1y, input$surv_50s_2y, input$surv_50s_3y, input$surv_50s_4y, input$surv_50s_5y)
-#       ref_surv_list[["60代"]] <- c(input$surv_60s_1y, input$surv_60s_2y, input$surv_60s_3y, input$surv_60s_4y, input$surv_60s_5y)
-#       ref_surv_list[["70代"]] <- c(input$surv_70s_1y, input$surv_70s_2y, input$surv_70s_3y, input$surv_70s_4y, input$surv_70s_5y)
-#       ref_surv_list[["80以上"]] <- c(input$surv_80s_1y, input$surv_80s_2y, input$surv_80s_3y, input$surv_80s_4y, input$surv_80s_5y)
-#     }
-#   }
-#
-#   # If list is successfully constructed
-#   if (length(ref_surv_list) > 0) {
-#
-#     # Ultimate fallback just in case some rare cancers have NO overall data either
-#     for (ag in age_groups) {
-#       if (is.null(ref_surv_list[[ag]])) ref_surv_list[[ag]] <- c(10, 5, 3, 2, 1) # Fallback to a poor prognosis
-#     }
-#
-#     Data_survival_interactive <- calculate_iptw_age(Data_survival_interactive, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢")
-#   } else {
-#     Data_survival_interactive$iptw <- 1.0 # Fallback
-#   }
-#
-#   # ID抽出関数を定義
-#   extract_group_ids <- function(group_num) {
-#     # 初期IDセット
-#     IDs <- unique(Data_survival_interactive$C.CAT調査結果.基本項目.ハッシュID)
-#
-#     # 動的に入力名を構築
-#     input_prefix <- paste0("gene_survival_interactive_", group_num, "_")
-#
-#     # 遺伝子フィルタ（P_1: 必須変異1）
-#     p1_input <- input[[paste0(input_prefix, "P_1_control")]]
-#     if(!all(is.null(p1_input))) {
-#       IDs <- intersect(IDs, (Data_MAF_target %>%
-#                                dplyr::filter(Hugo_Symbol %in% p1_input))$Tumor_Sample_Barcode)
-#     }
-#
-#     # 遺伝子フィルタ（P_2: 必須変異2）
-#     p2_input <- input[[paste0(input_prefix, "P_2_control")]]
-#     if(!all(is.null(p2_input))) {
-#       IDs <- intersect(IDs, (Data_MAF_target %>%
-#                                dplyr::filter(Hugo_Symbol %in% p2_input))$Tumor_Sample_Barcode)
-#     }
-#
-#     # 遺伝子除外（W: 除外変異）
-#     w_input <- input[[paste0(input_prefix, "W_control")]]
-#     if(!all(is.null(w_input))) {
-#       IDs <- setdiff(IDs, (Data_MAF_target %>%
-#                              dplyr::filter(Hugo_Symbol %in% w_input))$Tumor_Sample_Barcode)
-#     }
-#
-#     # 臨床データフィルタ
-#     clinical_filters <- list(
-#       A_control = "YoungOld",
-#       S_control = "症例.基本情報.性別.名称.",
-#       H_control = "Cancers"
-#     )
-#
-#     for(filter_key in names(clinical_filters)) {
-#       filter_input <- input[[paste0(input_prefix, filter_key)]]
-#       if(!all(is.null(filter_input))) {
-#         column_name <- clinical_filters[[filter_key]]
-#         filter_expr <- paste0(column_name, " %in% filter_input")
-#         IDs <- intersect(IDs, (Data_survival_interactive %>%
-#                                  dplyr::filter(!!parse_expr(filter_expr)))$C.CAT調査結果.基本項目.ハッシュID)
-#       }
-#     }
-#
-#     # 薬剤フィルタ（D）
-#     d_input <- input[[paste0(input_prefix, "D_control")]]
-#     if(!all(is.null(d_input))) {
-#       IDs <- intersect(IDs, (Data_drug %>%
-#                                dplyr::filter(Drug %in% d_input))$ID)
-#     }
-#
-#     return(IDs)
-#   }
-#
-#   # Group1とGroup2のIDを取得
-#   ID_1 <- extract_group_ids(1)
-#   ID_2 <- extract_group_ids(2)
-#
-#   # データ作成
-#   Data_survival_1 <- Data_survival_interactive %>%
-#     dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_1) %>%
-#     dplyr::mutate(Group = 1)
-#
-#   Data_survival_2 <- Data_survival_interactive %>%
-#     dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_2) %>%
-#     dplyr::mutate(Group = 2)
-#
-#   Data_survival <- rbind(Data_survival_1, Data_survival_2)
-#
-#   # サバイバル解析実行
-#   survival_compare_and_plot_CTx(
-#     data = Data_survival,
-#     time_var1 = "time_pre",
-#     time_var2 = "time_all",
-#     status_var = "censor",
-#     group_var = "Group",
-#     plot_title = "Survival analisys based on cohort data",
-#     adjustment = FALSE,
-#     color_var_surv_CTx_1 = "diagnosis",
-#     weights_var = "iptw"
-#   )
-# })
 
 output$figure_survival_CTx_interactive_1_control = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
@@ -950,3 +804,102 @@ output$forest_plot_multivariate = renderPlot({
 
   return(calculated_height)
 })
+
+# Helper function to calculate age-stratified IPTW
+calculate_iptw_age <- function(data, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢") {
+  init_pop <- 10000
+  max_years <- 10
+  bin_width <- 0.5 # 6-month window
+  breaks <- seq(0, max_years, by = bin_width)
+  n_bins <- length(breaks) - 1
+
+  # Categorize age and assign to 6-month time bins
+  data <- data %>%
+    dplyr::mutate(
+      age_num = as.numeric(!!sym(age_var)),
+      age_class = dplyr::case_when(
+        age_num < 40 ~ "40未満",
+        age_num < 50 ~ "40代",
+        age_num < 60 ~ "50代",
+        age_num < 70 ~ "60代",
+        age_num < 80 ~ "70代",
+        age_num >= 80 ~ "80以上",
+        TRUE ~ "Unknown"
+      ),
+      time_years = !!sym(time_var) / 365.25,
+      time_bin = ceiling(time_years / bin_width),
+      time_bin = ifelse(time_bin > n_bins, n_bins, time_bin),
+      time_bin = ifelse(time_bin == 0, 1, time_bin) # Safety for time=0
+    )
+
+  # Build Person-Time (PT) reference table
+  pt_table <- expand.grid(age_class = names(ref_surv_list), time_bin = 1:n_bins, stringsAsFactors = FALSE)
+  pt_table$pt_ref <- 0
+
+  t_points <- 1:5 # We have data for years 1, 2, 3, 4, 5
+
+  for(ag in names(ref_surv_list)) {
+    surv_rates <- ref_surv_list[[ag]]
+
+    if(length(surv_rates) >= 5) {
+      # Convert % to probabilities and avoid log(0) bounds
+      S_t <- surv_rates[1:5] / 100
+      S_t <- pmax(pmin(S_t, 0.999), 0.001)
+
+      # Log-logistic linearization: log(1/S(t) - 1) = p * log(lambda) + p * log(t)
+      y <- log(1/S_t - 1)
+      x <- log(t_points)
+
+      # Fit linear model to find parameters
+      fit <- lm(y ~ x)
+      p <- coef(fit)[2]
+      p_log_lambda <- coef(fit)[1]
+      lambda <- exp(p_log_lambda / p)
+
+      # Define smooth Log-logistic survival function
+      S_fit <- function(t_y) {
+        1 / (1 + (lambda * t_y)^p)
+      }
+
+      # Calculate Expected PT for each 6-month window using trapezoidal rule
+      pt_bins <- numeric(n_bins)
+      for(i in 1:n_bins) {
+        t_start <- breaks[i]
+        t_end <- breaks[i+1]
+        pt_bins[i] <- init_pop * (S_fit(t_start) + S_fit(t_end)) / 2 * bin_width
+      }
+      pt_table[pt_table$age_class == ag, "pt_ref"] <- pt_bins
+    }
+  }
+
+  # Count actual N in CGP data per age class and 6-month bin
+  bin_counts <- data %>% dplyr::count(age_class, time_bin, name = "N_cgp")
+
+  # Calculate IPTW (Weight = PT / N_cgp)
+  data <- data %>%
+    dplyr::left_join(pt_table, by = c("age_class", "time_bin")) %>%
+    dplyr::left_join(bin_counts, by = c("age_class", "time_bin")) %>%
+    dplyr::mutate(
+      raw_weight = ifelse(!is.na(N_cgp) & N_cgp > 0 & !is.na(pt_ref), pt_ref / N_cgp, 0)
+    )
+
+  # =========================================================================
+  # 極端な重み（外れ値）による分散の爆発を防ぐための2.5%〜97.5%トリミング
+  # =========================================================================
+  if (any(data$raw_weight > 0, na.rm = TRUE)) {
+    lower_bound <- quantile(data$raw_weight[data$raw_weight > 0], 0.025, na.rm = TRUE)
+    upper_bound <- quantile(data$raw_weight[data$raw_weight > 0], 0.975, na.rm = TRUE)
+
+    data <- data %>%
+      dplyr::mutate(
+        raw_weight = ifelse(raw_weight > 0 & raw_weight < lower_bound, lower_bound, raw_weight),
+        raw_weight = ifelse(raw_weight > upper_bound, upper_bound, raw_weight)
+      )
+  }
+  # Stabilize weights (mean = 1)
+  mean_w <- mean(data$raw_weight[data$raw_weight > 0], na.rm = TRUE)
+  data$iptw <- ifelse(data$raw_weight > 0, data$raw_weight / mean_w, 1.0)
+
+  return(data)
+}
+
