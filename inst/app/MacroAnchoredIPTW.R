@@ -14,88 +14,90 @@ find_censoring_param <- function(T2, target_rate, pattern) {
       return((sum(C2 < T2) / length(T2)) - target_rate)
     }
     opt_k <- tryCatch({ uniroot(obj_func, interval = c(1.05, 10))$root }, error = function(e) { 2.0 })
-    opt_scale <- 365.25 / ((opt_k - 1) / opt_k)^(1 / opt_k)
-    return(list(shape = opt_k, scale = opt_scale))
+    return(list(shape = opt_k, scale = 365.25 / ((opt_k - 1) / opt_k)^(1 / opt_k)))
+  } else if (pattern == "ushape") {
+    # U-shape のパラメータ探索
+    obj_func <- function(scale_param) {
+      u <- runif(length(T2))
+      C2 <- ifelse(u < 0.5, rweibull(length(T2), shape = 0.5, scale = scale_param),
+                   rweibull(length(T2), shape = 3.0, scale = scale_param * 2))
+      return((sum(C2 < T2) / length(T2)) - target_rate)
+    }
+    opt_scale <- tryCatch({ uniroot(obj_func, interval = c(0.1, 1000000))$root }, error = function(e) { median(T2) * 1.5 })
+    return(list(shape = NA, scale = opt_scale, is_ushape = TRUE))
   } else {
     obj_func_scale <- function(scale_param) {
-      C2 <- rexp(length(T2), rate = 1 / scale_param)
+      C2 <- if (pattern == "indep") rexp(length(T2), rate = 1 / scale_param) else rweibull(length(T2), shape = 0.5, scale = scale_param)
       return((sum(C2 < T2) / length(T2)) - target_rate)
     }
     opt_scale <- tryCatch({ uniroot(obj_func_scale, interval = c(0.1, 1000000))$root }, error = function(e) { median(T2) * 1.5 })
-    return(list(shape = 1.0, scale = opt_scale))
+    return(list(shape = if(pattern == "early") 0.5 else 1.0, scale = opt_scale, is_ushape = FALSE))
   }
 }
 
 run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, cens_rate, return_data = FALSE) {
-
-  # =========================================================================
-  # 1. Macro Population (Registry Anchor: Median OS ~2 years)
-  # =========================================================================
-  # ※全例がCGPを受けるわけではありません。10万人のレジストリから、後でN_target人だけが抽出されます。
   N_macro <- 100000
   Age <- round(runif(N_macro, 40, 80))
   Sex <- sample(c("Male", "Female"), N_macro, replace = TRUE, prob = c(0.55, 0.45))
   Histology <- sample(c("COAD", "READ", "COADREAD"), N_macro, replace = TRUE, prob = c(0.60, 0.30, 0.10))
   X <- rbinom(N_macro, 1, Mut_Freq)
 
-  True_AF_Age_10yr <- 0.85
-  True_AF_Sex_Female <- 1.10
-  True_AF_Hist_READ <- 0.90
-  True_AF_Hist_COADREAD <- 0.95
+  AF_bg <- 1.0 * (0.85 ^ ((Age - 60) / 10)) * ifelse(Sex == "Female", 1.10, 1.0) *
+    ifelse(Histology == "READ", 0.90, ifelse(Histology == "COADREAD", 0.95, 1.0))
 
-  AF_bg <- 1.0 * (True_AF_Age_10yr ^ ((Age - 60) / 10)) * ifelse(Sex == "Female", True_AF_Sex_Female, 1.0) *
-    ifelse(Histology == "READ", True_AF_Hist_READ, ifelse(Histology == "COADREAD", True_AF_Hist_COADREAD, 1.0))
-
-  shape_base <- 1.5
-  scale_base <- 2.0 * 365.25
-
-  u <- pmax(pmin(runif(N_macro), 0.999), 0.001)
-  T_true <- scale_base * ((1 - u) / u)^(1 / shape_base) * AF_bg * ifelse(X == 1, True_AF_X, 1.0)
+  T_true <- (2.0 * 365.25) * ((1 - pmax(pmin(runif(N_macro), 0.999), 0.001)) / pmax(pmin(runif(N_macro), 0.999), 0.001))^(1 / 1.5) * AF_bg * ifelse(X == 1, True_AF_X, 1.0)
 
   # =========================================================================
-  # 2. Timing of CGP (T1)
+  # Timing of CGP (T1) Patterns (早期パターン復活)
   # =========================================================================
-  if (t1_pat == "indep") {
-    T1 <- runif(N_macro, 30, pmax(31, T_true))
-  } else if (t1_pat == "dep_1yr") {
-    # 最悪の依存性切断: 死亡の約1年前にCGP
-    T2_exp <- rlnorm(N_macro, meanlog = log(365.25 * 1.0), sdlog = 0.3)
-    T1 <- pmax(30, T_true - T2_exp)
-  } else if (t1_pat == "dep_2yr") {
-    T2_exp <- rlnorm(N_macro, meanlog = log(365.25 * 2.0), sdlog = 0.3)
-    T1 <- pmax(30, T_true - T2_exp)
-  }
+  if (t1_pat == "indep") { T1 <- runif(N_macro, 30, pmax(31, T_true))
+  } else if (t1_pat == "early") { T1 <- runif(N_macro, 30, pmax(31, T_true * 0.3)) # 診断後早期
+  } else if (t1_pat == "dep_1yr") { T1 <- pmax(30, T_true - rlnorm(N_macro, log(365.25 * 1.0), 0.4))
+  } else if (t1_pat == "dep_2yr") { T1 <- pmax(30, T_true - rlnorm(N_macro, log(365.25 * 2.0), 0.4)) }
 
   cgp_indices <- which(T_true > T1)
   if(length(cgp_indices) < N_target) return(NULL)
 
-  prob_select <- ifelse(Age[cgp_indices] < 60, 0.8, 0.4)
+  prob_select <- ifelse(Age[cgp_indices] < 60, 0.9, 0.1) # 強烈な選択バイアス
   selected_indices <- sample(cgp_indices, size = N_target, prob = prob_select, replace = FALSE)
 
   Data_cgp <- data.frame(
-    ID = 1:N_target,
-    Age = Age[selected_indices],
-    Sex = factor(Sex[selected_indices], levels = c("Male", "Female")),
-    Histology = factor(Histology[selected_indices], levels = c("COAD", "READ", "COADREAD")),
-    X = factor(ifelse(X[selected_indices] == 1, "Mutated", "WT"), levels = c("WT", "Mutated")),
-    T_true = T_true[selected_indices],
-    T1 = T1[selected_indices]
+    ID = 1:N_target, Age = Age[selected_indices], Age_class = ifelse(Age[selected_indices] < 60, "Young", "Old"),
+    Sex = factor(Sex[selected_indices]), Histology = factor(Histology[selected_indices]),
+    X = factor(ifelse(X[selected_indices] == 1, "Mutated", "WT")), T_true = T_true[selected_indices], T1 = T1[selected_indices]
   )
   Data_cgp$T2_true <- Data_cgp$T_true - Data_cgp$T1
 
   # =========================================================================
-  # 3. Censoring (C2)
+  # Censoring (C2) Patterns (U-shape / 早期復活)
   # =========================================================================
   params <- find_censoring_param(Data_cgp$T2_true, cens_rate, cens_pat)
-  if (cens_pat == "indep") { C2 <- rexp(N_target, rate = 1 / params$scale)
-  } else { C2 <- rweibull(N_target, shape = params$shape, scale = params$scale) }
+  if (isTRUE(params$is_ushape)) {
+    u <- runif(N_target)
+    C2 <- ifelse(u < 0.5, rweibull(N_target, shape = 0.5, scale = params$scale), rweibull(N_target, shape = 3.0, scale = params$scale * 2))
+  } else if (cens_pat == "indep") {
+    C2 <- rexp(N_target, rate = 1 / params$scale)
+  } else {
+    C2 <- rweibull(N_target, shape = params$shape, scale = params$scale)
+  }
 
   Data_cgp$C2 <- C2
   Data_cgp$T2_obs <- pmin(Data_cgp$T2_true, C2)
   Data_cgp$Event <- ifelse(Data_cgp$T2_true <= C2, 1, 0)
-  Data_cgp$T_obs <- Data_cgp$T1 + Data_cgp$T2_obs # OS (全生存期間)
-  if(sum(Data_cgp$Event) < 20) return(NULL)
+  Data_cgp$T_obs <- Data_cgp$T1 + Data_cgp$T2_obs
 
+  # マクロ生存率抽出とIPTW計算 (先生の関数を利用)
+  ref_surv_list <- list()
+  for (ag in c("Young", "Old")) {
+    ref_surv_list[[ag]] <- sapply(1:5, function(y) mean(T_true[ifelse(Age < 60, "Young", "Old") == ag] > y * 365.25) * 100)
+  }
+  Data_cgp <- calculate_iptw_age(Data_cgp, ref_surv_list, time_var = "T1", age_var = "Age") # T1ベース！
+
+  # モデルフィッティング
+  form <- as.formula("~ X + Age + Sex + Histology")
+  fit_naive <- tryCatch({ flexsurvreg(update(Surv(T_obs, Event) ~ ., form), data = Data_cgp, dist = "llogis") }, error = function(e) NULL)
+  fit_lt <- tryCatch({ flexsurvreg(update(Surv(T1, T_obs, Event) ~ ., form), data = Data_cgp, dist = "llogis") }, error = function(e) NULL)
+  fit_prop <- tryCatch({ flexsurvreg(update(Surv(T1, T_obs, Event) ~ ., form), data = Data_cgp, weights = iptw, dist = "llogis") }, error = function(e) NULL)
   # =========================================================================
   # 4. 真の Tamura & Ikegami メソッド (OS-Matching IPTW)
   # 院内がん登録(Macro)のOSに完全一致させる重み付け

@@ -103,7 +103,7 @@ ui <- dashboardPage(
                hr(),
                menuSubItem("Custom survival analysis", tabName = "ControlCustom", icon = icon("angle-right")),
                menuSubItem("Simulation Study", tabName = "Simulation_Study", icon = icon("angle-right")),
-               menuSubItem("Copula model", tabName = "Copula_Model", icon = icon("angle-right")),
+               # menuSubItem("Copula model", tabName = "Copula_Model", icon = icon("angle-right")),
                hr()
       ),
       menuItem("Bias correction simulation", tabName = "SurvivalSimurationKMCurve", icon = icon("th")),
@@ -1483,8 +1483,7 @@ ui <- dashboardPage(
 
                     h4("Censoring Pattern (C2)"),
                     radioButtons("sim_cens_pattern", "Timing of Censoring:",
-                                 choices = c("Independent (Constant rate)" = "indep",
-                                             "Peak at ~1 year (Fixed mode Weibull)" = "peak1y")),
+                                 choices = c("Independent (Constant rate)" = "indep", "Early phase" = "early", "Dep 1yr" = "dep_1yr")),
                     numericInput("sim_cens_rate", "Target Censoring Rate (%):", 30, min = 10, max = 80, step = 5),
 
                     hr(),

@@ -1861,15 +1861,13 @@ optimize_data_datatable <- function(Data_forest_tmp_, input) {
   return(Data_forest_tmp_)
 }
 
-# Helper function to calculate age-stratified IPTW
 calculate_iptw_age <- function(data, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢") {
   init_pop <- 10000
   max_years <- 10
-  bin_width <- 0.5 # 6-month window
+  bin_width <- 0.5
   breaks <- seq(0, max_years, by = bin_width)
   n_bins <- length(breaks) - 1
 
-  # Categorize age and assign to 6-month time bins
   data <- data %>%
     dplyr::mutate(
       age_num = as.numeric(!!sym(age_var)),
@@ -1885,39 +1883,27 @@ calculate_iptw_age <- function(data, ref_surv_list, time_var = "time_pre", age_v
       time_years = !!sym(time_var) / 365.25,
       time_bin = ceiling(time_years / bin_width),
       time_bin = ifelse(time_bin > n_bins, n_bins, time_bin),
-      time_bin = ifelse(time_bin == 0, 1, time_bin) # Safety for time=0
+      time_bin = ifelse(time_bin == 0, 1, time_bin)
     )
 
-  # Build Person-Time (PT) reference table
   pt_table <- expand.grid(age_class = names(ref_surv_list), time_bin = 1:n_bins, stringsAsFactors = FALSE)
   pt_table$pt_ref <- 0
-
-  t_points <- 1:5 # We have data for years 1, 2, 3, 4, 5
+  t_points <- 1:5
 
   for(ag in names(ref_surv_list)) {
     surv_rates <- ref_surv_list[[ag]]
-
     if(length(surv_rates) >= 5) {
-      # Convert % to probabilities and avoid log(0) bounds
       S_t <- surv_rates[1:5] / 100
       S_t <- pmax(pmin(S_t, 0.999), 0.001)
 
-      # Log-logistic linearization: log(1/S(t) - 1) = p * log(lambda) + p * log(t)
       y <- log(1/S_t - 1)
       x <- log(t_points)
-
-      # Fit linear model to find parameters
       fit <- lm(y ~ x)
       p <- coef(fit)[2]
-      p_log_lambda <- coef(fit)[1]
-      lambda <- exp(p_log_lambda / p)
+      lambda <- exp(coef(fit)[1] / p)
 
-      # Define smooth Log-logistic survival function
-      S_fit <- function(t_y) {
-        1 / (1 + (lambda * t_y)^p)
-      }
+      S_fit <- function(t_y) { 1 / (1 + (lambda * t_y)^p) }
 
-      # Calculate Expected PT for each 6-month window using trapezoidal rule
       pt_bins <- numeric(n_bins)
       for(i in 1:n_bins) {
         t_start <- breaks[i]
@@ -1928,10 +1914,8 @@ calculate_iptw_age <- function(data, ref_surv_list, time_var = "time_pre", age_v
     }
   }
 
-  # Count actual N in CGP data per age class and 6-month bin
   bin_counts <- data %>% dplyr::count(age_class, time_bin, name = "N_cgp")
 
-  # Calculate IPTW (Weight = PT / N_cgp)
   data <- data %>%
     dplyr::left_join(pt_table, by = c("age_class", "time_bin")) %>%
     dplyr::left_join(bin_counts, by = c("age_class", "time_bin")) %>%
@@ -1939,9 +1923,7 @@ calculate_iptw_age <- function(data, ref_surv_list, time_var = "time_pre", age_v
       raw_weight = ifelse(!is.na(N_cgp) & N_cgp > 0 & !is.na(pt_ref), pt_ref / N_cgp, 0)
     )
 
-  # =========================================================================
-  # 極端な重み（外れ値）による分散の爆発を防ぐための2.5%〜97.5%トリミング
-  # =========================================================================
+  # トリミング（外れ値の暴走を完全に防ぐ）
   if (any(data$raw_weight > 0, na.rm = TRUE)) {
     lower_bound <- quantile(data$raw_weight[data$raw_weight > 0], 0.025, na.rm = TRUE)
     upper_bound <- quantile(data$raw_weight[data$raw_weight > 0], 0.975, na.rm = TRUE)
@@ -1952,7 +1934,6 @@ calculate_iptw_age <- function(data, ref_surv_list, time_var = "time_pre", age_v
         raw_weight = ifelse(raw_weight > upper_bound, upper_bound, raw_weight)
       )
   }
-  # Stabilize weights (mean = 1)
   mean_w <- mean(data$raw_weight[data$raw_weight > 0], na.rm = TRUE)
   data$iptw <- ifelse(data$raw_weight > 0, data$raw_weight / mean_w, 1.0)
 
