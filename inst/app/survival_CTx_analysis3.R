@@ -678,50 +678,46 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     weights_var = NULL
   )
 })
+# =========================================================================
+# Server Logic for Copula Model (Fixed Reactive Structure & Tie Handling)
+# =========================================================================
 
-observeEvent(input$run_copula, {
-  # 1. パッケージの確認
+# 1. 計算部分を eventReactive に分離し、ボタンが押された時だけ安全に実行する
+copula_results <- eventReactive(input$run_copula, {
+
+  # パッケージチェック
   shiny::validate(shiny::need(requireNamespace("depend.truncation", quietly = TRUE),
-                              "Please install 'depend.truncation' package: install.packages('depend.truncation')"))
+                              "Please install 'depend.truncation' package."))
   shiny::validate(shiny::need(requireNamespace("copula", quietly = TRUE),
-                              "Please install 'copula' package: install.packages('copula')"))
+                              "Please install 'copula' package."))
 
-  showNotification("Fitting Frank Copula model... This may take up to 10-20 seconds.", type = "message", duration = 5)
+  showNotification("Fitting Frank Copula model... This may take a few seconds.", type = "message", duration = 5)
 
   library(copula)
   library(depend.truncation)
   library(survival)
-  library(ggplot2)
 
   N_macro <- input$cop_n
   tau_target <- input$cop_tau
   cens_rate <- input$cop_cens / 100
 
   # =========================================================================
-  # 2. データ生成（依存性切断）
+  # データの生成
   # =========================================================================
-  # 相関パラメータの計算
   theta_frank <- tryCatch({ iTau(frankCopula(), tau_target) }, error = function(e) { 5.0 })
   cop <- frankCopula(param = theta_frank, dim = 2)
 
   uv <- rCopula(N_macro, cop)
-  u <- uv[, 1]
-  v <- uv[, 2]
+  u <- pmax(pmin(uv[, 1], 0.999), 0.001)
+  v <- pmax(pmin(uv[, 2], 0.999), 0.001)
 
-  # 安全のため確率を 0.001 ~ 0.999 にバウンド
-  u <- pmax(pmin(u, 0.999), 0.001)
-  v <- pmax(pmin(v, 0.999), 0.001)
-
-  # 周辺分布の逆関数（中央値約3年のワイブル分布）
   T_true <- qweibull(u, shape = 1.5, scale = 3 * 365.25)
   T1_latent <- qweibull(v, shape = 1.5, scale = 1.5 * 365.25)
 
-  # 左側切断（生存期間が到達期間より長い患者のみCGPにエントリー）
   idx_cgp <- which(T_true > T1_latent)
   T_true_obs <- T_true[idx_cgp]
   T1_obs <- T1_latent[idx_cgp]
 
-  # 打ち切りの安全な生成
   T2_true <- T_true_obs - T1_obs
   if (cens_rate > 0) {
     rate_c <- cens_rate / mean(T2_true, na.rm = TRUE)
@@ -733,116 +729,114 @@ observeEvent(input$run_copula, {
   T_obs <- T1_obs + pmin(T2_true, C2_obs)
   Event <- ifelse(T2_true <= C2_obs, 1, 0)
 
+  # 同値（Ties）によるパッケージのクラッシュを防ぐための微小な乱数（Jitter）を追加
+  T1_obs <- T1_obs + runif(length(T1_obs), 0, 0.01)
+  T_obs <- T_obs + runif(length(T_obs), 0, 0.01)
+
   Data_cgp <- data.frame(T1 = T1_obs, T_obs = T_obs, Event = Event)
 
-  shiny::validate(shiny::need(sum(Data_cgp$Event) > 30, "Not enough events generated. Please increase initial cohort size or reduce censoring rate."))
+  shiny::validate(shiny::need(sum(Data_cgp$Event) > 30, "Not enough events generated. Increase N or reduce censoring."))
 
-  # =========================================================================
-  # 3. コピュラ関数の計算量爆発を防ぐサンプリング処理
-  # =========================================================================
-  # depend.truncation のアルゴリズムはNが大きいとフリーズするため、最大300例に制限
+  # 計算量爆発を防ぐため最大300例にサンプリング
   if (nrow(Data_cgp) > 300) {
-    set.seed(123) # 再現性のため
+    set.seed(123)
     Data_cgp <- Data_cgp[sample(1:nrow(Data_cgp), 300), ]
   }
 
   # =========================================================================
-  # 4. 4つの手法による解析
+  # 4つの手法による解析
   # =========================================================================
-  # ① True Survival (マクロデータ全体からKM)
   fit_true <- survfit(Surv(T_true, rep(1, N_macro)) ~ 1)
-
-  # ② Naive KM (左側切断を無視)
   fit_naive <- survfit(Surv(T_obs, Event) ~ 1, data = Data_cgp)
-
-  # ③ Lynden-Bell estimator (標準の左側切断KM、依存性を無視)
   fit_lb <- survfit(Surv(T1, T_obs, Event) ~ 1, data = Data_cgp)
 
-  # ④ Frank Copula Model
+  # Copula Model: PMLE.Frank
   fit_copula <- tryCatch({
     depend.truncation::PMLE.Frank(Data_cgp$T1, Data_cgp$T_obs, Data_cgp$Event)
   }, error = function(e) { e$message })
 
-  # エラーが発生した場合は、画面にエラー理由を明示して止める
-  shiny::validate(shiny::need(is.list(fit_copula), paste("Copula model failed to fit. Package Error:", fit_copula)))
+  shiny::validate(shiny::need(is.list(fit_copula), paste("Copula model failed. Package Error:", fit_copula)))
 
-  # 出力オブジェクトのキー名（名前）の揺れに動的に対応してデータを抽出
   copula_time <- if (!is.null(fit_copula$time)) fit_copula$time else if (!is.null(fit_copula$Y)) fit_copula$Y else fit_copula$t
   copula_surv <- if (!is.null(fit_copula$surv)) fit_copula$surv else if (!is.null(fit_copula$S.Y)) fit_copula$S.Y else fit_copula$S_Y
 
-  shiny::validate(shiny::need(!is.null(copula_time) && !is.null(copula_surv),
-                              paste("Failed to extract data from copula model. Available variables:", paste(names(fit_copula), collapse=", "))))
+  shiny::validate(shiny::need(!is.null(copula_time) && !is.null(copula_surv), "Failed to extract survival data from depend.truncation output."))
 
-  # =========================================================================
-  # 5. 中央値の抽出とテーブル化
-  # =========================================================================
+  # 結果をリストとして返す
+  list(
+    fit_true = fit_true, fit_naive = fit_naive, fit_lb = fit_lb,
+    copula_time = copula_time, copula_surv = copula_surv
+  )
+})
+
+# 2. 結果を描画する（eventReactiveの戻り値を受け取る）
+output$copula_result_table <- renderTable({
+  res <- copula_results() # 計算結果を取得
+
   get_median <- function(time_vec, surv_vec) {
     idx <- which(surv_vec <= 0.5)
     if (length(idx) == 0) return(NA)
     return(time_vec[min(idx)])
   }
 
-  med_true <- summary(fit_true)$table["median"] / 365.25
-  med_naive <- summary(fit_naive)$table["median"] / 365.25
-  med_lb <- summary(fit_lb)$table["median"] / 365.25
-  med_copula <- get_median(copula_time, copula_surv) / 365.25
+  med_true <- summary(res$fit_true)$table["median"] / 365.25
+  med_naive <- summary(res$fit_naive)$table["median"] / 365.25
+  med_lb <- summary(res$fit_lb)$table["median"] / 365.25
+  med_copula <- get_median(res$copula_time, res$copula_surv) / 365.25
 
-  output$copula_result_table <- renderTable({
-    data.frame(
-      Model = c("1. True Marginal Survival",
-                "2. Naive KM (Ignores Truncation)",
-                "3. Standard LT-KM (Lynden-Bell)",
-                "4. Copula Model (depend.truncation)"),
-      `Median Survival (Years)` = c(sprintf("%.2f", med_true),
-                                    sprintf("%.2f", med_naive),
-                                    sprintf("%.2f", med_lb),
-                                    ifelse(is.na(med_copula), "Not Reached", sprintf("%.2f", med_copula))),
-      `Bias (Years)` = c("-",
-                         sprintf("%+.2f", med_naive - med_true),
-                         sprintf("%+.2f", med_lb - med_true),
-                         ifelse(is.na(med_copula), "-", sprintf("%+.2f", med_copula - med_true)))
+  data.frame(
+    Model = c("1. True Marginal Survival",
+              "2. Naive KM (Ignores Truncation)",
+              "3. Standard LT-KM (Lynden-Bell)",
+              "4. Copula Model (Frank)"),
+    `Median Survival (Years)` = c(sprintf("%.2f", med_true),
+                                  sprintf("%.2f", med_naive),
+                                  sprintf("%.2f", med_lb),
+                                  ifelse(is.na(med_copula), "Not Reached", sprintf("%.2f", med_copula))),
+    `Bias (Years)` = c("-",
+                       sprintf("%+.2f", med_naive - med_true),
+                       sprintf("%+.2f", med_lb - med_true),
+                       ifelse(is.na(med_copula), "-", sprintf("%+.2f", med_copula - med_true)))
+  )
+}, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c")
+
+output$copula_survival_plot <- renderPlot({
+  res <- copula_results() # 計算結果を取得
+  library(ggplot2)
+
+  df_true <- data.frame(Time = res$fit_true$time / 365.25, Surv = res$fit_true$surv, Method = "1. True Survival")
+  df_naive <- data.frame(Time = res$fit_naive$time / 365.25, Surv = res$fit_naive$surv, Method = "2. Naive KM")
+  df_lb <- data.frame(Time = res$fit_lb$time / 365.25, Surv = res$fit_lb$surv, Method = "3. Standard LT-KM (Lynden-Bell)")
+  df_copula <- data.frame(Time = res$copula_time / 365.25, Surv = res$copula_surv, Method = "4. Copula Model (Frank)")
+
+  plot_df <- rbind(df_true, df_naive, df_lb, df_copula)
+
+  ggplot(plot_df, aes(x = Time, y = Surv, color = Method, linetype = Method)) +
+    geom_step(size = 1.2) +
+    scale_color_manual(values = c("1. True Survival" = "black",
+                                  "2. Naive KM" = "#e74c3c",
+                                  "3. Standard LT-KM (Lynden-Bell)" = "#f39c12",
+                                  "4. Copula Model (Frank)" = "#27ae60")) +
+    scale_linetype_manual(values = c("1. True Survival" = "solid",
+                                     "2. Naive KM" = "dotted",
+                                     "3. Standard LT-KM (Lynden-Bell)" = "dashed",
+                                     "4. Copula Model (Frank)" = "solid")) +
+    scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
+    scale_x_continuous(limits = c(0, 8)) +
+    theme_minimal(base_size = 15) +
+    labs(
+      title = "Marginal Survival Recovery under Dependent Truncation",
+      subtitle = "Copula successfully corrects the bias from Lynden-Bell estimator.",
+      x = "Time from Diagnosis (Years)",
+      y = "Overall Survival Probability"
+    ) +
+    theme(
+      plot.title = element_text(face = "bold"),
+      legend.position = "bottom",
+      legend.title = element_blank(),
+      legend.direction = "vertical"
     )
-  }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c")
-
-  # =========================================================================
-  # 6. 生存曲線のプロット
-  # =========================================================================
-  output$copula_survival_plot <- renderPlot({
-    df_true <- data.frame(Time = fit_true$time / 365.25, Surv = fit_true$surv, Method = "1. True Survival")
-    df_naive <- data.frame(Time = fit_naive$time / 365.25, Surv = fit_naive$surv, Method = "2. Naive KM")
-    df_lb <- data.frame(Time = fit_lb$time / 365.25, Surv = fit_lb$surv, Method = "3. Standard LT-KM (Lynden-Bell)")
-    df_copula <- data.frame(Time = copula_time / 365.25, Surv = copula_surv, Method = "4. Copula Model (Frank)")
-
-    plot_df <- rbind(df_true, df_naive, df_lb, df_copula)
-
-    ggplot(plot_df, aes(x = Time, y = Surv, color = Method, linetype = Method)) +
-      geom_step(size = 1.2) +
-      scale_color_manual(values = c("1. True Survival" = "black",
-                                    "2. Naive KM" = "#e74c3c",
-                                    "3. Standard LT-KM (Lynden-Bell)" = "#f39c12",
-                                    "4. Copula Model (Frank)" = "#27ae60")) +
-      scale_linetype_manual(values = c("1. True Survival" = "solid",
-                                       "2. Naive KM" = "dotted",
-                                       "3. Standard LT-KM (Lynden-Bell)" = "dashed",
-                                       "4. Copula Model (Frank)" = "solid")) +
-      scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
-      scale_x_continuous(limits = c(0, 8)) +
-      theme_minimal(base_size = 15) +
-      labs(
-        title = "Marginal Survival Recovery under Dependent Truncation",
-        subtitle = paste0("Simulated positive dependence (Tau = ", tau_target, "). Copula N max 300 to prevent hangup."),
-        x = "Time from Diagnosis (Years)",
-        y = "Overall Survival Probability"
-      ) +
-      theme(
-        plot.title = element_text(face = "bold"),
-        legend.position = "bottom",
-        legend.title = element_blank(),
-        legend.direction = "vertical"
-      )
-  })
 })
-
 
 output$forest_plot_whole_cohort <- renderPlot({
   # 必要なデータと入力変数が揃っているか確認
