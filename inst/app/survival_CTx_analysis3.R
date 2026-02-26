@@ -557,18 +557,31 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   # =====================================================================
   simulated_data <- list()
 
-  # Extract empirical data from EP0 (Using absolute OS matching for left-truncation)
+  # [修正箇所] 先生のご指摘通り、不完全な比率の適用を防ぐため、
+  # 比率抽出のドナープールは「死亡確認例（censor == 1）」のみに限定します。
   emp_ep0 <- Data_EP0 %>%
-    dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre) %>%
+    dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre, censor == 1) %>% # censor == 1 を追加
     dplyr::mutate(
       actual_t2 = time_all - time_pre,
       t2_ratio = actual_t2 / time_all
     ) %>%
     dplyr::arrange(time_all)
 
+  # EP0群の死亡例が極端に少ない場合のフォールバック（全体から死亡例を探す）
   if(nrow(emp_ep0) < 5) {
     emp_ep0 <- Data_model %>%
-      dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre) %>%
+      dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre, censor == 1) %>% # censor == 1 を追加
+      dplyr::mutate(
+        actual_t2 = time_all - time_pre,
+        t2_ratio = actual_t2 / time_all
+      ) %>%
+      dplyr::arrange(time_all)
+  }
+
+  # 万が一、データ全体でも死亡例が5例未満という異常事態のための最終安全装置
+  if(nrow(emp_ep0) < 5) {
+    emp_ep0 <- Data_model %>%
+      dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre) %>% # ここだけは打ち切りも含める
       dplyr::mutate(
         actual_t2 = time_all - time_pre,
         t2_ratio = actual_t2 / time_all
