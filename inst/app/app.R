@@ -169,8 +169,9 @@ server <- function(input, output, session) {
       withProgress(message = "Data processing...", {
         survival_CTx_analysis2_logic()
       })
-    } else if (input$tabs %in% c("ControlCustom",
-                                 "Simulation_Study") &&
+    } else if (input$tabs %in% c("ControlCustom"#,
+                                 #"Simulation_Study"
+                                 ) &&
                is.null(OUTPUT_DATA$figure_surv_CTx_Data_survival_cancer_control)) {
       withProgress(message = "Data processing...", {
         survival_CTx_analysis2_logic_control()

@@ -1060,10 +1060,10 @@ output$forest_plot_multivariate = renderPlot({
 })
 
 # =========================================================================
-# Server Logic for Simulation Study
+# Server Logic for Simulation Study (Fixed Version)
 # =========================================================================
 
-# Helper function for censoring
+# Helper function for censoring scale estimation (Fixed interval for 'Days' scale)
 find_censoring_scale <- function(T2, target_rate, pattern) {
   obj_func <- function(scale_param) {
     if (pattern == "indep") {
@@ -1082,7 +1082,11 @@ find_censoring_scale <- function(T2, target_rate, pattern) {
     return(censored - target_rate)
   }
 
-  optimal <- tryCatch({ uniroot(obj_func, interval = c(0.01, 100))$root }, error = function(e) { 10 })
+  # [FIX] Expanded the interval to accommodate 'Days' (e.g., up to 1,000,000 days)
+  optimal <- tryCatch({
+    uniroot(obj_func, interval = c(1, 1000000))$root
+  }, error = function(e) { 365.25 * 5 }) # Fallback to 5 years
+
   return(optimal)
 }
 
@@ -1105,28 +1109,25 @@ observeEvent(input$run_sim, {
   Age <- round(runif(N_macro, 40, 80))
   Sex <- sample(c("Male", "Female"), N_macro, replace = TRUE, prob = c(0.55, 0.45))
   Histology <- sample(c("COAD", "READ", "COADREAD"), N_macro, replace = TRUE, prob = c(0.60, 0.30, 0.10))
-  X <- rbinom(N_macro, 1, Mut_Freq) # Target Gene
+  X <- rbinom(N_macro, 1, Mut_Freq)
 
-  # Set True AFs based on Registry insights
   True_AF_Age_10yr <- 0.85
   True_AF_Sex_Female <- 1.10
   True_AF_Hist_READ <- 0.90
   True_AF_Hist_COADREAD <- 0.95
 
-  # Calculate cumulative background AF for each patient
-  AF_bg <- 1.0 * (True_AF_Age_10yr ^ ((Age - 60) / 10)) * # Centered at 60 years
-    ifelse(Sex == "Female", True_AF_Sex_Female, 1.0) *
+  AF_bg <- 1.0 * (True_AF_Age_10yr ^ ((Age - 60) / 10)) * ifelse(Sex == "Female", True_AF_Sex_Female, 1.0) *
     ifelse(Histology == "READ", True_AF_Hist_READ,
            ifelse(Histology == "COADREAD", True_AF_Hist_COADREAD, 1.0))
 
-  # Baseline OS generated from Log-logistic (Base: 60yo Male COAD)
   shape_base <- 1.5
-  scale_base <- 3.0 * 365.25 # 3 years median for base profile
+  scale_base <- 3.0 * 365.25
 
   u <- runif(N_macro)
-  T_base <- scale_base * ((1 - u) / u)^(1 / shape_base)
+  # [FIX] Bound 'u' to prevent infinite survival times
+  u <- pmax(pmin(u, 0.999), 0.001)
 
-  # Final True OS combining background AF and Target Gene AF
+  T_base <- scale_base * ((1 - u) / u)^(1 / shape_base)
   T_true <- T_base * AF_bg * ifelse(X == 1, True_AF_X, 1.0)
 
   # =========================================================================
@@ -1143,7 +1144,6 @@ observeEvent(input$run_sim, {
 
   cgp_indices <- which(T_true > T1)
 
-  # Selection bias (Younger patients are slightly more likely to enter CGP)
   prob_select <- ifelse(Age[cgp_indices] < 60, 0.8, 0.4)
   selected_indices <- sample(cgp_indices, size = min(N_target, length(cgp_indices)), prob = prob_select, replace = FALSE)
 
@@ -1172,8 +1172,13 @@ observeEvent(input$run_sim, {
   }
 
   Data_cgp$T2_obs <- pmin(Data_cgp$T2_true, C2)
-  Data_cgp$Censor <- ifelse(Data_cgp$T2_true <= C2, 1, 0)
+
+  # [FIX] Renamed to 'Event' to clarify 1 = Death, 0 = Censored
+  Data_cgp$Event <- ifelse(Data_cgp$T2_true <= C2, 1, 0)
   Data_cgp$T_obs <- Data_cgp$T1 + Data_cgp$T2_obs
+
+  # Check if events exist to prevent model explosion
+  shiny::validate(shiny::need(sum(Data_cgp$Event) > 20, "Simulation generated too few events (deaths). The model cannot be fitted."))
 
   # =========================================================================
   # 4. Simplified IPTW based on Age
@@ -1193,10 +1198,12 @@ observeEvent(input$run_sim, {
   # 5. Fit Proposed Multivariate Left-Truncated AFT Model
   # =========================================================================
   library(flexsurv)
-  # Model: T ~ Target Gene + Age + Sex + Histology
+  # [FIX] using 'Event' instead of 'Censor'
   fit_prop <- tryCatch({
-    flexsurvreg(Surv(T1, T_obs, Censor) ~ X + Age + Sex + Histology, data = Data_cgp, weights = iptw, dist = "llogis")
+    flexsurvreg(Surv(T1, T_obs, Event) ~ X + Age + Sex + Histology, data = Data_cgp, weights = iptw, dist = "llogis")
   }, error = function(e) { NULL })
+
+  shiny::validate(shiny::need(!is.null(fit_prop), "The survival model failed to converge. Please try running the simulation again."))
 
   # =========================================================================
   # 6. Render Multivariate Results Table
@@ -1205,8 +1212,6 @@ observeEvent(input$run_sim, {
     req(fit_prop)
     res <- fit_prop$res
 
-    # Extract Estimated AFs (exponentiate coefficients)
-    # Note: For Age, we multiply the log-coef by 10 before exp() to get "per 10 years"
     est_X <- exp(res["XMutated", "est"])
     est_Age <- exp(res["Age", "est"] * 10)
     est_Sex <- exp(res["SexFemale", "est"])
@@ -1252,16 +1257,10 @@ observeEvent(input$run_sim, {
     req(fit_prop)
     library(ggplot2)
 
-    # We plot the marginal effect of the Target Gene at baseline covariates
-    # (Age=60, Sex=Male, Histology=COAD)
     shape_val <- fit_prop$res["shape", "est"]
-
-    # The 'scale' parameter in the model corresponds to Baseline (WT, Age=0, Male, COAD).
-    # We must adjust it to Age=60.
     log_scale_base <- fit_prop$res["scale", "est"] + (fit_prop$res["Age", "est"] * 60)
     scale_wt <- exp(log_scale_base)
 
-    # Apply Target Gene effect
     af_X <- exp(fit_prop$res["XMutated", "est"])
     scale_mut <- scale_wt * af_X
 
