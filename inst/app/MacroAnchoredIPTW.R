@@ -1,5 +1,5 @@
 # =========================================================================
-# Server Logic for Simulation Study (Tamura & Ikegami Model Ver 2.0)
+# Server Logic for Simulation Study (Tamura & Ikegami Model Ver 2.0 - Bug Fix)
 # =========================================================================
 library(dplyr)
 library(flexsurv)
@@ -33,16 +33,13 @@ find_censoring_param <- function(T2, target_rate, pattern) {
   }
 }
 
-# =========================================================================
-# ★ 先生の理論(1) & (2): Two-step IPTW (Dead-OS matching to T1 Hazard)
-# =========================================================================
+# 先生ご提案の「死亡例OSマッチング IPTW」
 calculate_iptw_v2 <- function(data, ref_surv_list) {
   data$iptw <- 1.0
   t_points <- 1:5
 
   for(ag in unique(data$Age_class)) {
     if(ag %in% names(ref_surv_list)) {
-      # 1. マクロOSのパラメトリックモデル(llogis)を構築
       S_t <- pmax(pmin(ref_surv_list[[ag]][1:5] / 100, 0.999), 0.001)
       y <- log(1/S_t - 1)
       x <- log(t_points)
@@ -50,7 +47,6 @@ calculate_iptw_v2 <- function(data, ref_surv_list) {
       p <- coef(fit)[2]
       lambda <- exp(coef(fit)[1] / p)
 
-      # 2. 死亡例のOS分布とマクロOSを比較し、W_OS(ハザード比)を算出
       ag_data <- data[data$Age_class == ag, ]
       dead_data <- ag_data[ag_data$Event == 1, ]
       if(nrow(dead_data) < 5) next
@@ -62,13 +58,12 @@ calculate_iptw_v2 <- function(data, ref_surv_list) {
       f_dead_os <- approxfun(dens_dead_os$x, dens_dead_os$y, rule = 2)
 
       w_os <- p_macro_val / pmax(f_dead_os(dead_data$T_obs / 365.25), 1e-4)
-      w_os <- w_os / sum(w_os) # 正規化
+      w_os <- w_os / sum(w_os)
 
-      # 3. 死亡例のT1にW_OSを掛けて「真のCGP到達ハザード(T1密度)」を推定
-      dens_t1_target <- density(dead_data$T1 / 365.25, weights = w_os, n = 512, from = 0)
+      # suppressWarningsでdensityの帯域幅計算警告を消去
+      dens_t1_target <- suppressWarnings(density(dead_data$T1 / 365.25, weights = w_os, n = 512, from = 0))
       f_t1_target <- approxfun(dens_t1_target$x, dens_t1_target$y, rule = 2)
 
-      # 4. 全例(打ち切り含む)のT1密度を計算し、IPTWを割り当て
       dens_t1_all <- density(ag_data$T1 / 365.25, n = 512, from = 0)
       f_t1_all <- approxfun(dens_t1_all$x, dens_t1_all$y, rule = 2)
 
@@ -77,7 +72,6 @@ calculate_iptw_v2 <- function(data, ref_surv_list) {
     }
   }
 
-  # トリミング（外れ値防止）
   lower_bound <- quantile(data$iptw, 0.05, na.rm = TRUE)
   upper_bound <- quantile(data$iptw, 0.95, na.rm = TRUE)
   data$iptw <- pmax(lower_bound, pmin(data$iptw, upper_bound))
@@ -86,12 +80,8 @@ calculate_iptw_v2 <- function(data, ref_surv_list) {
   return(data)
 }
 
-# =========================================================================
-# Core Simulation Engine
-# =========================================================================
 run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, cens_rate, return_data = FALSE) {
 
-  # データ生成 (依存性切断環境)
   N_macro <- 100000
   Age <- round(runif(N_macro, 40, 80))
   Sex <- sample(c("Male", "Female"), N_macro, replace = TRUE, prob = c(0.55, 0.45))
@@ -117,8 +107,10 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
 
   Data_cgp <- data.frame(
     ID = 1:N_target, Age = Age[selected_indices], Age_class = ifelse(Age[selected_indices] < 60, "Young", "Old"),
-    Sex = factor(Sex[selected_indices]), Histology = factor(Histology[selected_indices]),
-    X = factor(ifelse(X[selected_indices] == 1, "Mutated", "WT")), T_true = T_true[selected_indices], T1 = T1[selected_indices]
+    Sex = factor(Sex[selected_indices], levels = c("Male", "Female")),
+    Histology = factor(Histology[selected_indices], levels = c("COAD", "READ", "COADREAD")),
+    X = factor(ifelse(X[selected_indices] == 1, "Mutated", "WT"), levels = c("WT", "Mutated")),
+    T_true = T_true[selected_indices], T1 = T1[selected_indices]
   )
   Data_cgp$T2_true <- Data_cgp$T_true - Data_cgp$T1
 
@@ -135,7 +127,6 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
   Data_cgp$T_obs <- Data_cgp$T1 + Data_cgp$T2_obs
   if(sum(Data_cgp$Event) < 20) return(NULL)
 
-  # IPTW V2 適用
   ref_surv_list <- list()
   for (ag in c("Young", "Old")) {
     ref_surv_list[[ag]] <- sapply(1:5, function(y) mean(T_true[ifelse(Age < 60, "Young", "Old") == ag] > y * 365.25) * 100)
@@ -147,26 +138,20 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
   if (length(unique(Data_cgp$Histology)) > 1) valid_covs <- c(valid_covs, "Histology")
   form_t2 <- as.formula(paste("Surv(T2_obs, Event) ~", paste(valid_covs, collapse=" + ")))
 
-  # =========================================================================
-  # ★ 先生の理論(3): T1層別化による T2 AFTモデル (G-computation)
-  # =========================================================================
   med_t1 <- median(Data_cgp$T1)
   data_short <- subset(Data_cgp, T1 <= med_t1)
   data_long <- subset(Data_cgp, T1 > med_t1)
 
   fit_naive <- tryCatch({ flexsurvreg(update(Surv(T_obs, Event) ~ ., as.formula(paste("~", paste(valid_covs, collapse=" + ")))), data = Data_cgp, dist = "llogis") }, error = function(e) NULL)
 
-  # 提案手法 (T1 Stratified T2 Models)
   fit_t2_short <- tryCatch({ flexsurvreg(form_t2, data = data_short, weights = iptw, dist = "llogis") }, error = function(e) NULL)
   fit_t2_long <- tryCatch({ flexsurvreg(form_t2, data = data_long, weights = iptw, dist = "llogis") }, error = function(e) NULL)
 
-  # AFの抽出と平均化（層サイズで加重平均）
   extract_af <- function(rname) {
     af_s <- if(!is.null(fit_t2_short) && rname %in% rownames(fit_t2_short$res)) fit_t2_short$res[rname, "est"] else NA
     af_l <- if(!is.null(fit_t2_long) && rname %in% rownames(fit_t2_long$res)) fit_t2_long$res[rname, "est"] else NA
 
-    if(!is.na(af_s) && !is.na(af_l)) {
-      return(exp((af_s * nrow(data_short) + af_l * nrow(data_long)) / nrow(Data_cgp)))
+    if(!is.na(af_s) && !is.na(af_l)) { return(exp((af_s * nrow(data_short) + af_l * nrow(data_long)) / nrow(Data_cgp)))
     } else if (!is.na(af_s)) { return(exp(af_s))
     } else if (!is.na(af_l)) { return(exp(af_l))
     } else { return(NA) }
@@ -210,25 +195,20 @@ observeEvent(input$run_sim, {
   output$sim_survival_plot <- renderPlot({
     t_seq <- seq(0, 365.25 * 5, length.out = 100)
 
-    # 1. True Curve
     km_true <- survfit(Surv(res$T_true_macro, rep(1, length(res$T_true_macro))) ~ 1)
     surv_true <- approx(km_true$time, km_true$surv, xout = t_seq, method = "constant", f = 0, rule = 2)$y
 
-    # 2. Naive Curve
     surv_naive <- rep(NA, length(t_seq))
     if(!is.null(res$Naive)) {
       summ_n <- summary(res$Naive, newdata = res$Data_cgp[sample(1:nrow(res$Data_cgp), min(300, nrow(res$Data_cgp))), ], t = t_seq, tidy = TRUE)
       surv_naive <- aggregate(est ~ time, data = summ_n, FUN = mean)$est
     }
 
-    # 3. Proposed Method (G-computation)
-    # IPTWを使って仮想コホートをリサンプリング（バイアス浄化）
     idx_pseudo <- sample(1:nrow(res$Data_cgp), size = 3000, replace = TRUE, prob = res$Data_cgp$iptw)
     pseudo_cgp <- res$Data_cgp[idx_pseudo, ]
 
     gen_t2 <- function(fit, newdata) {
       if(is.null(fit)) return(rep(NA, nrow(newdata)))
-      mm <- model.matrix(fit$dfns$formula, data = newdata)
       res_m <- fit$res
       base_scale <- res_m["scale", "est"]; shape <- res_m["shape", "est"]
 
@@ -236,6 +216,8 @@ observeEvent(input$run_sim, {
       if("XMutated" %in% rownames(res_m)) af_vec <- af_vec * exp(res_m["XMutated", "est"] * (newdata$X == "Mutated"))
       if("Age" %in% rownames(res_m)) af_vec <- af_vec * exp(res_m["Age", "est"] * newdata$Age)
       if("SexFemale" %in% rownames(res_m)) af_vec <- af_vec * exp(res_m["SexFemale", "est"] * (newdata$Sex == "Female"))
+      if("HistologyREAD" %in% rownames(res_m)) af_vec <- af_vec * exp(res_m["HistologyREAD", "est"] * (newdata$Histology == "READ"))
+      if("HistologyCOADREAD" %in% rownames(res_m)) af_vec <- af_vec * exp(res_m["HistologyCOADREAD", "est"] * (newdata$Histology == "COADREAD"))
 
       return(flexsurv::rllogis(nrow(newdata), shape = shape, scale = base_scale * af_vec))
     }
@@ -263,4 +245,38 @@ observeEvent(input$run_sim, {
            x = "Time from Diagnosis (Years)", y = "Overall Survival Probability") +
       theme(plot.title = element_text(face = "bold"), legend.position = "bottom", legend.direction = "vertical", legend.title = element_blank())
   })
+})
+
+observeEvent(input$run_sim_multi, {
+  req(input$sim_n, input$sim_true_af, input$sim_cens_rate, input$sim_mut_freq)
+  n_sims <- 400; results <- list()
+  withProgress(message = 'Running 400 Simulations...', value = 0, {
+    for (i in 1:n_sims) {
+      res <- run_sim_iteration(input$sim_n, input$sim_true_af, input$sim_mut_freq / 100, input$sim_t1_pattern, input$sim_cens_pattern, input$sim_cens_rate / 100)
+      if (!is.null(res)) results[[length(results) + 1]] <- res
+      incProgress(1/n_sims, detail = paste("Iteration", i, "of", n_sims))
+    }
+  })
+  shiny::validate(shiny::need(length(results) > 0, "All simulations failed."))
+
+  True_AF <- input$sim_true_af
+  calc_stats <- function(metric_name, true_val) {
+    vals <- sapply(results, function(x) x[[metric_name]])
+    vals <- vals[!is.na(vals)]
+    if(length(vals) == 0) return("N/A")
+    mean_val <- mean(vals)
+    mse_val <- mean((vals - true_val)^2)
+    return(sprintf("%.2f (MSE: %.3f)", mean_val, mse_val))
+  }
+
+  output$sim_multi_result_table <- renderTable({
+    data.frame(
+      Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF"),
+      `True Value` = c(safe_fmt(True_AF), "0.85", "1.10", "0.90", "0.95"),
+      `Proposed Method` = c(
+        paste0("<b>", calc_stats("AF_X", True_AF), "</b>"), paste0("<b>", calc_stats("AF_Age", 0.85), "</b>"),
+        paste0("<b>", calc_stats("AF_Sex", 1.10), "</b>"), paste0("<b>", calc_stats("AF_READ", 0.90), "</b>"), paste0("<b>", calc_stats("AF_COADREAD", 0.95), "</b>")
+      )
+    )
+  }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c", sanitize.text.function = function(x) x)
 })
