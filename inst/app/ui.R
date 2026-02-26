@@ -1472,14 +1472,14 @@ ui <- dashboardPage(
                   sidebarPanel(
                     h4("Population & Target Gene Settings"),
                     numericInput("sim_n", "CGP Sample Size (N):", 1000, min = 500, max = 5000),
-                    numericInput("sim_mut_freq", "Target Gene (e.g., KRAS) Mutation Frequency (%):", 20, min = 1, max = 100, step = 1),
+                    numericInput("sim_mut_freq", "Target Gene Mutation Frequency (%):", 20, min = 1, max = 100, step = 1),
                     numericInput("sim_true_af", "True Target Gene AF (Time Ratio):", 1.5, min = 0.1, max = 5.0, step = 0.1),
 
                     h4("Left-Truncation (T1) Pattern"),
                     radioButtons("sim_t1_pattern", "Timing of CGP test (T1):",
                                  choices = c("Quasi-independent (Random timing)" = "indep",
-                                             "Realistic dependent (Slower progression -> Later CGP)" = "real",
-                                             "Reverse dependent (Faster progression -> Earlier CGP)" = "rev")),
+                                             "Realistic dependent (CGP ~1 year before death)" = "real",
+                                             "Early CGP (CGP ~2 years before death)" = "rev")),
 
                     h4("Censoring Pattern (after CGP)"),
                     radioButtons("sim_cens_pattern", "Timing of Censoring (C2):",
@@ -1492,22 +1492,22 @@ ui <- dashboardPage(
                     hr(),
                     actionButton("run_sim", "Run Single Simulation", class = "btn-primary", width = "100%"),
                     br(), br(),
-                    actionButton("run_sim_multi", "Run 400 Simulations (Takes 1-2 mins)", class = "btn-warning", width = "100%")
+                    actionButton("run_sim_multi", "Run 400 Simulations (Takes ~2 mins)", class = "btn-warning", width = "100%")
                   ),
 
                   mainPanel(
                     h4("Simulation Results"),
-                    p("Comparison of the True values versus the Estimated values. Baseline Profile is set to a 60-year-old Male patient with COAD (Stage 4 median OS ~ 2 years)."),
 
-                    # Single run results
                     conditionalPanel(
                       condition = "input.run_sim > 0 && input.run_sim_multi == 0 || input.run_sim > input.run_sim_multi",
                       h5(tags$b("Single Run Estimates")),
                       tableOutput("sim_result_table"),
-                      plotOutput("sim_survival_plot", height = "400px")
+                      fluidRow(
+                        column(7, plotOutput("sim_survival_plot", height = "350px")),
+                        column(5, plotOutput("sim_censor_plot", height = "350px"))
+                      )
                     ),
 
-                    # Multi run results
                     conditionalPanel(
                       condition = "input.run_sim_multi > 0 && input.run_sim_multi >= input.run_sim",
                       h5(tags$b("400 Iterations Summary (Mean, MSE, and CP)")),
@@ -1516,10 +1516,10 @@ ui <- dashboardPage(
 
                     tags$details(
                       style = "margin-top: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 5px;",
-                      tags$summary(tags$b("ℹ️ Methodological Notes")),
-                      tags$p("1. Baseline survival is calibrated to ~2.0 years median OS (Stage 4 colon cancer)."),
-                      tags$p("2. Naive and Standard LT AFT models often misestimate the Intercept due to selection bias, leading to severely biased Median OS and 5-year Survival estimates, even if the AF seems relatively stable."),
-                      tags$p("3. Our Proposed Method corrects this baseline shift, perfectly recovering both the relative effects (AF) and absolute timelines (Median, Survival %).")
+                      tags$summary(tags$b("ℹ️ Methodological Notes (Updated)")),
+                      tags$p("1. T1 is now generated via True Dependent Truncation: T1 = True_OS - T2, where T2 is ~1 year (Realistic) or ~2 years (Early CGP)."),
+                      tags$p("2. The survival curves are now Marginalized over the entire cohort, not just a specific profile, to accurately compare the global model fit."),
+                      tags$p("3. The C2 distribution plot allows you to verify if the generated censoring times overlap naturally with the true remaining survival times (T2).")
                     )
                   )
                 )

@@ -678,20 +678,20 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     weights_var = NULL
   )
 })
+R
 # =========================================================================
-# Server Logic for Copula Model (Fixed Reactive Structure & Tie Handling)
+# Server Logic for Copula Model (Fixed Function Name NPMLE.Frank)
 # =========================================================================
 
-# 1. 計算部分を eventReactive に分離し、ボタンが押された時だけ安全に実行する
 copula_results <- eventReactive(input$run_copula, {
 
-  # パッケージチェック
+  # 1. パッケージチェック
   shiny::validate(shiny::need(requireNamespace("depend.truncation", quietly = TRUE),
                               "Please install 'depend.truncation' package."))
   shiny::validate(shiny::need(requireNamespace("copula", quietly = TRUE),
                               "Please install 'copula' package."))
 
-  showNotification("Fitting Frank Copula model... This may take a few seconds.", type = "message", duration = 5)
+  showNotification("Fitting Frank Copula model (NPMLE)... This may take 10-20 seconds.", type = "message", duration = 5)
 
   library(copula)
   library(depend.truncation)
@@ -702,7 +702,7 @@ copula_results <- eventReactive(input$run_copula, {
   cens_rate <- input$cop_cens / 100
 
   # =========================================================================
-  # データの生成
+  # 2. データの生成
   # =========================================================================
   theta_frank <- tryCatch({ iTau(frankCopula(), tau_target) }, error = function(e) { 5.0 })
   cop <- frankCopula(param = theta_frank, dim = 2)
@@ -729,7 +729,8 @@ copula_results <- eventReactive(input$run_copula, {
   T_obs <- T1_obs + pmin(T2_true, C2_obs)
   Event <- ifelse(T2_true <= C2_obs, 1, 0)
 
-  # 同値（Ties）によるパッケージのクラッシュを防ぐための微小な乱数（Jitter）を追加
+  # 同値（Ties）によるNPMLEの微分のクラッシュを防ぐための微小な乱数（Jitter）
+  set.seed(Sys.time())
   T1_obs <- T1_obs + runif(length(T1_obs), 0, 0.01)
   T_obs <- T_obs + runif(length(T_obs), 0, 0.01)
 
@@ -737,41 +738,44 @@ copula_results <- eventReactive(input$run_copula, {
 
   shiny::validate(shiny::need(sum(Data_cgp$Event) > 30, "Not enough events generated. Increase N or reduce censoring."))
 
-  # 計算量爆発を防ぐため最大300例にサンプリング
+  # NPMLEは計算量が非常に重いため、最大300例にサンプリングしてハングアップを防ぐ
   if (nrow(Data_cgp) > 300) {
-    set.seed(123)
     Data_cgp <- Data_cgp[sample(1:nrow(Data_cgp), 300), ]
   }
 
   # =========================================================================
-  # 4つの手法による解析
+  # 3. 4つの手法による解析
   # =========================================================================
   fit_true <- survfit(Surv(T_true, rep(1, N_macro)) ~ 1)
   fit_naive <- survfit(Surv(T_obs, Event) ~ 1, data = Data_cgp)
   fit_lb <- survfit(Surv(T1, T_obs, Event) ~ 1, data = Data_cgp)
 
-  # Copula Model: PMLE.Frank
+  # Copula Model: 【修正箇所】 NPMLE.Frank を使用
   fit_copula <- tryCatch({
-    depend.truncation::PMLE.Frank(Data_cgp$T1, Data_cgp$T_obs, Data_cgp$Event)
+    depend.truncation::NPMLE.Frank(Data_cgp$T1, Data_cgp$T_obs, Data_cgp$Event)
   }, error = function(e) { e$message })
 
-  shiny::validate(shiny::need(is.list(fit_copula), paste("Copula model failed. Package Error:", fit_copula)))
+  # 万が一コピュラがエラーを吐いた場合はUI上に文字で表示して停止する
+  shiny::validate(shiny::need(is.list(fit_copula), paste("Copula model failed. Error:", fit_copula)))
 
-  copula_time <- if (!is.null(fit_copula$time)) fit_copula$time else if (!is.null(fit_copula$Y)) fit_copula$Y else fit_copula$t
-  copula_surv <- if (!is.null(fit_copula$surv)) fit_copula$surv else if (!is.null(fit_copula$S.Y)) fit_copula$S.Y else fit_copula$S_Y
+  # depend.truncation の出力仕様に対応 (Time / Survival vector の抽出)
+  copula_time <- if (!is.null(fit_copula$time)) fit_copula$time else if (!is.null(fit_copula$Y)) fit_copula$Y else if (!is.null(fit_copula$t)) fit_copula$t else fit_copula[[1]]
+  copula_surv <- if (!is.null(fit_copula$surv)) fit_copula$surv else if (!is.null(fit_copula$S.Y)) fit_copula$S.Y else if (!is.null(fit_copula$S_Y)) fit_copula$S_Y else fit_copula[[2]]
 
   shiny::validate(shiny::need(!is.null(copula_time) && !is.null(copula_surv), "Failed to extract survival data from depend.truncation output."))
 
-  # 結果をリストとして返す
   list(
     fit_true = fit_true, fit_naive = fit_naive, fit_lb = fit_lb,
-    copula_time = copula_time, copula_surv = copula_surv
+    copula_time = copula_time, copula_surv = copula_surv,
+    copula_tau = fit_copula$tau # 推定されたKendall's tauも取得可能
   )
 })
 
-# 2. 結果を描画する（eventReactiveの戻り値を受け取る）
+# =========================================================================
+# テーブル描画
+# =========================================================================
 output$copula_result_table <- renderTable({
-  res <- copula_results() # 計算結果を取得
+  res <- copula_results()
 
   get_median <- function(time_vec, surv_vec) {
     idx <- which(surv_vec <= 0.5)
@@ -788,7 +792,7 @@ output$copula_result_table <- renderTable({
     Model = c("1. True Marginal Survival",
               "2. Naive KM (Ignores Truncation)",
               "3. Standard LT-KM (Lynden-Bell)",
-              "4. Copula Model (Frank)"),
+              "4. Copula Model (NPMLE.Frank)"),
     `Median Survival (Years)` = c(sprintf("%.2f", med_true),
                                   sprintf("%.2f", med_naive),
                                   sprintf("%.2f", med_lb),
@@ -800,14 +804,17 @@ output$copula_result_table <- renderTable({
   )
 }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c")
 
+# =========================================================================
+# プロット描画
+# =========================================================================
 output$copula_survival_plot <- renderPlot({
-  res <- copula_results() # 計算結果を取得
+  res <- copula_results()
   library(ggplot2)
 
   df_true <- data.frame(Time = res$fit_true$time / 365.25, Surv = res$fit_true$surv, Method = "1. True Survival")
   df_naive <- data.frame(Time = res$fit_naive$time / 365.25, Surv = res$fit_naive$surv, Method = "2. Naive KM")
   df_lb <- data.frame(Time = res$fit_lb$time / 365.25, Surv = res$fit_lb$surv, Method = "3. Standard LT-KM (Lynden-Bell)")
-  df_copula <- data.frame(Time = res$copula_time / 365.25, Surv = res$copula_surv, Method = "4. Copula Model (Frank)")
+  df_copula <- data.frame(Time = res$copula_time / 365.25, Surv = res$copula_surv, Method = "4. Copula Model (Frank NPMLE)")
 
   plot_df <- rbind(df_true, df_naive, df_lb, df_copula)
 
@@ -816,17 +823,17 @@ output$copula_survival_plot <- renderPlot({
     scale_color_manual(values = c("1. True Survival" = "black",
                                   "2. Naive KM" = "#e74c3c",
                                   "3. Standard LT-KM (Lynden-Bell)" = "#f39c12",
-                                  "4. Copula Model (Frank)" = "#27ae60")) +
+                                  "4. Copula Model (Frank NPMLE)" = "#27ae60")) +
     scale_linetype_manual(values = c("1. True Survival" = "solid",
                                      "2. Naive KM" = "dotted",
                                      "3. Standard LT-KM (Lynden-Bell)" = "dashed",
-                                     "4. Copula Model (Frank)" = "solid")) +
+                                     "4. Copula Model (Frank NPMLE)" = "solid")) +
     scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
     scale_x_continuous(limits = c(0, 8)) +
     theme_minimal(base_size = 15) +
     labs(
       title = "Marginal Survival Recovery under Dependent Truncation",
-      subtitle = "Copula successfully corrects the bias from Lynden-Bell estimator.",
+      subtitle = paste0("Copula Model Estimated Kendall's Tau: ", sprintf("%.2f", res$copula_tau)),
       x = "Time from Diagnosis (Years)",
       y = "Overall Survival Probability"
     ) +
@@ -1219,57 +1226,58 @@ output$forest_plot_multivariate = renderPlot({
 })
 
 # =========================================================================
-# Server Logic for Simulation Study (Fixed Inf Bug & Added All AFs)
+# Server Logic for Simulation Study
 # =========================================================================
 
-# Helper function to find censoring scale
 find_censoring_scale <- function(T2, target_rate, pattern) {
   obj_func <- function(scale_param) {
     if (pattern == "indep") { C2 <- rexp(length(T2), rate = 1 / scale_param)
     } else if (pattern == "early") { C2 <- rweibull(length(T2), shape = 0.5, scale = scale_param)
     } else if (pattern == "late") { C2 <- rweibull(length(T2), shape = 3.0, scale = scale_param)
     } else if (pattern == "ushape") {
-      u <- runif(length(T2))
-      C2 <- ifelse(u < 0.5, rweibull(length(T2), shape = 0.5, scale = scale_param), rweibull(length(T2), shape = 3.0, scale = scale_param * 2))
+      u <- runif(length(T2)); C2 <- ifelse(u < 0.5, rweibull(length(T2), shape = 0.5, scale = scale_param), rweibull(length(T2), shape = 3.0, scale = scale_param * 2))
     }
-    censored <- sum(C2 < T2) / length(T2)
-    return(censored - target_rate)
+    return((sum(C2 < T2) / length(T2)) - target_rate)
   }
-  # Safely handle optimization
   optimal <- tryCatch({ uniroot(obj_func, interval = c(0.1, 1000000))$root }, error = function(e) { median(T2) * 1.5 })
   return(optimal)
 }
 
-# Core simulation function (Run 1 iteration)
-run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, cens_rate) {
+run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, cens_rate, return_data = FALSE) {
   N_macro <- 100000
   Age <- round(runif(N_macro, 40, 80))
   Sex <- sample(c("Male", "Female"), N_macro, replace = TRUE, prob = c(0.55, 0.45))
   Histology <- sample(c("COAD", "READ", "COADREAD"), N_macro, replace = TRUE, prob = c(0.60, 0.30, 0.10))
   X <- rbinom(N_macro, 1, Mut_Freq)
 
-  # True Covariate Effects
   True_AF_Age_10yr <- 0.85
   True_AF_Sex_Female <- 1.10
   True_AF_Hist_READ <- 0.90
   True_AF_Hist_COADREAD <- 0.95
 
-  # Calculate background AF
   AF_bg <- 1.0 * (True_AF_Age_10yr ^ ((Age - 60) / 10)) * ifelse(Sex == "Female", True_AF_Sex_Female, 1.0) *
     ifelse(Histology == "READ", True_AF_Hist_READ, ifelse(Histology == "COADREAD", True_AF_Hist_COADREAD, 1.0))
 
   shape_base <- 1.5
-  scale_base <- 2.0 * 365.25 # Median OS for base profile (60yo Male COAD Stage 4) ~ 2 years
+  scale_base <- 2.0 * 365.25 # ~2 years median OS base
 
   u <- pmax(pmin(runif(N_macro), 0.999), 0.001)
-  T_base <- scale_base * ((1 - u) / u)^(1 / shape_base)
-  T_true <- T_base * AF_bg * ifelse(X == 1, True_AF_X, 1.0)
+  T_true <- scale_base * ((1 - u) / u)^(1 / shape_base) * AF_bg * ifelse(X == 1, True_AF_X, 1.0)
 
-  # Generate T1 (Covariate-dependent truncation)
-  Expected_T <- scale_base * AF_bg * ifelse(X == 1, True_AF_X, 1.0)
-  if (t1_pat == "indep") { T1 <- runif(N_macro, 30, 365.25 * 3)
-  } else if (t1_pat == "real") { T1 <- Expected_T * runif(N_macro, 0.1, 0.5)
-  } else if (t1_pat == "rev") { T1 <- pmax(30, (365.25 * 5) - Expected_T * runif(N_macro, 0.2, 0.8)) }
+  # =========================================================================
+  # 臨床的実態に基づく T1 の生成 (True Dependent Truncation)
+  # =========================================================================
+  if (t1_pat == "indep") {
+    T1 <- runif(N_macro, 30, 365.25 * 3)
+  } else if (t1_pat == "real") {
+    # 死亡の約1年前 (LogNormalで正の値を保証)
+    T2_exp <- rlnorm(N_macro, meanlog = log(365.25 * 1), sdlog = 0.5)
+    T1 <- pmax(30, T_true - T2_exp)
+  } else if (t1_pat == "rev") {
+    # 早期検査推進: 死亡の約2年前
+    T2_exp <- rlnorm(N_macro, meanlog = log(365.25 * 2), sdlog = 0.5)
+    T1 <- pmax(30, T_true - T2_exp)
+  }
 
   cgp_indices <- which(T_true > T1)
   if(length(cgp_indices) < N_target) return(NULL)
@@ -1287,136 +1295,144 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
   )
   Data_cgp$T2_true <- Data_cgp$T_true - Data_cgp$T1
 
-  # Apply Informative Censoring
+  # C2 生成
   scale_opt <- find_censoring_scale(Data_cgp$T2_true, cens_rate, cens_pat)
   if (cens_pat == "indep") { C2 <- rexp(N_target, rate = 1 / scale_opt)
   } else if (cens_pat == "early") { C2 <- rweibull(N_target, shape = 0.5, scale = scale_opt)
   } else if (cens_pat == "late") { C2 <- rweibull(N_target, shape = 3.0, scale = scale_opt)
   } else if (cens_pat == "ushape") {
-    u_c <- runif(N_target)
-    C2 <- ifelse(u_c < 0.5, rweibull(N_target, shape = 0.5, scale = scale_opt), rweibull(N_target, shape = 3.0, scale = scale_opt * 2))
+    u_c <- runif(N_target); C2 <- ifelse(u_c < 0.5, rweibull(N_target, shape = 0.5, scale = scale_opt), rweibull(N_target, shape = 3.0, scale = scale_opt * 2))
   }
 
+  Data_cgp$C2 <- C2
   Data_cgp$T2_obs <- pmin(Data_cgp$T2_true, C2)
   Data_cgp$Event <- ifelse(Data_cgp$T2_true <= C2, 1, 0)
   Data_cgp$T_obs <- Data_cgp$T1 + Data_cgp$T2_obs
   if(sum(Data_cgp$Event) < 20) return(NULL)
 
-  # Calculate IPTW
+  # IPTW
   prop_young_macro <- mean(Age < 60); prop_old_macro <- mean(Age >= 60)
   Data_cgp$Age_class <- ifelse(Data_cgp$Age < 60, "Young", "Old")
   prop_young_cgp <- mean(Data_cgp$Age_class == "Young")
   prop_old_cgp <- mean(Data_cgp$Age_class == "Old")
 
-  weight_young <- prop_young_macro / prop_young_cgp
-  weight_old <- prop_old_macro / prop_old_cgp
-  Data_cgp$iptw <- ifelse(Data_cgp$Age_class == "Young", weight_young, weight_old)
+  Data_cgp$iptw <- ifelse(Data_cgp$Age_class == "Young", prop_young_macro / prop_young_cgp, prop_old_macro / prop_old_cgp)
   Data_cgp$iptw <- Data_cgp$iptw / mean(Data_cgp$iptw)
 
-  # Fit Comparative Models
+  # Models
   library(flexsurv)
   form <- as.formula("~ X + Age + Sex + Histology")
   fit_naive <- tryCatch({ flexsurvreg(update(Surv(T_obs, Event) ~ ., form), data = Data_cgp, dist = "llogis") }, error = function(e) NULL)
   fit_lt <- tryCatch({ flexsurvreg(update(Surv(T1, T_obs, Event) ~ ., form), data = Data_cgp, dist = "llogis") }, error = function(e) NULL)
   fit_prop <- tryCatch({ flexsurvreg(update(Surv(T1, T_obs, Event) ~ ., form), data = Data_cgp, weights = iptw, dist = "llogis") }, error = function(e) NULL)
 
-  # Function to extract all metrics safely
   extract_metrics <- function(fit) {
     if (is.null(fit)) return(rep(NA, 11))
     res <- fit$res
-
-    # Extract Covariate AFs
-    AF_X <- exp(res["XMutated", "est"])
-    AF_X_L <- exp(res["XMutated", "L95%"])
-    AF_X_U <- exp(res["XMutated", "U95%"])
-    AF_Age <- exp(res["Age", "est"] * 10)
-    AF_Sex <- exp(res["SexFemale", "est"])
-    AF_READ <- exp(res["HistologyREAD", "est"])
-    AF_COADREAD <- exp(res["HistologyCOADREAD", "est"])
-
-    # [FIX] Extract shape and scale correctly
-    # 'scale' is on the natural log-logistic scale (Days). Do not exponentiate it.
-    scale_base <- res["scale", "est"]
-    shape <- res["shape", "est"]
-
-    # Adjust scale for Age=60 (baseline is Age=0, Male, COAD, WT)
+    AF_X <- exp(res["XMutated", "est"]); AF_X_L <- exp(res["XMutated", "L95%"]); AF_X_U <- exp(res["XMutated", "U95%"])
+    AF_Age <- exp(res["Age", "est"] * 10); AF_Sex <- exp(res["SexFemale", "est"])
+    AF_READ <- exp(res["HistologyREAD", "est"]); AF_COADREAD <- exp(res["HistologyCOADREAD", "est"])
+    scale_base <- res["scale", "est"]; shape <- res["shape", "est"]
     af_age60 <- exp(res["Age", "est"] * 60)
     med_wt_days <- scale_base * af_age60
-
-    # Calculate medians in years
-    med_wt <- med_wt_days / 365.25
-    med_mut <- med_wt * AF_X
-
-    # Calculate 5-year survival (%)
+    med_wt <- med_wt_days / 365.25; med_mut <- med_wt * AF_X
     s5_wt <- 1 / (1 + (5 * 365.25 / med_wt_days)^shape) * 100
     s5_mut <- 1 / (1 + (5 * 365.25 / (med_wt_days * AF_X))^shape) * 100
-
-    return(c(AF_X=AF_X, AF_X_L=AF_X_L, AF_X_U=AF_X_U,
-             AF_Age=AF_Age, AF_Sex=AF_Sex, AF_READ=AF_READ, AF_COADREAD=AF_COADREAD,
-             Med_WT=med_wt, Med_Mut=med_mut, S5_WT=s5_wt, S5_Mut=s5_mut))
+    return(c(AF_X=AF_X, AF_X_L=AF_X_L, AF_X_U=AF_X_U, AF_Age=AF_Age, AF_Sex=AF_Sex, AF_READ=AF_READ, AF_COADREAD=AF_COADREAD, Med_WT=med_wt, Med_Mut=med_mut, S5_WT=s5_wt, S5_Mut=s5_mut))
   }
 
-  list(Naive = extract_metrics(fit_naive), LT = extract_metrics(fit_lt), Prop = extract_metrics(fit_prop), fit_prop = fit_prop)
+  out <- list(Naive = extract_metrics(fit_naive), LT = extract_metrics(fit_lt), Prop = extract_metrics(fit_prop),
+              fit_naive = fit_naive, fit_lt = fit_lt, fit_prop = fit_prop, Data_cgp = Data_cgp, T_true_macro = T_true)
+  if(return_data) return(out) else return(out[1:3])
 }
 
-# -------------------------------------------------------------------------
-# Single Run Observer
-# -------------------------------------------------------------------------
 observeEvent(input$run_sim, {
   req(input$sim_n, input$sim_true_af, input$sim_cens_rate, input$sim_mut_freq)
   showNotification("Running single simulation...", type = "message", duration = 3)
 
-  res <- run_sim_iteration(input$sim_n, input$sim_true_af, input$sim_mut_freq / 100, input$sim_t1_pattern, input$sim_cens_pattern, input$sim_cens_rate / 100)
+  res <- run_sim_iteration(input$sim_n, input$sim_true_af, input$sim_mut_freq / 100, input$sim_t1_pattern, input$sim_cens_pattern, input$sim_cens_rate / 100, return_data = TRUE)
   shiny::validate(shiny::need(!is.null(res), "Simulation failed. Please try again."))
 
   True_AF <- input$sim_true_af
-  True_Med_WT <- 2.0
-  True_Med_Mut <- 2.0 * True_AF
-  True_S5_WT <- 1 / (1 + (5 / True_Med_WT)^1.5) * 100
-  True_S5_Mut <- 1 / (1 + (5 / True_Med_Mut)^1.5) * 100
+  True_Med_WT <- 2.0; True_Med_Mut <- 2.0 * True_AF
+  True_S5_WT <- 1 / (1 + (5 / True_Med_WT)^1.5) * 100; True_S5_Mut <- 1 / (1 + (5 / True_Med_Mut)^1.5) * 100
 
   output$sim_result_table <- renderTable({
     data.frame(
-      Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF",
-                 "Median OS (WT) [Years]", "Median OS (Mut) [Years]", "5-Year Survival (WT) [%]", "5-Year Survival (Mut) [%]"),
-      `True Value` = c(sprintf("%.2f", True_AF), "0.85", "1.10", "0.90", "0.95",
-                       sprintf("%.2f", True_Med_WT), sprintf("%.2f", True_Med_Mut), sprintf("%.1f", True_S5_WT), sprintf("%.1f", True_S5_Mut)),
-      `Naive AFT` = c(sprintf("%.2f", res$Naive["AF_X"]), sprintf("%.2f", res$Naive["AF_Age"]), sprintf("%.2f", res$Naive["AF_Sex"]), sprintf("%.2f", res$Naive["AF_READ"]), sprintf("%.2f", res$Naive["AF_COADREAD"]),
-                      sprintf("%.2f", res$Naive["Med_WT"]), sprintf("%.2f", res$Naive["Med_Mut"]), sprintf("%.1f", res$Naive["S5_WT"]), sprintf("%.1f", res$Naive["S5_Mut"])),
-      `Standard LT AFT` = c(sprintf("%.2f", res$LT["AF_X"]), sprintf("%.2f", res$LT["AF_Age"]), sprintf("%.2f", res$LT["AF_Sex"]), sprintf("%.2f", res$LT["AF_READ"]), sprintf("%.2f", res$LT["AF_COADREAD"]),
-                            sprintf("%.2f", res$LT["Med_WT"]), sprintf("%.2f", res$LT["Med_Mut"]), sprintf("%.1f", res$LT["S5_WT"]), sprintf("%.1f", res$LT["S5_Mut"])),
-      `Proposed Method` = c(sprintf("<b>%.2f</b>", res$Prop["AF_X"]), sprintf("<b>%.2f</b>", res$Prop["AF_Age"]), sprintf("<b>%.2f</b>", res$Prop["AF_Sex"]), sprintf("<b>%.2f</b>", res$Prop["AF_READ"]), sprintf("<b>%.2f</b>", res$Prop["AF_COADREAD"]),
-                            sprintf("<b>%.2f</b>", res$Prop["Med_WT"]), sprintf("<b>%.2f</b>", res$Prop["Med_Mut"]), sprintf("<b>%.1f</b>", res$Prop["S5_WT"]), sprintf("<b>%.1f</b>", res$Prop["S5_Mut"]))
+      Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF", "Median OS (WT)", "5-Year OS (WT) [%]"),
+      `True` = c(sprintf("%.2f", True_AF), "0.85", "1.10", "0.90", "0.95", sprintf("%.2f", True_Med_WT), sprintf("%.1f", True_S5_WT)),
+      `Naive AFT` = c(sprintf("%.2f", res$Naive["AF_X"]), sprintf("%.2f", res$Naive["AF_Age"]), sprintf("%.2f", res$Naive["AF_Sex"]), sprintf("%.2f", res$Naive["AF_READ"]), sprintf("%.2f", res$Naive["AF_COADREAD"]), sprintf("%.2f", res$Naive["Med_WT"]), sprintf("%.1f", res$Naive["S5_WT"])),
+      `Standard LT` = c(sprintf("%.2f", res$LT["AF_X"]), sprintf("%.2f", res$LT["AF_Age"]), sprintf("%.2f", res$LT["AF_Sex"]), sprintf("%.2f", res$LT["AF_READ"]), sprintf("%.2f", res$LT["AF_COADREAD"]), sprintf("%.2f", res$LT["Med_WT"]), sprintf("%.1f", res$LT["S5_WT"])),
+      `Proposed Method` = c(sprintf("<b>%.2f</b>", res$Prop["AF_X"]), sprintf("<b>%.2f</b>", res$Prop["AF_Age"]), sprintf("<b>%.2f</b>", res$Prop["AF_Sex"]), sprintf("<b>%.2f</b>", res$Prop["AF_READ"]), sprintf("<b>%.2f</b>", res$Prop["AF_COADREAD"]), sprintf("<b>%.2f</b>", res$Prop["Med_WT"]), sprintf("<b>%.1f</b>", res$Prop["S5_WT"]))
     )
   }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c", sanitize.text.function = function(x) x)
 
+  # =========================================================================
+  # Marginal Survival Plot (全症例平均)
+  # =========================================================================
   output$sim_survival_plot <- renderPlot({
-    req(res$fit_prop)
     library(ggplot2)
-    new_data <- data.frame(X = factor(c("WT", "Mutated"), levels = c("WT", "Mutated")), Age = c(60, 60), Sex = factor(c("Male", "Male"), levels = c("Male", "Female")), Histology = factor(c("COAD", "COAD"), levels = c("COAD", "READ", "COADREAD")))
+    library(survival)
     t_seq <- seq(0, 365.25 * 5, length.out = 100)
-    surv_res <- summary(res$fit_prop, newdata = new_data, t = t_seq, type = "survival", ci = FALSE)
-    plot_df <- data.frame(Time_Years = rep(t_seq / 365.25, 2), Survival = c(surv_res[[1]]$est, surv_res[[2]]$est), Group = rep(c("Wild-type", "Mutated (Target Gene)"), each = length(t_seq)))
 
-    ggplot(plot_df, aes(x = Time_Years, y = Survival, color = Group)) +
+    # 1. True Curve (Macro Kaplan-Meier)
+    km_true <- survfit(Surv(res$T_true_macro, rep(1, length(res$T_true_macro))) ~ 1)
+    surv_true <- approx(km_true$time, km_true$surv, xout = t_seq, method = "constant", f = 0, rule = 2)$y
+
+    # helper for marginalizing
+    calc_marginal <- function(fit) {
+      if(is.null(fit)) return(rep(NA, length(t_seq)))
+      samp_data <- res$Data_cgp[sample(1:nrow(res$Data_cgp), min(300, nrow(res$Data_cgp))), ]
+      summ <- summary(fit, newdata = samp_data, t = t_seq, type = "survival", tidy = TRUE)
+      agg <- aggregate(est ~ time, data = summ, FUN = mean)
+      return(agg$est)
+    }
+
+    surv_naive <- calc_marginal(res$fit_naive)
+    surv_lt <- calc_marginal(res$fit_lt)
+    surv_prop <- calc_marginal(res$fit_prop)
+
+    plot_df <- data.frame(
+      Time = rep(t_seq / 365.25, 4),
+      Survival = c(surv_true, surv_naive, surv_lt, surv_prop),
+      Model = factor(rep(c("1. True Marginal (Macro)", "2. Naive AFT", "3. Standard LT AFT", "4. Proposed Method"), each = length(t_seq)))
+    )
+
+    ggplot(plot_df, aes(x = Time, y = Survival, color = Model, linetype = Model)) +
       geom_line(size = 1.2) +
-      scale_color_manual(values = c("Wild-type" = "#2980b9", "Mutated (Target Gene)" = "#e74c3c")) +
+      scale_color_manual(values = c("black", "#e74c3c", "#f39c12", "#27ae60")) +
+      scale_linetype_manual(values = c("solid", "dotted", "dashed", "solid")) +
       scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
-      theme_minimal(base_size = 15) +
-      labs(title = paste0("Reconstructed Marginal Survival (Proposed Method)"), subtitle = "Curves for 60yo Male with COAD. Model successfully corrects baseline shift.", x = "Time from Diagnosis (Years)", y = "Overall Survival Probability") +
-      theme(plot.title = element_text(face = "bold"), legend.position = "bottom", legend.title = element_blank())
+      theme_minimal(base_size = 14) +
+      labs(title = "Marginal Overall Survival (Averaged over all patients)", x = "Time from Diagnosis (Years)", y = "Overall Survival Probability") +
+      theme(plot.title = element_text(face = "bold", size = 14), legend.position = "bottom", legend.title = element_blank())
+  })
+
+  # =========================================================================
+  # Censoring Distribution Plot
+  # =========================================================================
+  output$sim_censor_plot <- renderPlot({
+    library(ggplot2)
+    df <- data.frame(
+      Time_Years = c(res$Data_cgp$T2_true / 365.25, res$Data_cgp$C2 / 365.25),
+      Type = rep(c("True Remaining OS (T2)", "Censoring Time (C2)"), each = nrow(res$Data_cgp))
+    )
+    # C2 may contain Inf, limit to 10 years for plotting
+    df <- df[df$Time_Years <= 10, ]
+
+    ggplot(df, aes(x = Time_Years, fill = Type)) +
+      geom_density(alpha = 0.5, color = NA) +
+      scale_fill_manual(values = c("Censoring Time (C2)" = "#95a5a6", "True Remaining OS (T2)" = "#2980b9")) +
+      theme_minimal(base_size = 14) +
+      labs(title = "Distribution of C2 vs T2 after CGP", x = "Time after CGP (Years)", y = "Density") +
+      theme(legend.position = "bottom", legend.title = element_blank())
   })
 })
 
-# -------------------------------------------------------------------------
-# Multi Run (400 Iterations) Observer
-# -------------------------------------------------------------------------
 observeEvent(input$run_sim_multi, {
   req(input$sim_n, input$sim_true_af, input$sim_cens_rate, input$sim_mut_freq)
-
   n_sims <- 400
   results <- list()
-
   withProgress(message = 'Running 400 Simulations...', value = 0, {
     for (i in 1:n_sims) {
       res <- run_sim_iteration(input$sim_n, input$sim_true_af, input$sim_mut_freq / 100, input$sim_t1_pattern, input$sim_cens_pattern, input$sim_cens_rate / 100)
@@ -1424,52 +1440,25 @@ observeEvent(input$run_sim_multi, {
       incProgress(1/n_sims, detail = paste("Iteration", i, "of", n_sims))
     }
   })
-
   shiny::validate(shiny::need(length(results) > 0, "All simulations failed."))
 
-  True_AF <- input$sim_true_af
-  True_Med_WT <- 2.0
-  True_Med_Mut <- 2.0 * True_AF
-  True_S5_WT <- 1 / (1 + (5 / True_Med_WT)^1.5) * 100
-  True_S5_Mut <- 1 / (1 + (5 / True_Med_Mut)^1.5) * 100
-
+  True_AF <- input$sim_true_af; True_Med_WT <- 2.0; True_S5_WT <- 1 / (1 + (5 / True_Med_WT)^1.5) * 100
   calc_stats <- function(model_name, metric_name, true_val) {
     vals <- sapply(results, function(x) x[[model_name]][metric_name])
-    mean_val <- mean(vals, na.rm = TRUE)
-    mse_val <- mean((vals - true_val)^2, na.rm = TRUE)
+    mean_val <- mean(vals, na.rm = TRUE); mse_val <- mean((vals - true_val)^2, na.rm = TRUE)
     return(sprintf("%.2f (MSE: %.3f)", mean_val, mse_val))
   }
 
-  af_l <- sapply(results, function(x) x$Prop["AF_X_L"])
-  af_u <- sapply(results, function(x) x$Prop["AF_X_U"])
+  af_l <- sapply(results, function(x) x$Prop["AF_X_L"]); af_u <- sapply(results, function(x) x$Prop["AF_X_U"])
   cp_val <- mean(af_l <= True_AF & True_AF <= af_u, na.rm = TRUE) * 100
 
   output$sim_multi_result_table <- renderTable({
     data.frame(
-      Metric = c(
-        "Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF",
-        "Median OS (WT) [Years]", "Median OS (Mut) [Years]", "5-Year Survival (WT) [%]", "5-Year Survival (Mut) [%]"),
-      `True Value` = c(
-        sprintf("%.2f", True_AF), "0.85", "1.10", "0.90", "0.95",
-        sprintf("%.2f", True_Med_WT), sprintf("%.2f", True_Med_Mut), sprintf("%.1f", True_S5_WT), sprintf("%.1f", True_S5_Mut)),
-      `Naive AFT (Mean/MSE)` = c(
-        calc_stats("Naive", "AF_X", True_AF), calc_stats("Naive", "AF_Age", 0.85), calc_stats("Naive", "AF_Sex", 1.10), calc_stats("Naive", "AF_READ", 0.90), calc_stats("Naive", "AF_COADREAD", 0.95),
-        calc_stats("Naive", "Med_WT", True_Med_WT), calc_stats("Naive", "Med_Mut", True_Med_Mut), calc_stats("Naive", "S5_WT", True_S5_WT), calc_stats("Naive", "S5_Mut", True_S5_Mut)),
-      `Standard LT AFT (Mean/MSE)` = c(
-        calc_stats("LT", "AF_X", True_AF), calc_stats("LT", "AF_Age", 0.85), calc_stats("LT", "AF_Sex", 1.10), calc_stats("LT", "AF_READ", 0.90), calc_stats("LT", "AF_COADREAD", 0.95),
-        calc_stats("LT", "Med_WT", True_Med_WT), calc_stats("LT", "Med_Mut", True_Med_Mut), calc_stats("LT", "S5_WT", True_S5_WT), calc_stats("LT", "S5_Mut", True_S5_Mut)),
-      `Proposed Method (Mean/MSE)` = c(
-        paste0("<b>", calc_stats("Prop", "AF_X", True_AF), " [CP: ", sprintf("%.1f", cp_val), "%]</b>"),
-        sprintf("<b>%s</b>", calc_stats("Prop", "AF_Age", 0.85)),
-        sprintf("<b>%s</b>", calc_stats("Prop", "AF_Sex", 1.10)),
-        sprintf("<b>%s</b>", calc_stats("Prop", "AF_READ", 0.90)),
-        sprintf("<b>%s</b>", calc_stats("Prop", "AF_COADREAD", 0.95)),
-        sprintf("<b>%s</b>", calc_stats("Prop", "Med_WT", True_Med_WT)),
-        sprintf("<b>%s</b>", calc_stats("Prop", "Med_Mut", True_Med_Mut)),
-        sprintf("<b>%s</b>", calc_stats("Prop", "S5_WT", True_S5_WT)),
-        sprintf("<b>%s</b>", calc_stats("Prop", "S5_Mut", True_S5_Mut))
-      )
+      Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF", "Median OS (WT)", "5-Year OS (WT) [%]"),
+      `True Value` = c(sprintf("%.2f", True_AF), "0.85", "1.10", "0.90", "0.95", sprintf("%.2f", True_Med_WT), sprintf("%.1f", True_S5_WT)),
+      `Naive AFT` = c(calc_stats("Naive", "AF_X", True_AF), calc_stats("Naive", "AF_Age", 0.85), calc_stats("Naive", "AF_Sex", 1.10), calc_stats("Naive", "AF_READ", 0.90), calc_stats("Naive", "AF_COADREAD", 0.95), calc_stats("Naive", "Med_WT", True_Med_WT), calc_stats("Naive", "S5_WT", True_S5_WT)),
+      `Standard LT AFT` = c(calc_stats("LT", "AF_X", True_AF), calc_stats("LT", "AF_Age", 0.85), calc_stats("LT", "AF_Sex", 1.10), calc_stats("LT", "AF_READ", 0.90), calc_stats("LT", "AF_COADREAD", 0.95), calc_stats("LT", "Med_WT", True_Med_WT), calc_stats("LT", "S5_WT", True_S5_WT)),
+      `Proposed Method` = c(paste0("<b>", calc_stats("Prop", "AF_X", True_AF), " [CP: ", sprintf("%.1f", cp_val), "%]</b>"), sprintf("<b>%s</b>", calc_stats("Prop", "AF_Age", 0.85)), sprintf("<b>%s</b>", calc_stats("Prop", "AF_Sex", 1.10)), sprintf("<b>%s</b>", calc_stats("Prop", "AF_READ", 0.90)), sprintf("<b>%s</b>", calc_stats("Prop", "AF_COADREAD", 0.95)), sprintf("<b>%s</b>", calc_stats("Prop", "Med_WT", True_Med_WT)), sprintf("<b>%s</b>", calc_stats("Prop", "S5_WT", True_S5_WT)))
     )
   }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c", sanitize.text.function = function(x) x)
 })
-
