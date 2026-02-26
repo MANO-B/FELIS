@@ -680,7 +680,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 })
 
 # =========================================================================
-# Server Logic for Copula Model (High-Speed Version)
+# Server Logic for Copula Model (Fixed Data Extraction & Jitter)
 # =========================================================================
 
 copula_results <- eventReactive(input$run_copula, {
@@ -688,7 +688,6 @@ copula_results <- eventReactive(input$run_copula, {
   shiny::validate(shiny::need(requireNamespace("depend.truncation", quietly = TRUE), "Please install 'depend.truncation' package."))
   shiny::validate(shiny::need(requireNamespace("copula", quietly = TRUE), "Please install 'copula' package."))
 
-  # 処理時間の目安を通知
   id <- showNotification("Data sampling... (Max N=150 for NPMLE computation)", duration = NULL, type = "message")
   on.exit(removeNotification(id), add = TRUE)
 
@@ -728,20 +727,14 @@ copula_results <- eventReactive(input$run_copula, {
   T_obs <- T1_obs + pmin(T2_true, C2_obs)
   Event <- ifelse(T2_true <= C2_obs, 1, 0)
 
-  # 同値（Ties）を防ぐ強力なジッター
   set.seed(Sys.time())
   T1_obs <- T1_obs + runif(length(T1_obs), 0, 0.05)
   T_obs <- T_obs + runif(length(T_obs), 0, 0.05)
 
   Data_cgp <- data.frame(T1 = T1_obs, T_obs = T_obs, Event = Event)
-
   shiny::validate(shiny::need(sum(Data_cgp$Event) > 20, "Not enough events generated. Increase N or reduce censoring."))
 
-  # =========================================================================
-  # 【超重要】NPMLE計算爆発の回避：サンプルサイズを最大 150例 に強制制限
-  # =========================================================================
-  # N=150 ならば、一般的なPCでも数秒〜15秒程度で最適化が完了します
-  max_n_for_copula <- 50
+  max_n_for_copula <- 150
   if (nrow(Data_cgp) > max_n_for_copula) {
     Data_cgp <- Data_cgp[sample(1:nrow(Data_cgp), max_n_for_copula), ]
   }
@@ -753,7 +746,6 @@ copula_results <- eventReactive(input$run_copula, {
   fit_naive <- survfit(Surv(T_obs, Event) ~ 1, data = Data_cgp)
   fit_lb <- survfit(Surv(T1, T_obs, Event) ~ 1, data = Data_cgp)
 
-  # NPMLEの実行（タイマー付き通知）
   showNotification("Fitting NPMLE.Frank (Optimizing Likelihood)... Expected time: 3-10 seconds.", duration = 10, type = "warning")
 
   start_time <- Sys.time()
@@ -763,18 +755,32 @@ copula_results <- eventReactive(input$run_copula, {
   end_time <- Sys.time()
 
   shiny::validate(shiny::need(is.list(fit_copula), paste("Copula model failed. Error:", fit_copula)))
-
   showNotification(paste("Copula fit completed in", round(as.numeric(difftime(end_time, start_time, units="secs")), 1), "seconds!"), type = "message")
 
-  copula_time <- if (!is.null(fit_copula$time)) fit_copula$time else if (!is.null(fit_copula$Y)) fit_copula$Y else if (!is.null(fit_copula$t)) fit_copula$t else fit_copula[[1]]
-  copula_surv <- if (!is.null(fit_copula$surv)) fit_copula$surv else if (!is.null(fit_copula$S.Y)) fit_copula$S.Y else if (!is.null(fit_copula$S_Y)) fit_copula$S_Y else fit_copula[[2]]
+  # =========================================================================
+  # 【修正】出力データ（Time, Surv, Tau）の安全な抽出と補完
+  # =========================================================================
+  copula_tau <- if (!is.null(fit_copula$tau)) fit_copula$tau else if (!is.null(fit_copula$Tau)) fit_copula$Tau else NA
+  copula_surv <- if (!is.null(fit_copula$S.Y)) fit_copula$S.Y else if (!is.null(fit_copula$S_Y)) fit_copula$S_Y else NULL
 
-  shiny::validate(shiny::need(!is.null(copula_time) && !is.null(copula_surv), "Failed to extract survival data."))
+  shiny::validate(shiny::need(!is.null(copula_surv), "Failed to extract survival data from NPMLE output."))
+
+  # NPMLE.Frankは時間軸（Y）を出力しない場合があるため、観測されたユニークな生存期間をソートして充てる
+  copula_time <- if (!is.null(fit_copula$Y)) fit_copula$Y else if (!is.null(fit_copula$y)) fit_copula$y else NULL
+  if (is.null(copula_time)) {
+    unique_T <- sort(unique(Data_cgp$T_obs))
+    if (length(copula_surv) == length(unique_T)) {
+      copula_time <- unique_T
+    } else {
+      # フォールバック補完
+      copula_time <- seq(min(Data_cgp$T_obs), max(Data_cgp$T_obs), length.out = length(copula_surv))
+    }
+  }
 
   list(
     fit_true = fit_true, fit_naive = fit_naive, fit_lb = fit_lb,
     copula_time = copula_time, copula_surv = copula_surv,
-    copula_tau = fit_copula$tau
+    copula_tau = copula_tau
   )
 })
 
@@ -799,7 +805,7 @@ output$copula_result_table <- renderTable({
     Model = c("1. True Marginal Survival",
               "2. Naive KM (Ignores Truncation)",
               "3. Standard LT-KM (Lynden-Bell)",
-              "4. Copula Model (NPMLE.Frank)"),
+              "4. Copula Model (Frank NPMLE)"),
     `Median Survival (Years)` = c(sprintf("%.2f", med_true),
                                   sprintf("%.2f", med_naive),
                                   sprintf("%.2f", med_lb),
@@ -818,12 +824,21 @@ output$copula_survival_plot <- renderPlot({
   res <- copula_results()
   library(ggplot2)
 
+  # 原点 (0, 1) を追加してカーブがY軸から描画されるようにする関数
+  add_origin <- function(df) {
+    if (nrow(df) > 0 && df$Time[1] > 0) {
+      rbind(data.frame(Time = 0, Surv = 1, Method = df$Method[1]), df)
+    } else df
+  }
+
   df_true <- data.frame(Time = res$fit_true$time / 365.25, Surv = res$fit_true$surv, Method = "1. True Survival")
   df_naive <- data.frame(Time = res$fit_naive$time / 365.25, Surv = res$fit_naive$surv, Method = "2. Naive KM")
   df_lb <- data.frame(Time = res$fit_lb$time / 365.25, Surv = res$fit_lb$surv, Method = "3. Standard LT-KM (Lynden-Bell)")
   df_copula <- data.frame(Time = res$copula_time / 365.25, Surv = res$copula_surv, Method = "4. Copula Model (Frank NPMLE)")
 
-  plot_df <- rbind(df_true, df_naive, df_lb, df_copula)
+  plot_df <- rbind(add_origin(df_true), add_origin(df_naive), add_origin(df_lb), add_origin(df_copula))
+
+  tau_str <- if(is.na(res$copula_tau)) "N/A" else sprintf("%.2f", res$copula_tau)
 
   ggplot(plot_df, aes(x = Time, y = Surv, color = Method, linetype = Method)) +
     geom_step(size = 1.2) +
@@ -840,7 +855,7 @@ output$copula_survival_plot <- renderPlot({
     theme_minimal(base_size = 15) +
     labs(
       title = "Marginal Survival Recovery under Dependent Truncation",
-      subtitle = paste0("Copula Model Estimated Kendall's Tau: ", sprintf("%.2f", res$copula_tau)),
+      subtitle = paste0("Copula Model Estimated Kendall's Tau: ", tau_str),
       x = "Time from Diagnosis (Years)",
       y = "Overall Survival Probability"
     ) +
@@ -1275,7 +1290,7 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
   # 臨床的実態に基づく T1 の生成 (True Dependent Truncation)
   # =========================================================================
   if (t1_pat == "indep") {
-    T1 <- runif(N_macro, 30, 365.25 * 3)
+    T1 <- runif(N_macro, 30, T_true)
   } else if (t1_pat == "real") {
     # 死亡の約1年前 (LogNormalで正の値を保証)
     T2_exp <- rlnorm(N_macro, meanlog = log(365.25 * 1), sdlog = 0.5)
