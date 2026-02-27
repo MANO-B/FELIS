@@ -96,6 +96,9 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
 # =========================================================================
 # Core Simulation Engine
 # =========================================================================
+# =========================================================================
+# Core Simulation Engine (T1上限10年の追加)
+# =========================================================================
 run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shape, t1_pat, cens_pat, cens_rate, return_data = FALSE) {
 
   N_macro <- 100000
@@ -122,7 +125,8 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   T2_true <- T2_base * AF_total
   T_true <- T1 + T2_true
 
-  cgp_indices <- which(T_true > T1)
+  # 【修正】T_true > T1 (生存している) かつ T1 <= 10年 の患者のみを抽出対象とする
+  cgp_indices <- which(T_true > T1 & T1 <= 365.25 * 10)
   if (length(cgp_indices) < N_target) return(NULL)
 
   prob_select <- ifelse(Age[cgp_indices] < 60, 0.9, 0.1)
@@ -135,6 +139,7 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   )
   Data_cgp$T2_true <- Data_cgp$T_true - Data_cgp$T1
 
+  # ... (以下、元のcensoring計算などのロジックはそのまま維持) ...
   params <- find_censoring_param(Data_cgp$T2_true, cens_rate, cens_pat)
   if (isTRUE(params$is_ushape)) {
     u_c <- runif(N_target)
@@ -194,7 +199,8 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   form_prop_final <- as.formula(paste("Surv(sim_OS, sim_Event) ~", paste(valid_covs, collapse = " + ")))
   fit_prop_final <- tryCatch(flexsurvreg(form_prop_final, data = pseudo_cgp, dist = "llogis"), error = function(e) NULL)
 
-  extract_af_full <- function(fit) {
+  # --- Metrics extraction (分散補正ファクター cf を追加して過小評価を修正) ---
+  extract_af_full <- function(fit, cf = 1.0) {
     blank_res <- c(
       AF_X_est=NA, AF_X_L=NA, AF_X_U=NA,
       AF_Age_est=NA, AF_Age_L=NA, AF_Age_U=NA,
@@ -204,9 +210,27 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
     )
     if (is.null(fit)) return(blank_res)
     res_m <- fit$res
+
+    # 点推定
     get_est <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname, "est"] * mult) else NA_real_
-    get_L <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname, "L95%"] * mult) else NA_real_
-    get_U <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname, "U95%"] * mult) else NA_real_
+
+    # 信頼区間の下限 (補正係数 cf を掛けた標準誤差を使用)
+    get_L <- function(rname, mult=1) {
+      if (rname %in% rownames(res_m)) {
+        est <- res_m[rname, "est"]
+        se <- (res_m[rname, "U95%"] - res_m[rname, "L95%"]) / (2 * 1.95996)
+        exp((est - 1.95996 * se * cf) * mult)
+      } else NA_real_
+    }
+
+    # 信頼区間の上限 (補正係数 cf を掛けた標準誤差を使用)
+    get_U <- function(rname, mult=1) {
+      if (rname %in% rownames(res_m)) {
+        est <- res_m[rname, "est"]
+        se <- (res_m[rname, "U95%"] - res_m[rname, "L95%"]) / (2 * 1.95996)
+        exp((est + 1.95996 * se * cf) * mult)
+      } else NA_real_
+    }
 
     c(
       AF_X_est = get_est("XMutated"), AF_X_L = get_L("XMutated"), AF_X_U = get_U("XMutated"),
@@ -220,7 +244,6 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   sim_naive <- if(!is.null(fit_naive)) gen_sim_times(fit_naive, Data_cgp, "llogis") else rep(NA_real_, nrow(Data_cgp))
   sim_lt <- if(!is.null(fit_lt)) gen_sim_times(fit_lt, Data_cgp, "llogis") else rep(NA_real_, nrow(Data_cgp))
 
-  # 省メモリ化: 100点の曲線データのみを抽出して返す
   t_seq <- seq(0, 365.25 * 5, length.out = 100)
   calc_marginal_curve <- function(t_data) {
     if (is.null(t_data) || all(is.na(t_data))) return(rep(NA_real_, length(t_seq)))
@@ -233,26 +256,27 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
     c(Med = median(sim_times, na.rm = TRUE) / 365.25, S5 = mean(sim_times > 5 * 365.25, na.rm = TRUE) * 100)
   }
 
+  # 【重要】仮想コホートの膨張による分散の過小評価を、ESSベースでスケールバックする補正係数
+  correction_factor <- sqrt(nrow(pseudo_cgp) / ESS)
+
   out <- list(
     ESS = ESS,
     True_Metrics = calc_marginal_metrics(T_true),
-    Naive_AF = extract_af_full(fit_naive), Naive_Metrics = calc_marginal_metrics(sim_naive),
-    LT_AF = extract_af_full(fit_lt), LT_Metrics = calc_marginal_metrics(sim_lt),
-    Prop_AF = extract_af_full(fit_prop_final), Prop_Metrics = calc_marginal_metrics(pseudo_cgp$sim_OS),
+    Naive_AF = extract_af_full(fit_naive, cf = 1.0), Naive_Metrics = calc_marginal_metrics(sim_naive),
+    LT_AF = extract_af_full(fit_lt, cf = 1.0), LT_Metrics = calc_marginal_metrics(sim_lt),
+    # 提案手法のみ補正係数を適用
+    Prop_AF = extract_af_full(fit_prop_final, cf = correction_factor), Prop_Metrics = calc_marginal_metrics(pseudo_cgp$sim_OS),
 
-    # 図描画用のデータ抽出
     curve_true = calc_marginal_curve(T_true),
     curve_naive = calc_marginal_curve(sim_naive),
     curve_lt = calc_marginal_curve(sim_lt),
     curve_prop = calc_marginal_curve(pseudo_cgp$sim_OS),
 
-    # 散布図用に最初の500例だけT1とT2を保存
     sample_t1 = Data_cgp$T1[1:min(500, nrow(Data_cgp))],
     sample_t2 = Data_cgp$T2_true[1:min(500, nrow(Data_cgp))]
   )
   out
 }
-
 safe_fmt <- function(x, digits = 2) {
   sapply(x, function(v) if (is.na(v) || !is.numeric(v)) "N/A" else sprintf(paste0("%.", digits, "f"), v))
 }
@@ -381,7 +405,10 @@ observeEvent(input$run_sim_multi, {
     )
   }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c", sanitize.text.function = function(x) x)
 
-  # --- Fig 1: 400回の平均生存曲線 (安全な抽出処理) ---
+  # =========================================================================
+  # 図の描画 (Figure 1-3 を白黒/グレースケールに変更)
+  # =========================================================================
+  # --- Fig 1: 400回の平均生存曲線 (B&W) ---
   output$sim_multi_fig1 <- renderPlot({
     t_seq <- seq(0, 5, length.out = 100)
 
@@ -405,17 +432,18 @@ observeEvent(input$run_sim_multi, {
       Model = factor(rep(c("1. True Marginal", "2. Naive AFT", "3. Standard LT AFT", "4. Proposed Method"), each = 100))
     )
 
+    # 印刷用に白黒＋線種で明確に区別
     ggplot(plot_df1, aes(x = Time, y = Survival, color = Model, linetype = Model)) +
       geom_line(linewidth = 1.2) +
-      scale_color_manual(values = c("black", "#e74c3c", "#f39c12", "#27ae60")) +
-      scale_linetype_manual(values = c("solid", "dotted", "dashed", "solid")) +
+      scale_color_manual(values = c("black", "gray50", "gray50", "black")) +
+      scale_linetype_manual(values = c("solid", "dotted", "dashed", "twodash")) +
       scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
       theme_minimal(base_size = 15) +
       labs(title = "Figure 1: Reconstructed Marginal Survival Curves", subtitle = "Averaged across 400 iterations", x = "Time from Diagnosis (Years)", y = "Overall Survival Probability") +
       theme(plot.title = element_text(face = "bold"), legend.position = "bottom", legend.direction = "vertical", legend.title = element_blank())
   })
 
-  # --- Fig 2: AF推定値の箱ひげ図 ---
+  # --- Fig 2: AF推定値の箱ひげ図 (B&W) ---
   output$sim_multi_fig2 <- renderPlot({
     af_naive <- pull_vals(function(x) x$Naive_AF["AF_X_est"])
     af_lt    <- pull_vals(function(x) x$LT_AF["AF_X_est"])
@@ -429,24 +457,24 @@ observeEvent(input$run_sim_multi, {
     )
 
     ggplot(plot_df2, aes(x = Model, y = AF, fill = Model)) +
-      geom_boxplot(alpha = 0.7, outlier.shape = 1) +
+      geom_boxplot(alpha = 0.8, outlier.shape = 1) +
       geom_hline(yintercept = True_AF, color = "black", linetype = "dashed", linewidth = 1.2) +
-      scale_fill_manual(values = c("#e74c3c", "#f39c12", "#27ae60")) +
+      scale_fill_grey(start = 0.9, end = 0.4) + # 薄いグレーから濃いグレー
       coord_cartesian(ylim = c(0, max(True_AF * 2.5, 3))) +
       theme_minimal(base_size = 15) +
       labs(title = "Figure 2: Distribution of Estimated AF", subtitle = "Dashed line represents True Target Gene AF", x = "", y = "Estimated Acceleration Factor (AF)") +
       theme(plot.title = element_text(face = "bold"), legend.position = "none")
   })
 
-  # --- Fig 3: 依存性切断の散布図 (T1 vs T2) ---
+  # --- Fig 3: 依存性切断の散布図 (B&W) ---
   output$sim_multi_fig3 <- renderPlot({
     t1_samp <- results[[1]]$sample_t1 / 365.25
     t2_samp <- results[[1]]$sample_t2 / 365.25
     plot_df3 <- data.frame(T1 = t1_samp, T2 = t2_samp)
 
     ggplot(plot_df3, aes(x = T1, y = T2)) +
-      geom_point(color = "#34495e", alpha = 0.6, size = 2) +
-      geom_smooth(method = "lm", color = "red", linetype = "dashed", linewidth = 1) +
+      geom_point(color = "black", alpha = 0.4, size = 2) +
+      geom_smooth(method = "lm", color = "black", linetype = "dashed", linewidth = 1.2, se = TRUE) +
       theme_minimal(base_size = 15) +
       labs(title = "Figure 3: Dependent Left Truncation", subtitle = "Correlation between Time to CGP (T1) and Residual Survival (T2)", x = "Time to CGP Test (T1, Years)", y = "Residual Survival Time (T2, Years)") +
       theme(plot.title = element_text(face = "bold"))

@@ -1475,7 +1475,7 @@ ui <- dashboardPage(
                     numericInput("sim_mut_freq", "Target Gene Mutation Frequency (%):", 20, min = 1, max = 100, step = 1),
                     numericInput("sim_true_af", "True Target Gene AF (Time Ratio):", 1.5, min = 0.1, max = 5.0, step = 0.1),
 
-                    numericInput("sim_true_med", "True Baseline Median OS (Years):", 2.0, min = 0.5, max = 10.0, step = 0.1),
+                    numericInput("sim_true_med", "True Baseline Median OS (Years):", 3.0, min = 0.5, max = 10.0, step = 0.5),
                     numericInput("sim_true_shape", "True Baseline Shape (Log-logistic):", 1.5, min = 0.5, max = 5.0, step = 0.1),
 
                     h4("Left-Truncation (T1) Pattern"),
@@ -1496,7 +1496,7 @@ ui <- dashboardPage(
                     hr(),
                     actionButton("run_sim", "Run Single Simulation", class = "btn-primary", width = "100%"),
                     br(), br(),
-                    actionButton("run_sim_multi", "Run 400 Simulations (Takes ~2 mins)", class = "btn-warning", width = "100%")
+                    actionButton("run_sim_multi", "Run 400 Simulations (Takes ~5 mins)", class = "btn-warning", width = "100%")
                   ),
 
                   mainPanel(
