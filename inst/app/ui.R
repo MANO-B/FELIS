@@ -1503,20 +1503,19 @@ ui <- dashboardPage(
                     h4("Simulation Results"),
 
                     conditionalPanel(
-                      condition = "input.run_sim > 0 && input.run_sim_multi == 0 || input.run_sim > input.run_sim_multi",
+                      condition = "input.run_sim > 0",
                       h5(tags$b("Single Run Estimates (Point Estimate & 95% CI)")),
                       tableOutput("sim_result_table"),
                       fluidRow(
                         column(12, plotOutput("sim_survival_plot", height = "450px"))
                       )
                     ),
-
                     conditionalPanel(
                       condition = "input.run_sim_multi > 0",
                       h5(tags$b("400 Iterations Summary (Mean, MSE, and Coverage Rate [CR])")),
                       tableOutput("sim_multi_result_table"),
 
-                      # --- 新しく追加した 3つのFigure表示エリア ---
+                      # --- ここから下が重要 (Fig 1 - 3 の表示枠) ---
                       hr(),
                       h4("Visualizations for Manuscript (Fig 1 - 3)"),
                       fluidRow(

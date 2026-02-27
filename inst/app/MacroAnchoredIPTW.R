@@ -335,6 +335,7 @@ observeEvent(input$run_sim_multi, {
 
   pull_vals <- function(getter) { v <- sapply(results, getter); v[!is.na(v)] }
 
+  # AFの集計関数: 点推定(Mean), MSE, Coverage Rate(CR)
   calc_stats_af <- function(model_name, var_name, true_val) {
     est_vals <- pull_vals(function(x) x[[model_name]][paste0(var_name, "_est")])
     l_vals   <- pull_vals(function(x) x[[model_name]][paste0(var_name, "_L")])
@@ -347,10 +348,9 @@ observeEvent(input$run_sim_multi, {
     sprintf("%.2f (MSE: %.3f, CR: %.1f%%)", mean_est, mse_val, cr_val)
   }
 
+  # OS指標の集計関数 (True_Metricsからの抽出を修正)
   calc_stats_metrics <- function(model_name, metric_name, true_val = NULL) {
-    if(!is.null(model_name)){ vals <- sapply(results, function(x) x[[model_name]][metric_name])
-    } else { vals <- sapply(results, function(x) x[[metric_name]]) }
-    vals <- vals[!is.na(vals)]
+    vals <- pull_vals(function(x) x[[model_name]][metric_name])
     if(length(vals) == 0) return("N/A")
     mean_val <- mean(vals)
     if(!is.null(true_val)){
@@ -361,26 +361,43 @@ observeEvent(input$run_sim_multi, {
   }
 
   True_AF <- input$sim_true_af
-  true_med_vals <- pull_vals(function(x) x$True_Metrics["Med"])
-  true_s5_vals  <- pull_vals(function(x) x$True_Metrics["S5"])
+
+  # 【修正】True Valueの指標を安全に抽出して平均化
+  mean_true_med <- mean(pull_vals(function(x) x$True_Metrics["Med"]), na.rm = TRUE)
+  mean_true_s5  <- mean(pull_vals(function(x) x$True_Metrics["S5"]), na.rm = TRUE)
 
   output$sim_multi_result_table <- renderTable({
     data.frame(
       Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF", "Marginal Med OS [Years]", "Marginal 5-Year OS [%]", "Average ESS"),
-      `True Value` = c(safe_fmt(True_AF), "0.85", "1.10", "0.90", "0.95", calc_stats_metrics(NULL, "True_Metrics", 1), calc_stats_metrics(NULL, "True_Metrics", 2), "N/A"),
-      `Naive AFT` = c(calc_stats_af("Naive_AF", "AF_X", True_AF), calc_stats_af("Naive_AF", "AF_Age", 0.85), calc_stats_af("Naive_AF", "AF_Sex", 1.10), calc_stats_af("Naive_AF", "AF_READ", 0.90), calc_stats_af("Naive_AF", "AF_COADREAD", 0.95), calc_stats_metrics("Naive_Metrics", "Med", mean(true_med_vals)), calc_stats_metrics("Naive_Metrics", "S5", mean(true_s5_vals)), "N/A"),
-      `Standard LT AFT` = c(calc_stats_af("LT_AF", "AF_X", True_AF), calc_stats_af("LT_AF", "AF_Age", 0.85), calc_stats_af("LT_AF", "AF_Sex", 1.10), calc_stats_af("LT_AF", "AF_READ", 0.90), calc_stats_af("LT_AF", "AF_COADREAD", 0.95), calc_stats_metrics("LT_Metrics", "Med", mean(true_med_vals)), calc_stats_metrics("LT_Metrics", "S5", mean(true_s5_vals)), "N/A"),
-      `Proposed (Ver 2.3.2)` = c(paste0("<b>", calc_stats_af("Prop_AF", "AF_X", True_AF), "</b>"), paste0("<b>", calc_stats_af("Prop_AF", "AF_Age", 0.85), "</b>"), paste0("<b>", calc_stats_af("Prop_AF", "AF_Sex", 1.10), "</b>"), paste0("<b>", calc_stats_af("Prop_AF", "AF_READ", 0.90), "</b>"), paste0("<b>", calc_stats_af("Prop_AF", "AF_COADREAD", 0.95), "</b>"), paste0("<b>", calc_stats_metrics("Prop_Metrics", "Med", mean(true_med_vals)), "</b>"), paste0("<b>", calc_stats_metrics("Prop_Metrics", "S5", mean(true_s5_vals)), "</b>"), paste0("<b>", calc_stats_metrics(NULL, "ESS"), "</b>"))
+
+      # True Value には MSE を計算させない (ただの平均値を表示)
+      `True Value` = c(safe_fmt(True_AF), "0.85", "1.10", "0.90", "0.95", sprintf("%.2f", mean_true_med), sprintf("%.2f", mean_true_s5), "N/A"),
+
+      `Naive AFT` = c(calc_stats_af("Naive_AF", "AF_X", True_AF), calc_stats_af("Naive_AF", "AF_Age", 0.85), calc_stats_af("Naive_AF", "AF_Sex", 1.10), calc_stats_af("Naive_AF", "AF_READ", 0.90), calc_stats_af("Naive_AF", "AF_COADREAD", 0.95), calc_stats_metrics("Naive_Metrics", "Med", mean_true_med), calc_stats_metrics("Naive_Metrics", "S5", mean_true_s5), "N/A"),
+
+      `Standard LT AFT` = c(calc_stats_af("LT_AF", "AF_X", True_AF), calc_stats_af("LT_AF", "AF_Age", 0.85), calc_stats_af("LT_AF", "AF_Sex", 1.10), calc_stats_af("LT_AF", "AF_READ", 0.90), calc_stats_af("LT_AF", "AF_COADREAD", 0.95), calc_stats_metrics("LT_Metrics", "Med", mean_true_med), calc_stats_metrics("LT_Metrics", "S5", mean_true_s5), "N/A"),
+
+      `Proposed (Ver 2.3.2)` = c(paste0("<b>", calc_stats_af("Prop_AF", "AF_X", True_AF), "</b>"), paste0("<b>", calc_stats_af("Prop_AF", "AF_Age", 0.85), "</b>"), paste0("<b>", calc_stats_af("Prop_AF", "AF_Sex", 1.10), "</b>"), paste0("<b>", calc_stats_af("Prop_AF", "AF_READ", 0.90), "</b>"), paste0("<b>", calc_stats_af("Prop_AF", "AF_COADREAD", 0.95), "</b>"), paste0("<b>", calc_stats_metrics("Prop_Metrics", "Med", mean_true_med), "</b>"), paste0("<b>", calc_stats_metrics("Prop_Metrics", "S5", mean_true_s5), "</b>"), paste0("<b>", sprintf("%.2f", mean(pull_vals(function(x) x$ESS))), "</b>"))
     )
   }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c", sanitize.text.function = function(x) x)
 
-  # --- Fig 1: 400回の平均生存曲線 ---
+  # --- Fig 1: 400回の平均生存曲線 (安全な抽出処理) ---
   output$sim_multi_fig1 <- renderPlot({
     t_seq <- seq(0, 5, length.out = 100)
-    avg_curve_true <- colMeans(do.call(rbind, lapply(results, function(x) x$curve_true)), na.rm = TRUE)
-    avg_curve_naive <- colMeans(do.call(rbind, lapply(results, function(x) x$curve_naive)), na.rm = TRUE)
-    avg_curve_lt <- colMeans(do.call(rbind, lapply(results, function(x) x$curve_lt)), na.rm = TRUE)
-    avg_curve_prop <- colMeans(do.call(rbind, lapply(results, function(x) x$curve_prop)), na.rm = TRUE)
+
+    safe_curve_mean <- function(getter) {
+      mat <- do.call(rbind, lapply(results, function(x) {
+        v <- getter(x)
+        if (is.null(v) || length(v) != 100) return(rep(NA_real_, 100))
+        return(v)
+      }))
+      colMeans(mat, na.rm = TRUE)
+    }
+
+    avg_curve_true  <- safe_curve_mean(function(x) x$curve_true)
+    avg_curve_naive <- safe_curve_mean(function(x) x$curve_naive)
+    avg_curve_lt    <- safe_curve_mean(function(x) x$curve_lt)
+    avg_curve_prop  <- safe_curve_mean(function(x) x$curve_prop)
 
     plot_df1 <- data.frame(
       Time = rep(t_seq, 4),
@@ -401,8 +418,8 @@ observeEvent(input$run_sim_multi, {
   # --- Fig 2: AF推定値の箱ひげ図 ---
   output$sim_multi_fig2 <- renderPlot({
     af_naive <- pull_vals(function(x) x$Naive_AF["AF_X_est"])
-    af_lt <- pull_vals(function(x) x$LT_AF["AF_X_est"])
-    af_prop <- pull_vals(function(x) x$Prop_AF["AF_X_est"])
+    af_lt    <- pull_vals(function(x) x$LT_AF["AF_X_est"])
+    af_prop  <- pull_vals(function(x) x$Prop_AF["AF_X_est"])
 
     plot_df2 <- data.frame(
       AF = c(af_naive, af_lt, af_prop),
@@ -415,15 +432,14 @@ observeEvent(input$run_sim_multi, {
       geom_boxplot(alpha = 0.7, outlier.shape = 1) +
       geom_hline(yintercept = True_AF, color = "black", linetype = "dashed", linewidth = 1.2) +
       scale_fill_manual(values = c("#e74c3c", "#f39c12", "#27ae60")) +
-      coord_cartesian(ylim = c(0, max(True_AF * 2.5, 3))) + # LTが爆発しても見やすくクリップ
+      coord_cartesian(ylim = c(0, max(True_AF * 2.5, 3))) +
       theme_minimal(base_size = 15) +
-      labs(title = "Figure 2: Distribution of Estimated Acceleration Factors", subtitle = "Dashed line represents True Target Gene AF", x = "", y = "Estimated AF") +
+      labs(title = "Figure 2: Distribution of Estimated AF", subtitle = "Dashed line represents True Target Gene AF", x = "", y = "Estimated Acceleration Factor (AF)") +
       theme(plot.title = element_text(face = "bold"), legend.position = "none")
   })
 
   # --- Fig 3: 依存性切断の散布図 (T1 vs T2) ---
   output$sim_multi_fig3 <- renderPlot({
-    # 最初の成功したイテレーションのサンプルを使用
     t1_samp <- results[[1]]$sample_t1 / 365.25
     t2_samp <- results[[1]]$sample_t2 / 365.25
     plot_df3 <- data.frame(T1 = t1_samp, T2 = t2_samp)
@@ -432,7 +448,7 @@ observeEvent(input$run_sim_multi, {
       geom_point(color = "#34495e", alpha = 0.6, size = 2) +
       geom_smooth(method = "lm", color = "red", linetype = "dashed", linewidth = 1) +
       theme_minimal(base_size = 15) +
-      labs(title = "Figure 3: Visualization of Dependent Left Truncation", subtitle = "Positive correlation demonstrates the violation of the independent truncation assumption.", x = "Time to CGP Test (T1, Years)", y = "Residual Survival Time (T2, Years)") +
+      labs(title = "Figure 3: Dependent Left Truncation", subtitle = "Correlation between Time to CGP (T1) and Residual Survival (T2)", x = "Time to CGP Test (T1, Years)", y = "Residual Survival Time (T2, Years)") +
       theme(plot.title = element_text(face = "bold"))
   })
 })
