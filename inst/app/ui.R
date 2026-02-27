@@ -1466,7 +1466,7 @@ ui <- dashboardPage(
       ),
       tabItem("Simulation_Study",
               fluidPage(
-                titlePanel("Simulation Study: Robust Estimation via T1-based IPTW"),
+                titlePanel("Simulation Study: Tamura & Ikegami Model Ver 2.0 (G-computation)"),
 
                 sidebarLayout(
                   sidebarPanel(
