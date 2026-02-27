@@ -1466,7 +1466,7 @@ ui <- dashboardPage(
       ),
       tabItem("Simulation_Study",
               fluidPage(
-                titlePanel("Simulation Study: Tamura & Ikegami Model Ver 2.3 (Ultimate)"),
+                titlePanel("Simulation Study: Tamura & Ikegami Model Ver 2.3.2"),
 
                 sidebarLayout(
                   sidebarPanel(
@@ -1474,6 +1474,10 @@ ui <- dashboardPage(
                     numericInput("sim_n", "CGP Sample Size (N):", 1000, min = 500, max = 5000),
                     numericInput("sim_mut_freq", "Target Gene Mutation Frequency (%):", 20, min = 1, max = 100, step = 1),
                     numericInput("sim_true_af", "True Target Gene AF (Time Ratio):", 1.5, min = 0.1, max = 5.0, step = 0.1),
+
+                    # 追加: ベースラインOSのパラメータ調整
+                    numericInput("sim_true_med", "True Baseline Median OS (Years):", 2.0, min = 0.5, max = 10.0, step = 0.1),
+                    numericInput("sim_true_shape", "True Baseline Shape (Log-logistic):", 1.5, min = 0.5, max = 5.0, step = 0.1),
 
                     h4("Left-Truncation (T1) Pattern"),
                     radioButtons("sim_t1_pattern", "Timing of CGP test (T1):",
@@ -1500,17 +1504,18 @@ ui <- dashboardPage(
                     h4("Simulation Results"),
 
                     conditionalPanel(
-                      condition = "input.run_sim > 0",
-                      h5(tags$b("Single Run Estimates")),
+                      condition = "input.run_sim > 0 && input.run_sim_multi == 0 || input.run_sim > input.run_sim_multi",
+                      h5(tags$b("Single Run Estimates (Point Estimate & 95% CI)")),
                       tableOutput("sim_result_table"),
                       fluidRow(
                         column(12, plotOutput("sim_survival_plot", height = "450px"))
                       )
                     ),
 
+                    # 修正: 表示バグを回避するため条件をシンプルに
                     conditionalPanel(
                       condition = "input.run_sim_multi > 0",
-                      h5(tags$b("400 Iterations Summary (Mean, MSE, and CP)")),
+                      h5(tags$b("400 Iterations Summary (Mean, MSE, and Coverage Rate [CR])")),
                       tableOutput("sim_multi_result_table")
                     )
                   )
