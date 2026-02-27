@@ -126,7 +126,7 @@ survival_CTx_analysis2_logic_control <- function() {
 }
 
 # =========================================================================
-# GLOBAL HELPERS (Tamura & Ikegami Model Ver 2.3.2 実データ 修正版)
+# GLOBAL HELPERS (Tamura & Ikegami Model Ver 2.3.2 実データ 修正版2)
 # =========================================================================
 gen_sim_times_robust <- function(fit, newdata, dist_type = c("weibull", "llogis")) {
   dist_type <- match.arg(dist_type)
@@ -163,7 +163,6 @@ gen_sim_times_robust <- function(fit, newdata, dist_type = c("weibull", "llogis"
   } else { return(scale_vec * ((1 - u) / u)^(1 / shape)) }
 }
 
-# 【修正】より柔軟で確実な重み付け最適化 (W = exp(theta * T1))
 calculate_calibrated_iptw <- function(data, ref_surv_list) {
   data$iptw <- 1.0
   t_points_days <- (1:5) * 365.25
@@ -177,7 +176,6 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
 
     if (nrow(ag_data) < 5) next
 
-    # T1を年単位でスケーリング
     time_pre_years <- pmax(ag_data$time_pre / 365.25, 0.01)
 
     obj_func <- function(theta) {
@@ -215,8 +213,16 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
       OUTPUT_DATA$figure_surv_CTx_Data_drug_control)
 
-  # UIからの入力値変更を確実に感知する
-  input$registry_cancer_type
+  # 【完全修正】動的UIの入力値を確実に感知させるためのリスト化
+  ui_triggers <- list(
+    input$survival_data_source, input$registry_cancer_type,
+    input$surv_all_1y, input$surv_u40_1y
+  )
+
+  # デバッグ用：UIの値がどこまで取れているかをコンソールに表示
+  cat("\n--- 生存曲線描画トリガー検知 ---\n")
+  cat("Source: ", input$survival_data_source, "\n")
+  cat("Registry Type: ", input$registry_cancer_type, "\n")
 
   lapply(1:2, function(i) {
     prefix <- paste0("gene_survival_interactive_", i, "_")
@@ -236,27 +242,47 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
       )
     )
 
+  # ========================================================
+  # UI入力に応じたマクロデータ（ref_surv_list）の構築
+  # ========================================================
   ref_surv_list <- list()
   age_groups_all <- c("40未満", "40代", "50代", "60代", "70代", "80以上", "全年齢")
 
-  # 【修正】不要な条件式(input$survival_data_source)を排除し、直接 registry_cancer_type を読みに行く
-  if (!is.null(input$registry_cancer_type) && exists("Data_age_survival_5_year")) {
-    if (input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
-      cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
-      fallback_surv <- cancer_data[["全年齢"]]
-      for (ag in age_groups_all) {
-        if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
-          ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
-        } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
-          ref_surv_list[[ag]] <- as.numeric(fallback_surv)
+  if (!is.null(input$survival_data_source)) {
+    if (input$survival_data_source == "registry") {
+      if (!is.null(input$registry_cancer_type) && exists("Data_age_survival_5_year")) {
+        if (input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
+          cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
+          fallback_surv <- cancer_data[["全年齢"]]
+          for (ag in age_groups_all) {
+            if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
+              ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
+            } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
+              ref_surv_list[[ag]] <- as.numeric(fallback_surv)
+            }
+          }
+          cat("-> レジストリデータをロードしました\n")
         }
       }
+    } else if (input$survival_data_source == "manual_all") {
+      vals <- c(input$surv_all_1y, input$surv_all_2y, input$surv_all_3y, input$surv_all_4y, input$surv_all_5y)
+      for (ag in age_groups_all) ref_surv_list[[ag]] <- vals
+      cat("-> Manual All データをロードしました\n")
+    } else if (input$survival_data_source == "manual_age") {
+      ref_surv_list[["40未満"]] <- c(input$surv_u40_1y, input$surv_u40_2y, input$surv_u40_3y, input$surv_u40_4y, input$surv_u40_5y)
+      ref_surv_list[["40代"]] <- c(input$surv_40s_1y, input$surv_40s_2y, input$surv_40s_3y, input$surv_40s_4y, input$surv_40s_5y)
+      ref_surv_list[["50代"]] <- c(input$surv_50s_1y, input$surv_50s_2y, input$surv_50s_3y, input$surv_50s_4y, input$surv_50s_5y)
+      ref_surv_list[["60代"]] <- c(input$surv_60s_1y, input$surv_60s_2y, input$surv_60s_3y, input$surv_60s_4y, input$surv_60s_5y)
+      ref_surv_list[["70代"]] <- c(input$surv_70s_1y, input$surv_70s_2y, input$surv_70s_3y, input$surv_70s_4y, input$surv_70s_5y)
+      ref_surv_list[["80以上"]] <- c(input$surv_80s_1y, input$surv_80s_2y, input$surv_80s_3y, input$surv_80s_4y, input$surv_80s_5y)
+      ref_surv_list[["全年齢"]] <- ref_surv_list[["60代"]]
+      cat("-> Manual Age データをロードしました\n")
     }
   }
 
-  # 万が一データが取れなかった場合のフォールバック
   if (length(ref_surv_list) == 0) {
     for (ag in age_groups_all) ref_surv_list[[ag]] <- c(50, 30, 20, 15, 10)
+    cat("-> (警告) データ取得失敗。ダミーデータを適用します\n")
   }
 
   if (length(ref_surv_list) > 0) {
@@ -384,7 +410,11 @@ output$forest_plot_multivariate = renderPlot({
   shiny::validate(shiny::need(requireNamespace("patchwork", quietly = TRUE), "Please install the 'patchwork' package."))
   shiny::validate(shiny::need(requireNamespace("splines", quietly = TRUE), "Please install the 'splines' package."))
 
-  input$registry_cancer_type
+  # 【完全修正】動的UIの入力値を確実に感知
+  ui_triggers <- list(
+    input$survival_data_source, input$registry_cancer_type,
+    input$surv_all_1y, input$surv_u40_1y
+  )
 
   Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
@@ -399,20 +429,38 @@ output$forest_plot_multivariate = renderPlot({
       )
     )
 
+  # ========================================================
+  # UI入力に応じたマクロデータ（ref_surv_list）の構築
+  # ========================================================
   ref_surv_list <- list()
   age_groups_all <- c("40未満", "40代", "50代", "60代", "70代", "80以上", "全年齢")
 
-  if (!is.null(input$registry_cancer_type) && exists("Data_age_survival_5_year")) {
-    if (input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
-      cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
-      fallback_surv <- cancer_data[["全年齢"]]
-      for (ag in age_groups_all) {
-        if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
-          ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
-        } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
-          ref_surv_list[[ag]] <- as.numeric(fallback_surv)
+  if (!is.null(input$survival_data_source)) {
+    if (input$survival_data_source == "registry") {
+      if (!is.null(input$registry_cancer_type) && exists("Data_age_survival_5_year")) {
+        if (input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
+          cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
+          fallback_surv <- cancer_data[["全年齢"]]
+          for (ag in age_groups_all) {
+            if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
+              ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
+            } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
+              ref_surv_list[[ag]] <- as.numeric(fallback_surv)
+            }
+          }
         }
       }
+    } else if (input$survival_data_source == "manual_all") {
+      vals <- c(input$surv_all_1y, input$surv_all_2y, input$surv_all_3y, input$surv_all_4y, input$surv_all_5y)
+      for (ag in age_groups_all) ref_surv_list[[ag]] <- vals
+    } else if (input$survival_data_source == "manual_age") {
+      ref_surv_list[["40未満"]] <- c(input$surv_u40_1y, input$surv_u40_2y, input$surv_u40_3y, input$surv_u40_4y, input$surv_u40_5y)
+      ref_surv_list[["40代"]] <- c(input$surv_40s_1y, input$surv_40s_2y, input$surv_40s_3y, input$surv_40s_4y, input$surv_40s_5y)
+      ref_surv_list[["50代"]] <- c(input$surv_50s_1y, input$surv_50s_2y, input$surv_50s_3y, input$surv_50s_4y, input$surv_50s_5y)
+      ref_surv_list[["60代"]] <- c(input$surv_60s_1y, input$surv_60s_2y, input$surv_60s_3y, input$surv_60s_4y, input$surv_60s_5y)
+      ref_surv_list[["70代"]] <- c(input$surv_70s_1y, input$surv_70s_2y, input$surv_70s_3y, input$surv_70s_4y, input$surv_70s_5y)
+      ref_surv_list[["80以上"]] <- c(input$surv_80s_1y, input$surv_80s_2y, input$surv_80s_3y, input$surv_80s_4y, input$surv_80s_5y)
+      ref_surv_list[["全年齢"]] <- ref_surv_list[["60代"]]
     }
   }
 
@@ -494,6 +542,7 @@ output$forest_plot_multivariate = renderPlot({
   pseudo_forest <- Data_forest[idx_pseudo, ]
 
   pseudo_forest$sim_T1 <- gen_sim_times_robust(fit_t1, pseudo_forest, dist_type = "weibull")
+
   pseudo_forest$logT1_sim_scale <- log(pmax(pseudo_forest$sim_T1 / 365.25, 1e-6))
   ns_sim <- tryCatch(predict(ns_obj, pseudo_forest$logT1_sim_scale), error = function(e) matrix(0, nrow(pseudo_forest), attr(ns_obj, "df")))
   colnames(ns_sim) <- paste0("ns", seq_len(ncol(ns_sim)))
