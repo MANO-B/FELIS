@@ -84,31 +84,19 @@ make_age_class_6grp <- function(age_num) {
 build_ref_surv_list_realdata <- function(input, Data_age_survival_5_year = NULL) {
   ref_surv_list <- list()
   age_groups_all <- c("40未満", "40代", "50代", "60代", "70代", "80以上", "全年齢")
-
+  message("[ref_surv] point 0")
   if (!is.null(input$survival_data_source)) {
+    message("[ref_surv] point 1")
     if (input$survival_data_source == "registry") {
-      if (!is.null(input$registry_cancer_type) &&
-          input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
-
-        cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
-
-        message("[ref_surv] cancer=", input$registry_cancer_type)
-        message("[ref_surv] available keys: ", paste(names(cancer_data), collapse=" | "))
-
-        age_groups_all <- c("40未満","40代","50代","60代","70代","80以上","全年齢")
-        missing <- setdiff(age_groups_all, names(cancer_data))
-        message("[ref_surv] missing keys: ", paste(missing, collapse=" | "))
-
-        fallback_surv <- cancer_data[["全年齢"]]
-        message("[ref_surv] fallback(全年齢) length=",
-                ifelse(is.null(fallback_surv), "NULL", length(fallback_surv)))
-
-        for (ag in age_groups_all) {
-          if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
-            ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
-          } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
-            ref_surv_list[[ag]] <- as.numeric(fallback_surv)
-          }
+      message("[ref_surv] point 2")
+      cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
+      age_groups_all <- c("40未満","40代","50代","60代","70代","80以上","全年齢")
+      fallback_surv <- cancer_data[["全年齢"]]
+      for (ag in age_groups_all) {
+        if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
+          ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
+        } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
+          ref_surv_list[[ag]] <- as.numeric(fallback_surv)
         }
       }
     } else if (input$survival_data_source == "manual_all") {
