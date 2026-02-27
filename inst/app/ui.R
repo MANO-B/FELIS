@@ -1466,7 +1466,7 @@ ui <- dashboardPage(
       ),
       tabItem("Simulation_Study",
               fluidPage(
-                titlePanel("Simulation Study: Tamura & Ikegami Model Ver 2.2 (Ultimate G-comp)"),
+                titlePanel("Simulation Study: Tamura & Ikegami Model Ver 2.3 (Ultimate)"),
 
                 sidebarLayout(
                   sidebarPanel(
@@ -1500,7 +1500,7 @@ ui <- dashboardPage(
                     h4("Simulation Results"),
 
                     conditionalPanel(
-                      condition = "input.run_sim > 0 && input.run_sim_multi == 0 || input.run_sim > input.run_sim_multi",
+                      condition = "input.run_sim > 0",
                       h5(tags$b("Single Run Estimates")),
                       tableOutput("sim_result_table"),
                       fluidRow(
@@ -1509,7 +1509,7 @@ ui <- dashboardPage(
                     ),
 
                     conditionalPanel(
-                      condition = "input.run_sim_multi > 0 && input.run_sim_multi >= input.run_sim",
+                      condition = "input.run_sim_multi > 0",
                       h5(tags$b("400 Iterations Summary (Mean, MSE, and CP)")),
                       tableOutput("sim_multi_result_table")
                     )
