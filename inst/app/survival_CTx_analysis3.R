@@ -126,7 +126,7 @@ survival_CTx_analysis2_logic_control <- function() {
 }
 
 # =========================================================================
-# 2. Global Helpers for G-computation
+# GLOBAL HELPERS (Tamura & Ikegami Model Ver 2.3.2 実データ用 修正版)
 # =========================================================================
 gen_sim_times_robust <- function(fit, newdata, dist_type = c("weibull", "llogis")) {
   dist_type <- match.arg(dist_type)
@@ -163,9 +163,13 @@ gen_sim_times_robust <- function(fit, newdata, dist_type = c("weibull", "llogis"
   } else { return(scale_vec * ((1 - u) / u)^(1 / shape)) }
 }
 
+# =========================================================================
+# STEP 1: Calibration Weighting (1次元区間探索で勾配消失を完全回避)
+# =========================================================================
 calculate_calibrated_iptw <- function(data, ref_surv_list) {
   data$iptw <- 1.0
   t_points_days <- (1:5) * 365.25
+
   for (ag in unique(data$age_class)) {
     if (!(ag %in% names(ref_surv_list))) next
 
@@ -175,37 +179,48 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
 
     if (nrow(ag_data) < 5) next
 
-    log_t1 <- log(pmax(ag_data$time_pre / 365.25, 1e-6))
-    log_t1_sq <- log_t1^2
+    time_pre_years <- pmax(ag_data$time_pre / 365.25, 1e-6)
 
+    # 目的関数 (1パラメータ theta で T1のべき乗による重み付け)
     obj_func <- function(theta) {
-      w <- exp(theta[1] * log_t1 + theta[2] * log_t1_sq)
+      w <- time_pre_years^theta
       w <- pmax(w, 1e-4)
       w <- w / mean(w)
+
       km <- tryCatch(survfit(Surv(time_all, censor) ~ 1, data = ag_data, weights = w), error = function(e) NULL)
       if (is.null(km)) return(1e6)
+
       S_est <- approx(km$time, km$surv, xout = t_points_days, method = "constant", f = 0, rule = 2)$y
       S_est[is.na(S_est)] <- min(S_est, na.rm = TRUE)
-      sum((S_est - S_macro_target)^2) + 0.001 * sum(theta^2)
+
+      return(sum((S_est - S_macro_target)^2))
     }
 
-    opt <- tryCatch(optim(c(0, 0), obj_func, method = "BFGS"), error = function(e) list(par = c(0, 0)))
-    w_opt <- pmax(exp(opt$par[1] * log_t1 + opt$par[2] * log_t1_sq), 1e-4)
+    # optimize を用いて -5 から +5 の区間を確実に総当たり探索 (階段関数に強い)
+    opt <- tryCatch(optimize(obj_func, interval = c(-5, 5)), error = function(e) list(minimum = 0))
+    theta_hat <- opt$minimum
+
+    w_opt <- pmax(time_pre_years^theta_hat, 1e-4)
     lower_bound <- quantile(w_opt, 0.01, na.rm = TRUE)
     upper_bound <- quantile(w_opt, 0.99, na.rm = TRUE)
     w_opt <- pmax(lower_bound, pmin(w_opt, upper_bound))
+
     data$iptw[ag_data_idx] <- w_opt / mean(w_opt)
   }
   return(data)
 }
 
 # =========================================================================
-# 3. Survival Curve Plot (Standardized via G-computation)
+# 生存曲線プロット
 # =========================================================================
 output$figure_survival_CTx_interactive_1_control = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
       OUTPUT_DATA$figure_surv_CTx_Data_drug_control)
+
+  # 【修正】組織型の変更を感知するトリガーを追加
+  input$registry_cancer_type
+  input$survival_data_source
 
   lapply(1:2, function(i) {
     prefix <- paste0("gene_survival_interactive_", i, "_")
@@ -370,12 +385,16 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 })
 
 # =========================================================================
-# 4. Forest Plot Multivariate (Standardized TR via G-comp)
+# フォレストプロット (forest_plot_multivariate)
 # =========================================================================
 output$forest_plot_multivariate = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control, OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control)
   shiny::validate(shiny::need(requireNamespace("patchwork", quietly = TRUE), "Please install the 'patchwork' package."))
   shiny::validate(shiny::need(requireNamespace("splines", quietly = TRUE), "Please install the 'splines' package."))
+
+  # 【修正】組織型の変更を感知するトリガーを追加
+  input$registry_cancer_type
+  input$survival_data_source
 
   Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
@@ -483,6 +502,7 @@ output$forest_plot_multivariate = renderPlot({
   pseudo_forest <- Data_forest[idx_pseudo, ]
 
   pseudo_forest$sim_T1 <- gen_sim_times_robust(fit_t1, pseudo_forest, dist_type = "weibull")
+
   pseudo_forest$logT1_sim_scale <- log(pmax(pseudo_forest$sim_T1 / 365.25, 1e-6))
   ns_sim <- tryCatch(predict(ns_obj, pseudo_forest$logT1_sim_scale), error = function(e) matrix(0, nrow(pseudo_forest), attr(ns_obj, "df")))
   colnames(ns_sim) <- paste0("ns", seq_len(ncol(ns_sim)))
