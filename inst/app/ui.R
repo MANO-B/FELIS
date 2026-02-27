@@ -1475,7 +1475,6 @@ ui <- dashboardPage(
                     numericInput("sim_mut_freq", "Target Gene Mutation Frequency (%):", 20, min = 1, max = 100, step = 1),
                     numericInput("sim_true_af", "True Target Gene AF (Time Ratio):", 1.5, min = 0.1, max = 5.0, step = 0.1),
 
-                    # 追加: ベースラインOSのパラメータ調整
                     numericInput("sim_true_med", "True Baseline Median OS (Years):", 2.0, min = 0.5, max = 10.0, step = 0.1),
                     numericInput("sim_true_shape", "True Baseline Shape (Log-logistic):", 1.5, min = 0.5, max = 5.0, step = 0.1),
 
@@ -1512,11 +1511,22 @@ ui <- dashboardPage(
                       )
                     ),
 
-                    # 修正: 表示バグを回避するため条件をシンプルに
                     conditionalPanel(
                       condition = "input.run_sim_multi > 0",
                       h5(tags$b("400 Iterations Summary (Mean, MSE, and Coverage Rate [CR])")),
-                      tableOutput("sim_multi_result_table")
+                      tableOutput("sim_multi_result_table"),
+
+                      # --- 新しく追加した 3つのFigure表示エリア ---
+                      hr(),
+                      h4("Visualizations for Manuscript (Fig 1 - 3)"),
+                      fluidRow(
+                        column(12, plotOutput("sim_multi_fig1", height = "450px"))
+                      ),
+                      br(),
+                      fluidRow(
+                        column(6, plotOutput("sim_multi_fig2", height = "450px")),
+                        column(6, plotOutput("sim_multi_fig3", height = "450px"))
+                      )
                     )
                   )
                 )
