@@ -174,23 +174,113 @@ survival_CTx_analysis2_logic_control <- function() {
 
 
 
+# =========================================================================
+# GLOBAL HELPERS (Tamura & Ikegami Model Ver 2.3.2 実データ用)
+# どんな複雑な共変量（Factor）にも対応できる堅牢なサンプリング関数
+# =========================================================================
+gen_sim_times_robust <- function(fit, newdata, dist_type = c("weibull", "llogis")) {
+  dist_type <- match.arg(dist_type)
+  if (is.null(fit) || nrow(newdata) == 0) return(rep(NA_real_, nrow(newdata)))
+
+  shape <- fit$res["shape", "est"]
+  base_scale <- fit$res["scale", "est"]
+
+  # 共変量がない場合
+  if (length(fit$coefficients) == 2) {
+    scale_vec <- rep(base_scale, nrow(newdata))
+  } else {
+    # 実データ特有の複雑なダミー変数展開を自動処理
+    form <- fit$call$formula
+    form[[2]] <- NULL # 応答変数を削除
+
+    # 欠損値でエラーが出ないよう安全にモデル行列を作成
+    mf <- model.frame(form, data = newdata, xlev = fit$xlevels, na.action = na.pass)
+    mm <- model.matrix(form, mf, contrasts.arg = fit$contrasts)
+
+    cov_names <- colnames(mm)[-1] # Interceptを除外
+    cov_coefs <- fit$coefficients[cov_names]
+    cov_coefs[is.na(cov_coefs)] <- 0 # 安全装置
+
+    # 線形予測子（eta）から個別のscaleを計算
+    eta <- as.numeric(mm[, -1, drop = FALSE] %*% cov_coefs)
+    scale_vec <- base_scale * exp(eta)
+  }
+
+  u <- pmax(pmin(runif(nrow(newdata)), 0.9999), 0.0001)
+
+  if (dist_type == "weibull") {
+    return(scale_vec * (-log(u))^(1 / shape))
+  } else {
+    return(scale_vec * ((1 - u) / u)^(1 / shape))
+  }
+}
+
+# =========================================================================
+# STEP 1: Calibration Weighting (実データ OSのKMをマクロ1-5年に較正)
+# =========================================================================
+calculate_calibrated_iptw <- function(data, ref_surv_list) {
+  data$iptw <- 1.0
+  t_points_days <- (1:5) * 365.25
+
+  for (ag in unique(data$age_class)) {
+    if (!(ag %in% names(ref_surv_list))) next
+
+    # マクロターゲット生存率
+    S_macro_target <- pmax(pmin(ref_surv_list[[ag]][1:5] / 100, 0.999), 0.001)
+    ag_data_idx <- which(data$age_class == ag)
+    ag_data <- data[ag_data_idx, , drop = FALSE]
+
+    if (nrow(ag_data) < 5) next # サンプル不足時の安全装置
+
+    # 重みの関数定義: W = exp(a*logT1 + b*logT1^2)
+    log_t1 <- log(pmax(ag_data$time_pre / 365.25, 1e-6))
+    log_t1_sq <- log_t1^2
+
+    obj_func <- function(theta) {
+      w <- exp(theta[1] * log_t1 + theta[2] * log_t1_sq)
+      w <- pmax(w, 1e-4)
+      w <- w / mean(w)
+
+      km <- tryCatch(survfit(Surv(time_all, censor) ~ 1, data = ag_data, weights = w), error = function(e) NULL)
+      if (is.null(km)) return(1e6)
+
+      S_est <- approx(km$time, km$surv, xout = t_points_days, method = "constant", f = 0, rule = 2)$y
+      S_est[is.na(S_est)] <- min(S_est, na.rm = TRUE) # 曲線が早く途切れた場合の補完
+
+      sum((S_est - S_macro_target)^2) + 0.001 * sum(theta^2) # SSE + 緩やかなRidgeペナルティ
+    }
+
+    # 瞬時に最適化
+    opt <- tryCatch(optim(c(0, 0), obj_func, method = "BFGS"), error = function(e) list(par = c(0, 0)))
+    w_opt <- pmax(exp(opt$par[1] * log_t1 + opt$par[2] * log_t1_sq), 1e-4)
+
+    # 極端な重みをトリミング
+    lower_bound <- quantile(w_opt, 0.01, na.rm = TRUE)
+    upper_bound <- quantile(w_opt, 0.99, na.rm = TRUE)
+    w_opt <- pmax(lower_bound, pmin(w_opt, upper_bound))
+
+    data$iptw[ag_data_idx] <- w_opt / mean(w_opt)
+  }
+  return(data)
+}
+
+# =========================================================================
+# 生存曲線描画ロジック (G-computation Ver 2.3.2 統合)
+# =========================================================================
 output$figure_survival_CTx_interactive_1_control = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
       OUTPUT_DATA$figure_surv_CTx_Data_drug_control)
 
   # =========================================================================
-  # Force Reactivity: Evaluate inputs explicitly so Shiny redraws on changes
+  # Force Reactivity
   # =========================================================================
   lapply(1:2, function(i) {
     prefix <- paste0("gene_survival_interactive_", i, "_")
     list(
-      input[[paste0(prefix, "P_1_control")]],
-      input[[paste0(prefix, "P_2_control")]],
-      input[[paste0(prefix, "W_control")]],
-      input[[paste0(prefix, "A_control")]],
-      input[[paste0(prefix, "S_control")]],
-      input[[paste0(prefix, "H_control")]],
+      input[[paste0(prefix, "P_1_control")]], input[[paste0(prefix, "P_2_control")]],
+      input[[paste0(prefix, "W_control")]], input[[paste0(prefix, "A_control")]],
+      input[[paste0(prefix, "S_control")]], input[[paste0(prefix, "H_control")]],
       input[[paste0(prefix, "D_control")]]
     )
   })
@@ -198,6 +288,17 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
   Data_drug = OUTPUT_DATA$figure_surv_CTx_Data_drug_control
+
+  # 年齢クラスの事前計算
+  Data_survival_interactive <- Data_survival_interactive %>%
+    dplyr::mutate(
+      age_num = as.numeric(症例.基本情報.年齢),
+      age_class = dplyr::case_when(
+        age_num < 40 ~ "40未満", age_num < 50 ~ "40代", age_num < 60 ~ "50代",
+        age_num < 70 ~ "60代", age_num < 80 ~ "70代", age_num >= 80 ~ "80以上",
+        TRUE ~ "全年齢"
+      )
+    )
 
   # ========================================================
   # Prepare Reference Survival Data (Macro Data)
@@ -210,7 +311,6 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
       if(exists("Data_age_survival_5_year") && input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
         cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
         fallback_surv <- cancer_data[["全年齢"]]
-
         for (ag in age_groups) {
           if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
             ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
@@ -232,44 +332,19 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     }
   }
 
-  # Fallback generation for empty lists
   if (length(ref_surv_list) == 0) {
     for (ag in age_groups) ref_surv_list[[ag]] <- c(50, 30, 20, 15, 10)
   } else {
-    for (ag in age_groups) {
-      if (is.null(ref_surv_list[[ag]])) ref_surv_list[[ag]] <- ref_surv_list[[1]]
-    }
+    for (ag in age_groups) { if (is.null(ref_surv_list[[ag]])) ref_surv_list[[ag]] <- ref_surv_list[[1]] }
   }
 
-  # ========================================================
-  # Calculate IPTW (Inverse Probability of Treatment Weighting)
-  # ========================================================
-  # This step projects the CGP cohort to match the general population survival baseline
+  # 【Ver 2.3.2】 Calibration Weighting の適用
   if (length(ref_surv_list) > 0) {
-    # NOTE: Assuming 'calculate_iptw_age' or 'calculate_iptw_loglogistic_age' is defined
-    Data_survival_interactive <- calculate_iptw_age(Data_survival_interactive, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢")
+    Data_survival_interactive <- calculate_calibrated_iptw(Data_survival_interactive, ref_surv_list)
   } else {
     Data_survival_interactive$iptw <- 1.0
   }
-
-  # Sanitize IPTW to ensure it is a pure numeric vector
-  Data_survival_interactive$iptw <- as.numeric(unlist(Data_survival_interactive$iptw))
   Data_survival_interactive$iptw <- ifelse(is.na(Data_survival_interactive$iptw) | Data_survival_interactive$iptw <= 0, 1.0, Data_survival_interactive$iptw)
-
-  # Pre-calculate age class for safety
-  Data_survival_interactive <- Data_survival_interactive %>%
-    dplyr::mutate(
-      age_num = as.numeric(症例.基本情報.年齢),
-      age_class = dplyr::case_when(
-        age_num < 40 ~ "40未満",
-        age_num < 50 ~ "40代",
-        age_num < 60 ~ "50代",
-        age_num < 70 ~ "60代",
-        age_num < 80 ~ "70代",
-        age_num >= 80 ~ "80以上",
-        TRUE ~ "全年齢"
-      )
-    )
 
   # ========================================================
   # Extract Group IDs
@@ -310,200 +385,89 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 
   Data_survival_1 <- Data_survival_interactive %>% dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_1) %>% dplyr::mutate(Group = "1")
   Data_survival_2 <- Data_survival_interactive %>% dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_2) %>% dplyr::mutate(Group = "2")
+  Data_EP0 <- Data_survival_interactive %>% dplyr::filter(EP_treat == 0) %>% dplyr::mutate(Group = "EP0")
 
-  # =====================================================================
-  # Data Pre-processing for Anchored Models
-  # =====================================================================
-  # Create a baseline reference group (EP_treat == 0)
-  Data_EP0 <- Data_survival_interactive %>%
-    dplyr::filter(EP_treat == 0) %>%
-    dplyr::mutate(Group = "EP0")
-
-  # Combine EP0, Group 1, and Group 2 for OS modeling
   Data_model <- rbind(Data_EP0, Data_survival_1, Data_survival_2) %>%
-    dplyr::mutate(time_t2 = time_all - time_pre) %>%
+    dplyr::mutate(
+      time_t2 = pmax(time_all - time_pre, 0.1), # エラー回避のための微小値保証
+      time_pre_event = 1, # T1は全員到達済み
+      Sex = as.factor(`症例.基本情報.性別.名称.`),
+      Cancers = as.factor(Cancers)
+    ) %>%
     dplyr::filter(time_pre > 0, time_all > time_pre)
 
   shiny::validate(shiny::need(nrow(Data_model) > 0, "No valid data to fit the model."))
-
-  # Set EP0 as the reference baseline level
   Data_model$Group <- factor(Data_model$Group, levels = c("EP0", "1", "2"))
 
-  shiny::validate(shiny::need(nrow(Data_model %>% dplyr::filter(Group == "EP0")) >= 5,
-                              "Not enough EP_treat == 0 patients to establish the reference baseline."))
-
   # =====================================================================
-  # Fit Multivariate Left-Truncated OS Model with IPTW (Doubly Robust)
+  # G-computation のための T1・T2 スプラインモデル構築 (Ver 2.3.2)
   # =====================================================================
-  req(requireNamespace("flexsurv", quietly = TRUE))
+  library(splines)
 
-  # 1. Define potential confounding factors to include in the multivariate model
-  # Ensure the column names exactly match your dataset
-  potential_covariates <- c("age_num", "`症例.基本情報.性別.名称.`", "Cancers")
+  # スプライン変数の生成
+  Data_model$logT1_scale <- log(pmax(Data_model$time_pre / 365.25, 1e-6))
+  ns_obj <- ns(Data_model$logT1_scale, df = 3)
+  ns_mat <- as.matrix(ns_obj)
+  colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
+  for(j in seq_len(ncol(ns_mat))) Data_model[[colnames(ns_mat)[j]]] <- ns_mat[, j]
 
-  # 2. Dynamically build the formula by checking if columns exist and have sufficient variance
-  # (Prevents model crash if a variable has only 1 level in the filtered data)
+  # 共変量の構築 (一意な値が2つ以上あるものだけ抽出)
+  potential_covariates <- c("age_num", "Sex", "Cancers")
   valid_covariates <- c("Group")
   for (cov in potential_covariates) {
-    clean_cov <- gsub("`", "", cov) # Remove backticks for checking
-    if (clean_cov %in% colnames(Data_model)) {
-      # Only add if there are at least 2 distinct values (to avoid singularity)
-      if (length(unique(na.omit(Data_model[[clean_cov]]))) > 1) {
-        valid_covariates <- c(valid_covariates, cov)
-      }
+    if (cov %in% colnames(Data_model) && length(unique(na.omit(Data_model[[cov]]))) > 1) {
+      valid_covariates <- c(valid_covariates, cov)
     }
   }
 
-  # Construct the multivariate formula: Surv(...) ~ Group + age_num + Cancers...
-  formula_str <- paste("Surv(time_pre, time_all, censor) ~", paste(valid_covariates, collapse = " + "))
-  os_formula <- as.formula(formula_str)
-  dist_choice <- "llogis"
-  # 3. Fit the Doubly Robust AFT Model
-  fit_os <- tryCatch({
-    flexsurv::flexsurvreg(os_formula,
-                          data = Data_model,
-                          weights = iptw,
-                          dist = dist_choice)
-  }, error = function(e) {
-    # Fallback to unweighted if the multi-dimensional matrix is singular
-    tryCatch({
-      flexsurv::flexsurvreg(os_formula, data = Data_model, dist = dist_choice)
-    }, error = function(e2) { NULL })
-  })
+  req(requireNamespace("flexsurv", quietly = TRUE))
 
-  # Fail-safe: Fallback to Log-logistic if Weibull fails in multivariate space
-  if (is.null(fit_os) && dist_choice == "weibull") {
-    dist_choice <- "llogis"
-    fit_os <- tryCatch({
-      flexsurv::flexsurvreg(os_formula, data = Data_model, weights = iptw, dist = "llogis")
-    }, error = function(e) { NULL })
-  }
+  # Model T1 (Weibull)
+  form_t1 <- as.formula(paste("Surv(time_pre, time_pre_event) ~", paste(valid_covariates, collapse = " + ")))
+  fit_t1 <- tryCatch(flexsurv::flexsurvreg(form_t1, data = Data_model, weights = iptw, dist = "weibull"), error = function(e) NULL)
 
-  shiny::validate(shiny::need(!is.null(fit_os), paste("Failed to fit the multivariate left-truncated OS model. Too many rare cancer types might cause a singular matrix.")))
+  # Model T2 (Llogis + splines)
+  form_t2 <- as.formula(paste("Surv(time_t2, censor) ~", paste(c(valid_covariates, colnames(ns_mat)), collapse = " + ")))
+  fit_t2 <- tryCatch(flexsurv::flexsurvreg(form_t2, data = Data_model, weights = iptw, dist = "llogis"), error = function(e) NULL)
 
-  # 4. Extract the MULTIVARIATE-ADJUSTED pure Acceleration Factors
-  # These coefficients now represent the isolated effect of the group, independent of age/histology
-  af_g1 <- ifelse("Group1" %in% rownames(fit_os$res), fit_os$res["Group1", "est"], 0)
-  af_g2 <- ifelse("Group2" %in% rownames(fit_os$res), fit_os$res["Group2", "est"], 0)
-  OUTPUT_DATA$fit_os <- fit_os
+  shiny::validate(shiny::need(!is.null(fit_t1) && !is.null(fit_t2), "Model fitting failed. The dataset might be too small or sparse."))
 
   # =====================================================================
-  # Extract Age-Stratified Baseline Parameters from Macro Data (Registry)
+  # シミュレーション (標準化因果効果の算出)
   # =====================================================================
-  # [FIX] Instead of "全年齢" (All Ages), we calculate parameters for EACH age group
-  macro_models <- list()
-  for (ag in names(ref_surv_list)) {
-    S_t <- ref_surv_list[[ag]][1:5] / 100
-    S_t <- pmax(pmin(S_t, 0.999), 0.001)
+  # 1. 疑似母集団のリサンプリング
+  set.seed(2024) # 描画を安定させるための固定シード
+  idx_pseudo <- sample(seq_len(nrow(Data_model)), size = 5000, replace = TRUE, prob = Data_model$iptw)
+  pseudo_base <- Data_model[idx_pseudo, ]
 
-    y_llogis <- log(1/S_t - 1)
-    x_llogis <- log(1:5)
-    fit_macro <- lm(y_llogis ~ x_llogis)
-
-    shape <- coef(fit_macro)[2]
-    scale_days <- exp(-coef(fit_macro)[1] / shape) * 365.25
-
-    macro_models[[ag]] <- list(shape = shape, scale = scale_days)
-  }
-
-  # =====================================================================
-  # Simulation: Absolute OS Nearest Neighbor Matching (Age-Stratified)
-  # =====================================================================
   simulated_data <- list()
+  cap_days <- 365.25 * 10 # 10年の管理打ち切り
 
-  # [修正箇所] 先生のご指摘通り、不完全な比率の適用を防ぐため、
-  # 比率抽出のドナープールは「死亡確認例（censor == 1）」のみに限定します。
-  emp_ep0 <- Data_EP0 %>%
-    dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre, censor == 1) %>% # censor == 1 を追加
-    dplyr::mutate(
-      actual_t2 = time_all - time_pre,
-      t2_ratio = actual_t2 / time_all
-    ) %>%
-    dplyr::arrange(time_all)
-
-  # EP0群の死亡例が極端に少ない場合のフォールバック（全体から死亡例を探す）
-  if(nrow(emp_ep0) < 5) {
-    emp_ep0 <- Data_model %>%
-      dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre, censor == 1) %>% # censor == 1 を追加
-      dplyr::mutate(
-        actual_t2 = time_all - time_pre,
-        t2_ratio = actual_t2 / time_all
-      ) %>%
-      dplyr::arrange(time_all)
-  }
-
-  # 万が一、データ全体でも死亡例が5例未満という異常事態のための最終安全装置
-  if(nrow(emp_ep0) < 5) {
-    emp_ep0 <- Data_model %>%
-      dplyr::filter(time_all > 0, time_pre > 0, time_all > time_pre) %>% # ここだけは打ち切りも含める
-      dplyr::mutate(
-        actual_t2 = time_all - time_pre,
-        t2_ratio = actual_t2 / time_all
-      ) %>%
-      dplyr::arrange(time_all)
-  }
-
-  actual_os_array <- emp_ep0$time_all
-  actual_t2_ratio_array <- emp_ep0$t2_ratio
-
+  # Group 1 と Group 2 の Counterfactual（反事実）OSを生成
   for (g in c("1", "2")) {
-    group_data <- if(g == "1") Data_survival_1 else Data_survival_2
-    n_sim <- nrow(group_data)
+    pseudo_g <- pseudo_base
+    pseudo_g$Group <- factor(g, levels = levels(Data_model$Group)) # 全員がGroup g だった場合の世界
 
-    if (n_sim == 0) next
+    # T1生成
+    sim_T1 <- gen_sim_times_robust(fit_t1, pseudo_g, dist_type = "weibull")
 
-    # 1. Generate Age-Stratified Baseline OS (Deterministic Quantile Sampling)
-    # [FIX] Replace 'runif' with evenly spaced quantiles to eliminate simulation variance
-    sim_os_macro <- numeric(n_sim)
+    # 新しいT1に基づくスプライン変数の再計算
+    pseudo_g$logT1_scale <- log(pmax(sim_T1 / 365.25, 1e-6))
+    ns_sim <- tryCatch(predict(ns_obj, pseudo_g$logT1_scale), error = function(e) matrix(0, nrow(pseudo_g), attr(ns_obj, "df")))
+    colnames(ns_sim) <- paste0("ns", seq_len(ncol(ns_sim)))
+    for(j in seq_len(ncol(ns_sim))) pseudo_g[[colnames(ns_sim)[j]]] <- ns_sim[, j]
 
-    unique_ages <- unique(group_data$age_class)
-    for (ag in unique_ages) {
-      idx <- which(group_data$age_class == ag)
-      n_ag <- length(idx)
+    # T2生成と合算
+    sim_T2 <- gen_sim_times_robust(fit_t2, pseudo_g, dist_type = "llogis")
+    sim_OS <- sim_T1 + sim_T2
 
-      if (n_ag == 0) next
-
-      # Generate evenly spaced probabilities: (0.5/n, 1.5/n, ..., (n-0.5)/n)
-      u_ag <- (1:n_ag - 0.5) / n_ag
-      # Bound strictly to avoid Inf at absolute extremes if n_ag is very small
-      u_ag <- pmax(pmin(u_ag, 0.999), 0.001)
-
-      ag_model <- ag
-      if (is.null(macro_models[[ag_model]])) ag_model <- "全年齢"
-      if (is.null(macro_models[[ag_model]])) ag_model <- names(macro_models)[1] # Fallback
-
-      shape_m <- macro_models[[ag_model]]$shape
-      scale_m <- macro_models[[ag_model]]$scale
-
-      # Calculate deterministic expected OS values directly from the CDF
-      sim_os_macro[idx] <- scale_m * ((1 - u_ag) / u_ag)^(1 / shape_m)
-    }
-
-    # 2. Nearest Neighbor Matching based on ABSOLUTE OS length
-    pos <- findInterval(sim_os_macro, actual_os_array, all.inside = TRUE)
-    diff1 <- abs(sim_os_macro - actual_os_array[pos])
-    diff2 <- abs(sim_os_macro - actual_os_array[pos + 1])
-    idx <- ifelse(diff1 <= diff2, pos, pos + 1)
-
-    matched_t2_ratio <- actual_t2_ratio_array[idx]
-    sim_t2_base <- sim_os_macro * matched_t2_ratio
-
-    # 3. Apply Mutation/Treatment Effects (AF) to the ENTIRE OS
-    af <- ifelse(g == "1", af_g1, af_g2)
-    sim_os_treated <- sim_os_macro * exp(af)
-
-    # 4. Reconstruct timelines expanding proportionally
-    sim_t2_treated <- sim_t2_base * exp(af)
-    sim_t1_treated <- sim_os_treated - sim_t2_treated
-
-    # 10-Year Administrative Censoring
-    cap_days <- 365.25 * 10
-    final_censor <- ifelse(sim_os_treated > cap_days, 0, 1)
-    final_os <- pmin(sim_os_treated, cap_days)
-    final_t1 <- pmin(sim_t1_treated, cap_days - 0.1)
+    # 打ち切り適用
+    final_censor <- ifelse(sim_OS > cap_days, 0, 1)
+    final_os <- pmin(sim_OS, cap_days)
+    final_t1 <- pmin(sim_T1, cap_days - 0.1)
 
     simulated_data[[length(simulated_data) + 1]] <- data.frame(
-      C.CAT調査結果.基本項目.ハッシュID = group_data$C.CAT調査結果.基本項目.ハッシュID,
+      C.CAT調査結果.基本項目.ハッシュID = pseudo_g$C.CAT調査結果.基本項目.ハッシュID,
       time_pre = final_t1,
       time_all = final_os,
       censor = final_censor,
@@ -511,22 +475,19 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     )
   }
 
-  Data_survival_simulated <- do.call(rbind, simulated_data) %>%
-    dplyr::filter(is.finite(time_all))
-
-  shiny::validate(shiny::need(!is.null(Data_survival_simulated) && nrow(Data_survival_simulated) > 0,
-                              "Simulation yielded no data."))
+  Data_survival_simulated <- do.call(rbind, simulated_data) %>% dplyr::filter(is.finite(time_all))
+  shiny::validate(shiny::need(nrow(Data_survival_simulated) > 0, "Simulation yielded no data."))
 
   # =====================================================================
-  # Plot the Unbiased Simulated Cohort Data
+  # 既存のプロット関数へ渡す
   # =====================================================================
   survival_compare_and_plot_CTx(
     data = Data_survival_simulated,
-    time_var1 = "time_pre", # Not used for adjustment=FALSE
+    time_var1 = "time_pre", # 調整なし描画では無視されるが変数として必要
     time_var2 = "time_all",
     status_var = "censor",
     group_var = "Group",
-    plot_title = "Unbiased OS Simulation (IPTW + Left-Truncated Llogis + Rank Match)",
+    plot_title = "Standardized OS (Ver 2.3.2: Calibrated G-computation)",
     adjustment = FALSE,
     color_var_surv_CTx_1 = "diagnosis",
     weights_var = NULL
@@ -542,13 +503,15 @@ output$forest_plot_multivariate = renderPlot({
 
   shiny::validate(shiny::need(requireNamespace("patchwork", quietly = TRUE),
                               "Please install the 'patchwork' package. Run: install.packages('patchwork')"))
+  shiny::validate(shiny::need(requireNamespace("splines", quietly = TRUE),
+                              "Please install the 'splines' package."))
 
   Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
   selected_genes <- input$gene_survival_interactive_1_P_1_control_forest
 
   # =========================================================================
-  # Prepare Reference Survival Data for IPTW
+  # Prepare Reference Survival Data & Calibration IPTW (Ver 2.3.2)
   # =========================================================================
   ref_surv_list <- list()
   age_groups <- c("40未満", "40代", "50代", "60代", "70代", "80以上")
@@ -558,7 +521,6 @@ output$forest_plot_multivariate = renderPlot({
       if(exists("Data_age_survival_5_year") && input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
         cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
         fallback_surv <- cancer_data[["全年齢"]]
-
         for (ag in age_groups) {
           if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
             ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
@@ -580,14 +542,21 @@ output$forest_plot_multivariate = renderPlot({
     }
   }
 
-  # Calculate IPTW
+  Data_survival_interactive <- Data_survival_interactive %>%
+    dplyr::mutate(
+      age_num = as.numeric(症例.基本情報.年齢),
+      age_class = dplyr::case_when(
+        age_num < 40 ~ "40未満", age_num < 50 ~ "40代", age_num < 60 ~ "50代",
+        age_num < 70 ~ "60代", age_num < 80 ~ "70代", age_num >= 80 ~ "80以上",
+        TRUE ~ "全年齢"
+      )
+    )
+
   if (length(ref_surv_list) > 0) {
-    Data_survival_interactive <- calculate_iptw_age(Data_survival_interactive, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢")
+    Data_survival_interactive <- calculate_calibrated_iptw(Data_survival_interactive, ref_surv_list)
   } else {
     Data_survival_interactive$iptw <- 1.0
   }
-
-  Data_survival_interactive$iptw <- as.numeric(unlist(Data_survival_interactive$iptw))
   Data_survival_interactive$iptw <- ifelse(is.na(Data_survival_interactive$iptw) | Data_survival_interactive$iptw <= 0, 1.0, Data_survival_interactive$iptw)
 
   # =========================================================================
@@ -596,27 +565,28 @@ output$forest_plot_multivariate = renderPlot({
   Data_forest <- Data_survival_interactive %>%
     dplyr::filter(time_pre > 0, time_all > time_pre) %>%
     dplyr::mutate(
-      age_num = as.numeric(症例.基本情報.年齢),
+      time_t2 = pmax(time_all - time_pre, 0.1),
+      time_pre_event = 1,
       Sex = as.factor(`症例.基本情報.性別.名称.`),
       Cancers = as.character(Cancers)
     )
 
   shiny::validate(shiny::need(nrow(Data_forest) > 50, "Not enough valid cases for multivariate analysis."))
-  total_cohort_N <- nrow(Data_forest)
+  total_cohort_N <- nrow(Data_forest) # 実データ（元データ）の患者数を記録
 
-  # Set Sex reference
+  # 性別のリファレンス設定
   if(length(levels(Data_forest$Sex)) > 1) {
     top_sex <- names(sort(table(Data_forest$Sex), decreasing = TRUE))[1]
     Data_forest$Sex <- relevel(Data_forest$Sex, ref = top_sex)
   }
 
-  # [MODIFIED] Lump rare cancers (< 50 cases) into "Others"
+  # 希少がん（50例未満）を "Others" にまとめる
   cancer_counts <- table(Data_forest$Cancers)
   rare_cancers <- names(cancer_counts)[cancer_counts < 50]
   Data_forest$Cancers[Data_forest$Cancers %in% rare_cancers] <- "Others"
   Data_forest$Cancers <- as.factor(Data_forest$Cancers)
 
-  # Ensure the most frequent cancer type is the reference level
+  # 最多がん種をリファレンスに
   top_cancer <- names(sort(table(Data_forest$Cancers), decreasing = TRUE))[1]
   Data_forest$Cancers <- relevel(Data_forest$Cancers, ref = top_cancer)
 
@@ -640,30 +610,61 @@ output$forest_plot_multivariate = renderPlot({
     }
   }
 
-  # =========================================================================
-  # Build and Fit Model
-  # =========================================================================
   base_covariates <- c("age_num", "Sex", "Cancers")
   all_covariates <- c()
-
   for(cov in base_covariates) {
     if(length(unique(na.omit(Data_forest[[cov]]))) > 1) {
       all_covariates <- c(all_covariates, cov)
     }
   }
   all_covariates <- c(all_covariates, valid_gene_covariates)
-
   shiny::validate(shiny::need(length(all_covariates) > 0, "No valid covariates found."))
-  formula_str <- paste("Surv(time_pre, time_all, censor) ~", paste(all_covariates, collapse = " + "))
+
+  # =========================================================================
+  # 【Ver 2.3.2 核心】 G-computation による最終同期モデルの構築
+  # =========================================================================
+  library(splines)
+
+  # スプライン変数の生成
+  Data_forest$logT1_scale <- log(pmax(Data_forest$time_pre / 365.25, 1e-6))
+  ns_obj <- ns(Data_forest$logT1_scale, df = 3)
+  ns_mat <- as.matrix(ns_obj)
+  colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
+  for(j in seq_len(ncol(ns_mat))) Data_forest[[colnames(ns_mat)[j]]] <- ns_mat[, j]
 
   req(requireNamespace("flexsurv", quietly = TRUE))
-  fit_forest <- tryCatch({
-    flexsurv::flexsurvreg(as.formula(formula_str), data = Data_forest, weights = iptw, dist = "llogis")
-  }, error = function(e) {
-    tryCatch({ flexsurv::flexsurvreg(as.formula(formula_str), data = Data_forest, dist = "llogis") }, error = function(e2) { NULL })
-  })
 
-  shiny::validate(shiny::need(!is.null(fit_forest), "Multivariate model failed to converge."))
+  # T1 & T2 モデルの構築
+  form_t1 <- as.formula(paste("Surv(time_pre, time_pre_event) ~", paste(all_covariates, collapse = " + ")))
+  fit_t1 <- tryCatch(flexsurv::flexsurvreg(form_t1, data = Data_forest, weights = iptw, dist = "weibull"), error = function(e) NULL)
+
+  form_t2 <- as.formula(paste("Surv(time_t2, censor) ~", paste(c(all_covariates, colnames(ns_mat)), collapse = " + ")))
+  fit_t2 <- tryCatch(flexsurv::flexsurvreg(form_t2, data = Data_forest, weights = iptw, dist = "llogis"), error = function(e) NULL)
+
+  shiny::validate(shiny::need(!is.null(fit_t1) && !is.null(fit_t2), "T1/T2 modeling failed. Matrix may be singular."))
+
+  # G-computation の実行
+  set.seed(2024)
+  M_pseudo <- 10000 # 安定した係数抽出のための大容量サンプリング
+  idx_pseudo <- sample(seq_len(nrow(Data_forest)), size = M_pseudo, replace = TRUE, prob = Data_forest$iptw)
+  pseudo_forest <- Data_forest[idx_pseudo, ]
+
+  pseudo_forest$sim_T1 <- gen_sim_times_robust(fit_t1, pseudo_forest, dist_type = "weibull")
+
+  pseudo_forest$logT1_sim_scale <- log(pmax(pseudo_forest$sim_T1 / 365.25, 1e-6))
+  ns_sim <- tryCatch(predict(ns_obj, pseudo_forest$logT1_sim_scale), error = function(e) matrix(0, nrow(pseudo_forest), attr(ns_obj, "df")))
+  colnames(ns_sim) <- paste0("ns", seq_len(ncol(ns_sim)))
+  for(j in seq_len(ncol(ns_sim))) pseudo_forest[[colnames(ns_sim)[j]]] <- ns_sim[, j]
+
+  pseudo_forest$sim_T2 <- gen_sim_times_robust(fit_t2, pseudo_forest, dist_type = "llogis")
+  pseudo_forest$sim_OS <- pseudo_forest$sim_T1 + pseudo_forest$sim_T2
+  pseudo_forest$sim_Event <- 1
+
+  # 最終同期モデルのフィッティング (完全な sim_OS に対して)
+  form_final <- as.formula(paste("Surv(sim_OS, sim_Event) ~", paste(all_covariates, collapse = " + ")))
+  fit_forest <- tryCatch(flexsurv::flexsurvreg(form_final, data = pseudo_forest, dist = "llogis"), error = function(e) NULL)
+
+  shiny::validate(shiny::need(!is.null(fit_forest), "Final synchronized multivariate model failed to converge."))
 
   # =====================================================================
   # Extract and Format Data for Plot and Table
@@ -679,25 +680,24 @@ output$forest_plot_multivariate = renderPlot({
     Category = NA, Label = NA, Positive_N = NA, Total_N = total_cohort_N, Text_CI = NA
   )
 
-  # [MODIFIED] Adjust Estimate and CI for Age (per +10 years)
+  # 年齢補正 (per +10 years)
   for (i in 1:nrow(plot_data)) {
     var <- plot_data$Variable_Raw[i]
     if (grepl("^age_num", var)) {
-      # Multiply log-coefficient by 10, then exponentiate to get TR per 10 years
       plot_data$Estimate[i] <- exp(res[var, "est"] * 10)
       plot_data$Lower[i] <- exp(res[var, "L95%"] * 10)
       plot_data$Upper[i] <- exp(res[var, "U95%"] * 10)
     }
   }
 
-  # Format CI text after age correction
   plot_data$Text_CI <- sprintf("%.2f (%.2f-%.2f)", plot_data$Estimate, plot_data$Lower, plot_data$Upper)
 
+  # ラベルと「実際の」N数の集計 (疑似コホートではなく Data_forest を参照する)
   for (i in 1:nrow(plot_data)) {
     var <- plot_data$Variable_Raw[i]
 
     if (grepl("^age_num", var)) {
-      plot_data$Label[i] <- "Age (per +10 years)" # Updated label
+      plot_data$Label[i] <- "Age (per +10 years)"
       plot_data$Category[i] <- "Demographics"
       plot_data$Positive_N[i] <- NA
 
@@ -735,7 +735,6 @@ output$forest_plot_multivariate = renderPlot({
   # =====================================================================
   # Build Two-Panel Plot (Forest Plot + Text Table) using Patchwork
   # =====================================================================
-  library(ggplot2)
   library(patchwork)
 
   # Left: Forest Plot
@@ -759,7 +758,7 @@ output$forest_plot_multivariate = renderPlot({
     geom_text(aes(x = 0, label = Total_N), hjust = 0.5, size = 4.5, color = "#2c3e50") +
     geom_text(aes(x = 1, label = Text_PosN), hjust = 0.5, size = 4.5, color = "#2c3e50") +
     geom_text(aes(x = 2, label = Text_CI), hjust = 0.5, size = 4.5, color = "#2c3e50") +
-    scale_x_continuous(limits = c(-0.5, 2.5), breaks = c(0, 1, 2), labels = c("Total N", "Positive N", "TR (95% CI)")) +
+    scale_x_continuous(limits = c(-0.5, 2.5), breaks = c(0, 1, 2), labels = c("Total N\n(Real)", "Positive N\n(Real)", "TR\n(95% CI)")) +
     theme_minimal(base_size = 14) +
     labs(x = "", y = "") +
     theme(
@@ -770,11 +769,10 @@ output$forest_plot_multivariate = renderPlot({
     )
 
   # Merge with patchwork
-  # [MODIFIED] Added N >= 50 condition to the subtitle
   final_plot <- p_left + p_right + plot_layout(widths = c(2, 1.2)) +
     plot_annotation(
-      title = "Independent Prognostic Impact (Multivariate AFT Model)",
-      subtitle = "Model adjusted for Age, Sex, Histology (N >= 50), and concurrent Mutations (IPTW applied)\nTR > 1: Prolonged Survival | TR < 1: Shortened Survival",
+      title = "Independent Prognostic Impact (Standardized AFT Model)",
+      subtitle = "Computed via Calibrated G-computation (Ver 2.3.2) correcting Immortal Time & Dependent Truncation\nTR > 1: Prolonged Survival | TR < 1: Shortened Survival",
       theme = theme(
         plot.title = element_text(face = "bold", size = 16),
         plot.subtitle = element_text(size = 13, color = "#34495e")
@@ -792,114 +790,13 @@ output$forest_plot_multivariate = renderPlot({
 
   n_genes <- length(input$gene_survival_interactive_1_P_1_control_forest)
 
-  # [MODIFIED] Accurately count histology levels (>= 50 cases)
   cancer_counts <- table(Data_whole$Cancers)
   n_cancers <- sum(cancer_counts >= 50)
   if (n_cancers <= 1) n_cancers <- 1
 
-  # Age(1) + Sex(1) + Histologies(n_cancers - 1 ref) + Genes(n_genes)
   estimated_items <- 1 + 1 + (n_cancers - 1) + n_genes
-
   calculated_height <- max(450, estimated_items * 35 + 200)
 
   return(calculated_height)
 })
-
-# Helper function to calculate age-stratified IPTW
-calculate_iptw_age <- function(data, ref_surv_list, time_var = "time_pre", age_var = "症例.基本情報.年齢") {
-  init_pop <- 10000
-  max_years <- 10
-  bin_width <- 0.5 # 6-month window
-  breaks <- seq(0, max_years, by = bin_width)
-  n_bins <- length(breaks) - 1
-
-  # Categorize age and assign to 6-month time bins
-  data <- data %>%
-    dplyr::mutate(
-      age_num = as.numeric(!!sym(age_var)),
-      age_class = dplyr::case_when(
-        age_num < 40 ~ "40未満",
-        age_num < 50 ~ "40代",
-        age_num < 60 ~ "50代",
-        age_num < 70 ~ "60代",
-        age_num < 80 ~ "70代",
-        age_num >= 80 ~ "80以上",
-        TRUE ~ "Unknown"
-      ),
-      time_years = !!sym(time_var) / 365.25,
-      time_bin = ceiling(time_years / bin_width),
-      time_bin = ifelse(time_bin > n_bins, n_bins, time_bin),
-      time_bin = ifelse(time_bin == 0, 1, time_bin) # Safety for time=0
-    )
-
-  # Build Person-Time (PT) reference table
-  pt_table <- expand.grid(age_class = names(ref_surv_list), time_bin = 1:n_bins, stringsAsFactors = FALSE)
-  pt_table$pt_ref <- 0
-
-  t_points <- 1:5 # We have data for years 1, 2, 3, 4, 5
-
-  for(ag in names(ref_surv_list)) {
-    surv_rates <- ref_surv_list[[ag]]
-
-    if(length(surv_rates) >= 5) {
-      # Convert % to probabilities and avoid log(0) bounds
-      S_t <- surv_rates[1:5] / 100
-      S_t <- pmax(pmin(S_t, 0.999), 0.001)
-
-      # Log-logistic linearization: log(1/S(t) - 1) = p * log(lambda) + p * log(t)
-      y <- log(1/S_t - 1)
-      x <- log(t_points)
-
-      # Fit linear model to find parameters
-      fit <- lm(y ~ x)
-      p <- coef(fit)[2]
-      p_log_lambda <- coef(fit)[1]
-      lambda <- exp(p_log_lambda / p)
-
-      # Define smooth Log-logistic survival function
-      S_fit <- function(t_y) {
-        1 / (1 + (lambda * t_y)^p)
-      }
-
-      # Calculate Expected PT for each 6-month window using trapezoidal rule
-      pt_bins <- numeric(n_bins)
-      for(i in 1:n_bins) {
-        t_start <- breaks[i]
-        t_end <- breaks[i+1]
-        pt_bins[i] <- init_pop * (S_fit(t_start) + S_fit(t_end)) / 2 * bin_width
-      }
-      pt_table[pt_table$age_class == ag, "pt_ref"] <- pt_bins
-    }
-  }
-
-  # Count actual N in CGP data per age class and 6-month bin
-  bin_counts <- data %>% dplyr::count(age_class, time_bin, name = "N_cgp")
-
-  # Calculate IPTW (Weight = PT / N_cgp)
-  data <- data %>%
-    dplyr::left_join(pt_table, by = c("age_class", "time_bin")) %>%
-    dplyr::left_join(bin_counts, by = c("age_class", "time_bin")) %>%
-    dplyr::mutate(
-      raw_weight = ifelse(!is.na(N_cgp) & N_cgp > 0 & !is.na(pt_ref), pt_ref / N_cgp, 0)
-    )
-
-  # =========================================================================
-  # 極端な重み（外れ値）による分散の爆発を防ぐための2.5%〜97.5%トリミング
-  # =========================================================================
-  if (any(data$raw_weight > 0, na.rm = TRUE)) {
-    lower_bound <- quantile(data$raw_weight[data$raw_weight > 0], 0.025, na.rm = TRUE)
-    upper_bound <- quantile(data$raw_weight[data$raw_weight > 0], 0.975, na.rm = TRUE)
-
-    data <- data %>%
-      dplyr::mutate(
-        raw_weight = ifelse(raw_weight > 0 & raw_weight < lower_bound, lower_bound, raw_weight),
-        raw_weight = ifelse(raw_weight > upper_bound, upper_bound, raw_weight)
-      )
-  }
-  # Stabilize weights (mean = 1)
-  mean_w <- mean(data$raw_weight[data$raw_weight > 0], na.rm = TRUE)
-  data$iptw <- ifelse(data$raw_weight > 0, data$raw_weight / mean_w, 1.0)
-
-  return(data)
-}
 
