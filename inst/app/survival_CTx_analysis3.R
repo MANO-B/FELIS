@@ -1,5 +1,5 @@
 # =========================================================================
-# 1. Main Logic Control Function (Restored from your original code)
+# 1. Main Logic Control Function
 # =========================================================================
 survival_CTx_analysis2_logic_control <- function() {
   analysis_env <- new.env()
@@ -126,7 +126,7 @@ survival_CTx_analysis2_logic_control <- function() {
 }
 
 # =========================================================================
-# GLOBAL HELPERS (Tamura & Ikegami Model Ver 2.3.2 実データ用 修正版)
+# 2. Global Helpers for G-computation
 # =========================================================================
 gen_sim_times_robust <- function(fit, newdata, dist_type = c("weibull", "llogis")) {
   dist_type <- match.arg(dist_type)
@@ -163,9 +163,7 @@ gen_sim_times_robust <- function(fit, newdata, dist_type = c("weibull", "llogis"
   } else { return(scale_vec * ((1 - u) / u)^(1 / shape)) }
 }
 
-# =========================================================================
-# STEP 1: Calibration Weighting (1次元区間探索で勾配消失を完全回避)
-# =========================================================================
+# 【修正済み】 勾配消失を回避する1次元区間探索 (optimize)
 calculate_calibrated_iptw <- function(data, ref_surv_list) {
   data$iptw <- 1.0
   t_points_days <- (1:5) * 365.25
@@ -181,7 +179,7 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
 
     time_pre_years <- pmax(ag_data$time_pre / 365.25, 1e-6)
 
-    # 目的関数 (1パラメータ theta で T1のべき乗による重み付け)
+    # 1次元パラメータ theta で T1のべき乗による重み付け
     obj_func <- function(theta) {
       w <- time_pre_years^theta
       w <- pmax(w, 1e-4)
@@ -196,11 +194,12 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
       return(sum((S_est - S_macro_target)^2))
     }
 
-    # optimize を用いて -5 から +5 の区間を確実に総当たり探索 (階段関数に強い)
+    # optim(BFGS)を廃止し、-5 から +5 の範囲を総当たりで確実探索する
     opt <- tryCatch(optimize(obj_func, interval = c(-5, 5)), error = function(e) list(minimum = 0))
     theta_hat <- opt$minimum
 
     w_opt <- pmax(time_pre_years^theta_hat, 1e-4)
+
     lower_bound <- quantile(w_opt, 0.01, na.rm = TRUE)
     upper_bound <- quantile(w_opt, 0.99, na.rm = TRUE)
     w_opt <- pmax(lower_bound, pmin(w_opt, upper_bound))
@@ -211,14 +210,14 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
 }
 
 # =========================================================================
-# 生存曲線プロット
+# 3. Survival Curve Plot (Standardized via G-computation)
 # =========================================================================
 output$figure_survival_CTx_interactive_1_control = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
       OUTPUT_DATA$figure_surv_CTx_Data_drug_control)
 
-  # 【修正】組織型の変更を感知するトリガーを追加
+  # 組織型の変更を明示的に感知させるトリガー
   input$registry_cancer_type
   input$survival_data_source
 
@@ -385,14 +384,14 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 })
 
 # =========================================================================
-# フォレストプロット (forest_plot_multivariate)
+# 4. Forest Plot Multivariate (Standardized TR via G-comp)
 # =========================================================================
 output$forest_plot_multivariate = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control, OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control)
   shiny::validate(shiny::need(requireNamespace("patchwork", quietly = TRUE), "Please install the 'patchwork' package."))
   shiny::validate(shiny::need(requireNamespace("splines", quietly = TRUE), "Please install the 'splines' package."))
 
-  # 【修正】組織型の変更を感知するトリガーを追加
+  # 組織型の変更を明示的に感知させるトリガー
   input$registry_cancer_type
   input$survival_data_source
 
