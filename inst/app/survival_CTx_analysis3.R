@@ -87,8 +87,7 @@ build_ref_surv_list_realdata <- function(input, Data_age_survival_5_year = NULL)
 
   if (!is.null(input$survival_data_source)) {
     if (input$survival_data_source == "registry") {
-      if (!is.null(Data_age_survival_5_year) &&
-          exists("Data_age_survival_5_year") &&
+      if (!is.null(input$registry_cancer_type) &&
           input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
 
         cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
