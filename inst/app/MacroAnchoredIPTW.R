@@ -6,7 +6,6 @@ library(flexsurv)
 library(survival)
 library(ggplot2)
 
-# Helper function to generate complex censoring patterns
 find_censoring_param <- function(T2, target_rate, pattern) {
   if (pattern == "peak1y") {
     obj_func <- function(k) {
@@ -34,16 +33,16 @@ find_censoring_param <- function(T2, target_rate, pattern) {
   }
 }
 
-# -------------------------------------------------------------------------
-# GLOBAL HELPER: AFTモデルからの安全な生存期間サンプリング (バグ回避版)
-# -------------------------------------------------------------------------
+# =========================================================================
+# GLOBAL HELPER: AFTモデルからの安全な生存期間サンプリング
+# =========================================================================
 gen_sim_times <- function(fit, newdata) {
   if(is.null(fit) || nrow(newdata) == 0) return(rep(NA, nrow(newdata)))
   res_m <- fit$res
   base_scale <- res_m["scale", "est"]
   shape <- res_m["shape", "est"]
 
-  # model.matrixによるクラッシュを避けるため、動的に係数(AF)を掛け合わせる
+  # クラッシュを防ぐため、モデル行列ではなく直接係数を当てはめる
   af_vec <- rep(1, nrow(newdata))
   if("XMutated" %in% rownames(res_m)) af_vec <- af_vec * exp(res_m["XMutated", "est"] * as.numeric(newdata$X == "Mutated"))
   if("Age" %in% rownames(res_m)) af_vec <- af_vec * exp(res_m["Age", "est"] * newdata$Age)
@@ -55,7 +54,7 @@ gen_sim_times <- function(fit, newdata) {
   u <- runif(nrow(newdata))
   u <- pmax(pmin(u, 0.9999), 0.0001)
   sim_t <- scale_vec * ((1 - u) / u)^(1 / shape)
-  return(sim_t) # 返り値は日数(days)
+  return(sim_t)
 }
 
 # =========================================================================
@@ -68,7 +67,7 @@ calculate_iptw_gcomp <- function(data, ref_surv_list) {
   for(ag in unique(data$Age_class)) {
     if(ag %in% names(ref_surv_list)) {
 
-      # 【STEP 1】 院内がん登録（Macro）のOS分布を滑らかな確率密度(llogis)としてモデル化
+      # 【STEP 1】 院内がん登録（Macro）のOS分布をモデル化
       S_t <- pmax(pmin(ref_surv_list[[ag]][1:5] / 100, 0.999), 0.001)
       y <- log(1/S_t - 1)
       x <- log(t_points)
@@ -77,7 +76,7 @@ calculate_iptw_gcomp <- function(data, ref_surv_list) {
       lambda <- exp(coef(fit)[1] / p)
       pdf_macro <- function(t_y) { (lambda^p * p * t_y^(p-1)) / (1 + (lambda * t_y)^p)^2 }
 
-      # 打ち切り(情報リーク)を避けるため「死亡患者」のみ抽出
+      # 打ち切り（情報リーク）を避けるため「死亡患者」のみ抽出
       ag_data <- data[data$Age_class == ag, ]
       dead_data <- ag_data[ag_data$Event == 1, ]
       if(nrow(dead_data) < 5) next
@@ -85,21 +84,22 @@ calculate_iptw_gcomp <- function(data, ref_surv_list) {
       # 【STEP 2】 死亡例OSとMacro-OSを比較し、バイアスを消す「ハザード比(W_os)」を算出
       p_macro_val <- pdf_macro(dead_data$T_obs / 365.25)
 
-      bw_os <- density(dead_data$T_obs / 365.25)$bw # エラー防止のためバンド幅を固定
-      dens_dead_os <- density(dead_data$T_obs / 365.25, bw = bw_os, n = 512, from = 0)
+      # エラー防止のためバンド幅を明示的に指定して警告を抑制
+      bw_os <- suppressWarnings(density(dead_data$T_obs / 365.25)$bw)
+      dens_dead_os <- suppressWarnings(density(dead_data$T_obs / 365.25, bw = bw_os, n = 512, from = 0))
       f_dead_os <- approxfun(dens_dead_os$x, dens_dead_os$y, rule = 2)
 
       w_os <- p_macro_val / pmax(f_dead_os(dead_data$T_obs / 365.25), 1e-6)
       w_os <- w_os / sum(w_os)
 
-      # 【STEP 3】 死亡例のT1にW_osを掛け、一般集団における「真のCGP到達ハザード(T1密度)」を再構築
-      bw_t1 <- density(dead_data$T1 / 365.25)$bw
+      # 【STEP 3】 死亡例のT1にW_osを掛け、「真のCGP到達ハザード(T1密度)」を再構築
+      bw_t1 <- suppressWarnings(density(dead_data$T1 / 365.25)$bw)
       dens_t1_target <- suppressWarnings(density(dead_data$T1 / 365.25, weights = w_os, bw = bw_t1, n = 512, from = 0))
       f_t1_target <- approxfun(dens_t1_target$x, dens_t1_target$y, rule = 2)
 
-      # 【STEP 4】 打ち切り例を含む全CGP患者に対し、真のハザード比に基づくIPTWを割り当てる
-      bw_t1_all <- density(ag_data$T1 / 365.25)$bw
-      dens_t1_all <- density(ag_data$T1 / 365.25, bw = bw_t1_all, n = 512, from = 0)
+      # 【STEP 4】 打ち切り例を含む全CGP患者に対し、IPTWを割り当てる
+      bw_t1_all <- suppressWarnings(density(ag_data$T1 / 365.25)$bw)
+      dens_t1_all <- suppressWarnings(density(ag_data$T1 / 365.25, bw = bw_t1_all, n = 512, from = 0))
       f_t1_all <- approxfun(dens_t1_all$x, dens_t1_all$y, rule = 2)
 
       w_final <- f_t1_target(ag_data$T1 / 365.25) / pmax(f_t1_all(ag_data$T1 / 365.25), 1e-6)
@@ -192,63 +192,65 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, t1_pat, cens_pat, c
   data_long <- subset(Data_cgp, T1 > med_t1)
 
   form_t2 <- as.formula(paste("Surv(T2_obs, Event) ~", paste(valid_covs, collapse=" + ")))
-  # 左側切断の罠を避けるため、T2単独のモデルを構築
   fit_t2_short <- tryCatch({ flexsurvreg(form_t2, data = data_short, weights = iptw, dist = "llogis") }, error = function(e) NULL)
   fit_t2_long <- tryCatch({ flexsurvreg(form_t2, data = data_long, weights = iptw, dist = "llogis") }, error = function(e) NULL)
 
   # =========================================================================
-  # 【STEP 6】 最終同期: 仮想全生存期間(sim_OS)を生成し、単一モデルで再評価
-  # 表の抽出とプロットを完全に一致させるためのブレイクスルー
+  # 【STEP 6】 完全なるG-computation (表とグラフの100%同期化)
   # =========================================================================
-  # 1. IPTWを用いてバイアスのない仮想コホート(Pseudo-population)をリサンプリング
-  idx_pseudo <- sample(1:nrow(Data_cgp), size = 10000, replace = TRUE, prob = Data_cgp$iptw)
+
+  # 1. 真のマージナル値の計算（グラフの黒線と完全に一致する値）
+  True_Med <- median(T_true) / 365.25
+  True_S5 <- mean(T_true > 5*365.25) * 100
+
+  # 2. Naiveのマージナルシミュレーション
+  t_naive <- gen_sim_times(fit_naive, Data_cgp)
+  naive_med <- median(t_naive, na.rm=TRUE) / 365.25
+  naive_s5 <- mean(t_naive > 5*365.25, na.rm=TRUE) * 100
+
+  # 3. Standard LTのマージナルシミュレーション
+  t_lt <- gen_sim_times(fit_lt, Data_cgp)
+  lt_med <- median(t_lt, na.rm=TRUE) / 365.25
+  lt_s5 <- mean(t_lt > 5*365.25, na.rm=TRUE) * 100
+
+  # 4. Proposed (G-comp) のマージナルシミュレーション
+  # IPTWによるバイアス浄化コホートを再構築
+  idx_pseudo <- sample(1:nrow(Data_cgp), size = 3000, replace = TRUE, prob = Data_cgp$iptw)
   pseudo_cgp <- Data_cgp[idx_pseudo, ]
 
-  # 2. 層別モデルを用いて各患者のT2をシミュレーション
-  pseudo_cgp$sim_T2 <- ifelse(pseudo_cgp$T1 <= med_t1,
-                              gen_sim_times(fit_t2_short, pseudo_cgp),
-                              gen_sim_times(fit_t2_long, pseudo_cgp))
+  # T2をシミュレーションし、T1に足し合わせる
+  t2_prop <- ifelse(pseudo_cgp$T1 <= med_t1, gen_sim_times(fit_t2_short, pseudo_cgp), gen_sim_times(fit_t2_long, pseudo_cgp))
+  t_prop <- pseudo_cgp$T1 + t2_prop
+  prop_med <- median(t_prop, na.rm=TRUE) / 365.25
+  prop_s5 <- mean(t_prop > 5*365.25, na.rm=TRUE) * 100
 
-  # 3. 実際のT1とシミュレーションT2を足し合わせ、バイアスゼロの完全OSを構築
-  pseudo_cgp$sim_OS <- pseudo_cgp$T1 + pseudo_cgp$sim_T2
-  pseudo_cgp$sim_Event <- 1 # 全員が死亡するまでのデータが揃った状態
-
-  # 4. この完全OSに対して標準AFTモデルを当てはめ、真のAFを一括抽出する
-  form_prop_final <- as.formula(paste("Surv(sim_OS, sim_Event) ~", paste(valid_covs, collapse=" + ")))
-  fit_prop_final <- tryCatch({ flexsurvreg(form_prop_final, data = pseudo_cgp, dist = "llogis") }, error = function(e) NULL)
-
-
-  # --- 共通の指標抽出関数 ---
-  extract_metrics <- function(fit) {
-    blank_res <- c(AF_X=NA, AF_Age=NA, AF_Sex=NA, AF_READ=NA, AF_COADREAD=NA, Med_WT=NA, S5_WT=NA)
-    if (is.null(fit)) return(blank_res)
+  # --- AFの抽出 ---
+  extract_af <- function(fit) {
+    if (is.null(fit)) return(c(AF_X=NA, AF_Age=NA, AF_Sex=NA, AF_READ=NA, AF_COADREAD=NA))
     res_m <- fit$res
-    get_val <- function(rname, cname) { if (rname %in% rownames(res_m) && cname %in% colnames(res_m)) res_m[rname, cname] else NA }
-
-    AF_X <- exp(get_val("XMutated", "est"))
-    AF_Age <- exp(get_val("Age", "est") * 10)
-    AF_Sex <- exp(get_val("SexFemale", "est"))
-    AF_READ <- exp(get_val("HistologyREAD", "est"))
-    AF_COADREAD <- exp(get_val("HistologyCOADREAD", "est"))
-
-    # Baseline: Age=60, Male, COAD (True=2.0 と一致させる基準点)
-    scale_base <- get_val("scale", "est")
-    shape <- get_val("shape", "est")
-    scale_wt_baseline <- scale_base * exp(get_val("Age", "est") * 60)
-
-    med_wt <- scale_wt_baseline / 365.25
-    s5_wt <- 1 / (1 + (5 * 365.25 / scale_wt_baseline)^shape) * 100
-
-    return(c(AF_X=AF_X, AF_Age=AF_Age, AF_Sex=AF_Sex, AF_READ=AF_READ, AF_COADREAD=AF_COADREAD, Med_WT=med_wt, S5_WT=s5_wt))
+    get_val <- function(rname) if (rname %in% rownames(res_m)) res_m[rname, "est"] else NA
+    c(AF_X = exp(get_val("XMutated")), AF_Age = exp(get_val("Age") * 10),
+      AF_Sex = exp(get_val("SexFemale")), AF_READ = exp(get_val("HistologyREAD")), AF_COADREAD = exp(get_val("HistologyCOADREAD")))
   }
 
-  out <- list(Naive = extract_metrics(fit_naive),
-              LT = extract_metrics(fit_lt),
-              Prop = extract_metrics(fit_prop_final), # 完璧に同期したProposed結果
-              fit_naive = fit_naive, fit_lt = fit_lt, fit_prop_final = fit_prop_final,
-              pseudo_cgp = pseudo_cgp, T_true_macro = T_true)
+  get_prop_af <- function(vname, multiplier=1) {
+    val_s <- if(!is.null(fit_t2_short) && vname %in% rownames(fit_t2_short$res)) fit_t2_short$res[vname, "est"] else NA
+    val_l <- if(!is.null(fit_t2_long) && vname %in% rownames(fit_t2_long$res)) fit_t2_long$res[vname, "est"] else NA
+    if(!is.na(val_s) && !is.na(val_l)) {
+      w_avg <- (val_s * nrow(data_short) + val_l * nrow(data_long)) / nrow(Data_cgp)
+      return(exp(w_avg * multiplier))
+    } else return(NA)
+  }
 
-  if(return_data) return(out) else return(list(Naive=out$Naive, LT=out$LT, Prop=out$Prop))
+  out <- list(
+    True_Metrics = c(True_Med, True_S5),
+    Naive_AF = extract_af(fit_naive), Naive_Metrics = c(naive_med, naive_s5),
+    LT_AF = extract_af(fit_lt), LT_Metrics = c(lt_med, lt_s5),
+    Prop_AF = c(AF_X=get_prop_af("XMutated"), AF_Age=get_prop_af("Age", 10), AF_Sex=get_prop_af("SexFemale"), AF_READ=get_prop_af("HistologyREAD"), AF_COADREAD=get_prop_af("HistologyCOADREAD")),
+    Prop_Metrics = c(prop_med, prop_s5),
+    T_true_macro = T_true, t_naive_plot = t_naive, t_lt_plot = t_lt, t_prop_plot = t_prop
+  )
+  if(return_data) return(out) else return(out)
 }
 
 safe_fmt <- function(x, digits=2) { sapply(x, function(v) if(is.na(v) || !is.numeric(v)) "N/A" else sprintf(paste0("%.", digits, "f"), v)) }
@@ -263,40 +265,33 @@ observeEvent(input$run_sim, {
   res <- run_sim_iteration(input$sim_n, input$sim_true_af, input$sim_mut_freq / 100, input$sim_t1_pattern, input$sim_cens_pattern, input$sim_cens_rate / 100, return_data = TRUE)
   shiny::validate(shiny::need(!is.null(res), "Simulation failed. Not enough events generated."))
 
-  True_AF <- input$sim_true_af; True_Med_WT <- 2.0; True_S5_WT <- 1 / (1 + (5 / True_Med_WT)^1.5) * 100
+  True_AF <- input$sim_true_af
 
   output$sim_result_table <- renderTable({
     data.frame(
-      Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF", "Baseline Med OS (WT)", "Baseline 5-Year OS (WT) [%]"),
-      `True` = c(safe_fmt(True_AF), "0.85", "1.10", "0.90", "0.95", safe_fmt(True_Med_WT), safe_fmt(True_S5_WT, 1)),
-      `Naive AFT (Surv(T_obs))` = c(safe_fmt(res$Naive["AF_X"]), safe_fmt(res$Naive["AF_Age"]), safe_fmt(res$Naive["AF_Sex"]), safe_fmt(res$Naive["AF_READ"]), safe_fmt(res$Naive["AF_COADREAD"]), safe_fmt(res$Naive["Med_WT"]), safe_fmt(res$Naive["S5_WT"], 1)),
-      `Standard LT (Surv(T1,T_obs))` = c(safe_fmt(res$LT["AF_X"]), safe_fmt(res$LT["AF_Age"]), safe_fmt(res$LT["AF_Sex"]), safe_fmt(res$LT["AF_READ"]), safe_fmt(res$LT["AF_COADREAD"]), safe_fmt(res$LT["Med_WT"]), safe_fmt(res$LT["S5_WT"], 1)),
-      `Proposed (G-comp)` = c(paste0("<b>", safe_fmt(res$Prop["AF_X"]), "</b>"), paste0("<b>", safe_fmt(res$Prop["AF_Age"]), "</b>"), paste0("<b>", safe_fmt(res$Prop["AF_Sex"]), "</b>"), paste0("<b>", safe_fmt(res$Prop["AF_READ"]), "</b>"), paste0("<b>", safe_fmt(res$Prop["AF_COADREAD"]), "</b>"), paste0("<b>", safe_fmt(res$Prop["Med_WT"]), "</b>"), paste0("<b>", safe_fmt(res$Prop["S5_WT"], 1), "</b>"))
+      Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF", "Marginal Med OS [Years]", "Marginal 5-Year OS [%]"),
+      `True` = c(safe_fmt(True_AF), "0.85", "1.10", "0.90", "0.95", safe_fmt(res$True_Metrics[1]), safe_fmt(res$True_Metrics[2], 1)),
+      `Naive AFT (Surv(T_obs))` = c(safe_fmt(res$Naive_AF["AF_X"]), safe_fmt(res$Naive_AF["AF_Age"]), safe_fmt(res$Naive_AF["AF_Sex"]), safe_fmt(res$Naive_AF["AF_READ"]), safe_fmt(res$Naive_AF["AF_COADREAD"]), safe_fmt(res$Naive_Metrics[1]), safe_fmt(res$Naive_Metrics[2], 1)),
+      `Standard LT (Surv(T1,T_obs))` = c(safe_fmt(res$LT_AF["AF_X"]), safe_fmt(res$LT_AF["AF_Age"]), safe_fmt(res$LT_AF["AF_Sex"]), safe_fmt(res$LT_AF["AF_READ"]), safe_fmt(res$LT_AF["AF_COADREAD"]), safe_fmt(res$LT_Metrics[1]), safe_fmt(res$LT_Metrics[2], 1)),
+      `Proposed (G-comp)` = c(paste0("<b>", safe_fmt(res$Prop_AF["AF_X"]), "</b>"), paste0("<b>", safe_fmt(res$Prop_AF["AF_Age"]), "</b>"), paste0("<b>", safe_fmt(res$Prop_AF["AF_Sex"]), "</b>"), paste0("<b>", safe_fmt(res$Prop_AF["AF_READ"]), "</b>"), paste0("<b>", safe_fmt(res$Prop_AF["AF_COADREAD"]), "</b>"), paste0("<b>", safe_fmt(res$Prop_Metrics[1]), "</b>"), paste0("<b>", safe_fmt(res$Prop_Metrics[2], 1), "</b>"))
     )
   }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c", sanitize.text.function = function(x) x)
 
   output$sim_survival_plot <- renderPlot({
     t_seq <- seq(0, 365.25 * 5, length.out = 100)
 
-    # 1. True Marginal Curve
     km_true <- survfit(Surv(res$T_true_macro, rep(1, length(res$T_true_macro))) ~ 1)
     surv_true <- approx(km_true$time, km_true$surv, xout = t_seq, method = "constant", f = 0, rule = 2)$y
 
-    calc_marginal <- function(fit, dataset) {
-      if(is.null(fit)) return(rep(NA, length(t_seq)))
-      samp <- dataset[sample(1:nrow(dataset), min(500, nrow(dataset))), ]
-      summ <- summary(fit, newdata = samp, t = t_seq, tidy = TRUE)
-      return(aggregate(est ~ time, data = summ, FUN = mean)$est)
+    calc_marginal <- function(t_data) {
+      if(is.null(t_data) || length(t_data) == 0) return(rep(NA, length(t_seq)))
+      km <- survfit(Surv(t_data, rep(1, length(t_data))) ~ 1)
+      return(approx(km$time, km$surv, xout = t_seq, method = "constant", f = 0, rule = 2)$y)
     }
 
-    # 2. Naive Curve
-    surv_naive <- calc_marginal(res$fit_naive, res$pseudo_cgp)
-
-    # 3. Standard LT Curve
-    surv_lt <- calc_marginal(res$fit_lt, res$pseudo_cgp)
-
-    # 4. Proposed Method Curve (表と100%同期した最終完成モデルから出力)
-    surv_prop <- calc_marginal(res$fit_prop_final, res$pseudo_cgp)
+    surv_naive <- calc_marginal(res$t_naive_plot)
+    surv_lt <- calc_marginal(res$t_lt_plot)
+    surv_prop <- calc_marginal(res$t_prop_plot)
 
     plot_df <- data.frame(
       Time = rep(t_seq / 365.25, 4),
@@ -311,7 +306,7 @@ observeEvent(input$run_sim, {
       scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
       theme_minimal(base_size = 15) +
       labs(title = "Tamura & Ikegami Model Ver 2.0 Validation",
-           subtitle = "G-computation creates un-biased pseudo-population, synchronizing Table & Plot perfectly.",
+           subtitle = "G-computation natively resolves dependent truncation. Table and Plot are now 100% perfectly synchronized.",
            x = "Time from Diagnosis (Years)", y = "Overall Survival Probability") +
       theme(plot.title = element_text(face = "bold"), legend.position = "bottom", legend.direction = "vertical", legend.title = element_blank())
   })
@@ -329,24 +324,31 @@ observeEvent(input$run_sim_multi, {
   })
   shiny::validate(shiny::need(length(results) > 0, "All simulations failed."))
 
-  True_AF <- input$sim_true_af; True_Med_WT <- 2.0; True_S5_WT <- 1 / (1 + (5 / True_Med_WT)^1.5) * 100
+  True_AF <- input$sim_true_af;
 
-  calc_stats <- function(model_name, metric_name, true_val) {
-    vals <- sapply(results, function(x) x[[model_name]][metric_name])
+  calc_stats <- function(model_name, metric_name, true_val = NULL) {
+    if(!is.null(model_name)){
+      vals <- sapply(results, function(x) x[[model_name]][metric_name])
+    } else {
+      vals <- sapply(results, function(x) x[[metric_name]])
+    }
     vals <- vals[!is.na(vals)]
     if(length(vals) == 0) return("N/A")
     mean_val <- mean(vals)
-    mse_val <- mean((vals - true_val)^2)
-    return(sprintf("%.2f (MSE: %.3f)", mean_val, mse_val))
+    if(!is.null(true_val)){
+      mse_val <- mean((vals - true_val)^2)
+      return(sprintf("%.2f (MSE: %.3f)", mean_val, mse_val))
+    }
+    return(sprintf("%.2f", mean_val))
   }
 
   output$sim_multi_result_table <- renderTable({
     data.frame(
-      Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF", "Baseline Med OS (WT)", "Baseline 5-Year OS (WT) [%]"),
-      `True Value` = c(safe_fmt(True_AF), "0.85", "1.10", "0.90", "0.95", safe_fmt(True_Med_WT), safe_fmt(True_S5_WT, 1)),
-      `Naive AFT` = c(calc_stats("Naive", "AF_X", True_AF), calc_stats("Naive", "AF_Age", 0.85), calc_stats("Naive", "AF_Sex", 1.10), calc_stats("Naive", "AF_READ", 0.90), calc_stats("Naive", "AF_COADREAD", 0.95), calc_stats("Naive", "Med_WT", True_Med_WT), calc_stats("Naive", "S5_WT", True_S5_WT)),
-      `Standard LT AFT` = c(calc_stats("LT", "AF_X", True_AF), calc_stats("LT", "AF_Age", 0.85), calc_stats("LT", "AF_Sex", 1.10), calc_stats("LT", "AF_READ", 0.90), calc_stats("LT", "AF_COADREAD", 0.95), calc_stats("LT", "Med_WT", True_Med_WT), calc_stats("LT", "S5_WT", True_S5_WT)),
-      `Proposed (G-comp)` = c(paste0("<b>", calc_stats("Prop", "AF_X", True_AF), "</b>"), paste0("<b>", calc_stats("Prop", "AF_Age", 0.85), "</b>"), paste0("<b>", calc_stats("Prop", "AF_Sex", 1.10), "</b>"), paste0("<b>", calc_stats("Prop", "AF_READ", 0.90), "</b>"), paste0("<b>", calc_stats("Prop", "AF_COADREAD", 0.95), "</b>"), paste0("<b>", calc_stats("Prop", "Med_WT", True_Med_WT), "</b>"), paste0("<b>", calc_stats("Prop", "S5_WT", True_S5_WT), "</b>"))
+      Metric = c("Target Gene AF", "Age (+10 yrs) AF", "Sex (Female) AF", "Histology (READ) AF", "Histology (COADREAD) AF", "Marginal Med OS [Years]", "Marginal 5-Year OS [%]"),
+      `True Value` = c(safe_fmt(True_AF), "0.85", "1.10", "0.90", "0.95", calc_stats("True_Metrics", 1), calc_stats("True_Metrics", 2)),
+      `Naive AFT` = c(calc_stats("Naive_AF", "AF_X", True_AF), calc_stats("Naive_AF", "AF_Age", 0.85), calc_stats("Naive_AF", "AF_Sex", 1.10), calc_stats("Naive_AF", "AF_READ", 0.90), calc_stats("Naive_AF", "AF_COADREAD", 0.95), calc_stats("Naive_Metrics", 1), calc_stats("Naive_Metrics", 2)),
+      `Standard LT AFT` = c(calc_stats("LT_AF", "AF_X", True_AF), calc_stats("LT_AF", "AF_Age", 0.85), calc_stats("LT_AF", "AF_Sex", 1.10), calc_stats("LT_AF", "AF_READ", 0.90), calc_stats("LT_AF", "AF_COADREAD", 0.95), calc_stats("LT_Metrics", 1), calc_stats("LT_Metrics", 2)),
+      `Proposed (G-comp)` = c(paste0("<b>", calc_stats("Prop_AF", "AF_X", True_AF), "</b>"), paste0("<b>", calc_stats("Prop_AF", "AF_Age", 0.85), "</b>"), paste0("<b>", calc_stats("Prop_AF", "AF_Sex", 1.10), "</b>"), paste0("<b>", calc_stats("Prop_AF", "AF_READ", 0.90), "</b>"), paste0("<b>", calc_stats("Prop_AF", "AF_COADREAD", 0.95), "</b>"), paste0("<b>", calc_stats("Prop_Metrics", 1), "</b>"), paste0("<b>", calc_stats("Prop_Metrics", 2), "</b>"))
     )
   }, bordered = TRUE, striped = TRUE, hover = TRUE, align = "c", sanitize.text.function = function(x) x)
 })
