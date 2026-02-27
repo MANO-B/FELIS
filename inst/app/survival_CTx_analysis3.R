@@ -173,8 +173,6 @@ survival_CTx_analysis2_logic_control <- function() {
 }
 
 
-
-R
 # =========================================================================
 # GLOBAL HELPERS (Tamura & Ikegami Model Ver 2.3.2 実データ用)
 # エラー完全回避版：モデル行列を安全に生成するサンプリング関数
