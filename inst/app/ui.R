@@ -1466,7 +1466,7 @@ ui <- dashboardPage(
       ),
       tabItem("Simulation_Study",
               fluidPage(
-                titlePanel("Simulation Study: Tamura & Ikegami Model Ver 2.0 (G-computation)"),
+                titlePanel("Simulation Study: Tamura & Ikegami Model Ver 2.0 (G-comp)"),
 
                 sidebarLayout(
                   sidebarPanel(
