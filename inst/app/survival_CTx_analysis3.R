@@ -81,20 +81,15 @@ make_age_class_6grp <- function(age_num) {
 }
 
 # Build registry/manual reference survival list (1-5y) with safe fallback
-build_ref_surv_list_realdata <- function(input, Data_age_survival_5_year = NULL) {
+build_ref_surv_list_realdata <- function(input) {
   ref_surv_list <- list()
   age_groups_all <- c("40未満", "40代", "50代", "60代", "70代", "80以上", "全年齢")
-  message("[ref_surv] point 0")
   if (!is.null(input$survival_data_source)) {
-    message("[ref_surv] point 1")
     if (input$survival_data_source == "registry") {
       cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
-      message("[ref_surv] point 2", cancer_data)
       age_groups_all <- c("40未満","40代","50代","60代","70代","80以上","全年齢")
       fallback_surv <- cancer_data[["全年齢"]]
       for (ag in age_groups_all) {
-        message("[ref_surv] point 3", ag)
-        message("[ref_surv] point 4", cancer_data[[ag]])
         if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
           ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
         } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
