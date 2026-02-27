@@ -27,21 +27,14 @@ survival_CTx_analysis2_logic_control <- function() {
                       time_enroll_final, time_palliative_final, time_palliative_enroll,
                       time_2L_final, time_diagnosis_enroll, time_diagnosis_final, time_2L_enroll)
 
-      if(input$HER2 == "No"){
-        Data_case_target = Data_case_target %>% dplyr::select(-HER2_IHC)
-      } else {
-        Data_case_target = Data_case_target %>% dplyr::filter(HER2_IHC != "Unknown")
-      }
-      if(input$MSI == "No"){
-        Data_case_target = Data_case_target %>% dplyr::select(-MSI_PCR)
-      } else {
-        Data_case_target = Data_case_target %>% dplyr::filter(MSI_PCR != "Unknown")
-      }
-      if(input$MMR == "No"){
-        Data_case_target = Data_case_target %>% dplyr::select(-MMR_IHC)
-      } else {
-        Data_case_target = Data_case_target %>% dplyr::filter(MMR_IHC != "Unknown")
-      }
+      if(input$HER2 == "No") Data_case_target = Data_case_target %>% dplyr::select(-HER2_IHC)
+      else Data_case_target = Data_case_target %>% dplyr::filter(HER2_IHC != "Unknown")
+
+      if(input$MSI == "No") Data_case_target = Data_case_target %>% dplyr::select(-MSI_PCR)
+      else Data_case_target = Data_case_target %>% dplyr::filter(MSI_PCR != "Unknown")
+
+      if(input$MMR == "No") Data_case_target = Data_case_target %>% dplyr::select(-MMR_IHC)
+      else Data_case_target = Data_case_target %>% dplyr::filter(MMR_IHC != "Unknown")
 
       Data_case_target$Cancers = Data_case_target$症例.基本情報.がん種.OncoTree.
       incProgress(1 / 13)
@@ -50,61 +43,44 @@ survival_CTx_analysis2_logic_control <- function() {
 
       Data_case_target = Data_case_target %>% dplyr::distinct(.keep_all = TRUE, C.CAT調査結果.基本項目.ハッシュID)
       Data_MAF = Data_report() %>%
-        dplyr::filter(
-          !str_detect(Hugo_Symbol, ",") & Hugo_Symbol != "" &
-            Evidence_level %in% c("","A","B","C","D","E","F") &
-            Variant_Classification != "expression"
-        ) %>%
+        dplyr::filter(!str_detect(Hugo_Symbol, ",") & Hugo_Symbol != "" & Evidence_level %in% c("","A","B","C","D","E","F") & Variant_Classification != "expression") %>%
         dplyr::arrange(desc(Evidence_level)) %>%
         dplyr::distinct(Tumor_Sample_Barcode, Hugo_Symbol, Start_Position, .keep_all = TRUE)
 
-      if(length(Data_MAF[Data_MAF$TMB > 30,]$TMB) > 0){
-        Data_MAF[Data_MAF$TMB > 30,]$TMB = 30
-      }
+      if(length(Data_MAF[Data_MAF$TMB > 30,]$TMB) > 0) Data_MAF[Data_MAF$TMB > 30,]$TMB = 30
 
       if(nrow(Data_case_target)>0){
         Data_report_TMB = Data_MAF %>%
           dplyr::filter(Tumor_Sample_Barcode %in% Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
-          dplyr::select(Tumor_Sample_Barcode, TMB) %>%
-          dplyr::distinct(Tumor_Sample_Barcode, .keep_all=T)
+          dplyr::select(Tumor_Sample_Barcode, TMB) %>% dplyr::distinct(Tumor_Sample_Barcode, .keep_all=T)
         colnames(Data_report_TMB) = c("C.CAT調査結果.基本項目.ハッシュID", "TMB")
         Data_case_target = left_join(Data_case_target, Data_report_TMB, by = "C.CAT調査結果.基本項目.ハッシュID")
 
         Data_MAF_target = Data_MAF %>% dplyr::filter(Tumor_Sample_Barcode %in% Data_case_target$C.CAT調査結果.基本項目.ハッシュID)
-        if(input$patho == "Only pathogenic muts"){
-          Data_MAF_target = Data_MAF_target %>% dplyr::filter(Evidence_level == "F")
-        }
+        if(input$patho == "Only pathogenic muts") Data_MAF_target = Data_MAF_target %>% dplyr::filter(Evidence_level == "F")
         Data_MAF_target = Data_MAF_target %>% dplyr::distinct(Tumor_Sample_Barcode, Hugo_Symbol, .keep_all = T)
         Gene_list = unique(names(sort(table(Data_MAF_target$Hugo_Symbol), decreasing = T)))
 
-        if(length(Data_case_target$censor[is.na(Data_case_target$censor)])> 0){
-          Data_case_target$censor[is.na(Data_case_target$censor)] = 0
-        }
+        if(length(Data_case_target$censor[is.na(Data_case_target$censor)])> 0) Data_case_target$censor[is.na(Data_case_target$censor)] = 0
         incProgress(1 / 13)
 
         Data_case_target$time_pre = Data_case_target$time_diagnosis_enroll
         Data_case_target$time_all = Data_case_target$time_diagnosis_final
         Data_case_target = Data_case_target %>% dplyr::filter(time_pre > 0)
-        adjustment = TRUE
-        OUTPUT_DATA$figure_surv_CTx_adjustment_control = adjustment
+        OUTPUT_DATA$figure_surv_CTx_adjustment_control = TRUE
 
         Data_case_target = Data_case_target %>% dplyr::filter(
           !is.na(time_enroll_final) & is.finite(time_enroll_final) & time_enroll_final > 0 &
-            !is.na(time_pre) & is.finite(time_pre) &
-            !is.na(censor) & is.finite(censor)
+            !is.na(time_pre) & is.finite(time_pre) & !is.na(censor) & is.finite(censor)
         )
         Data_survival = Data_case_target
         Data_MAF_target = Data_MAF_target %>% dplyr::filter(Tumor_Sample_Barcode %in% Data_survival$C.CAT調査結果.基本項目.ハッシュID)
         OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control = Data_MAF_target
         incProgress(1 / 13)
 
-        Data_survival_interactive = Data_survival
-        OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control = Data_survival_interactive
+        OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control = Data_survival
 
-        candidate_genes = sort(unique(c(Data_MAF_target$Hugo_Symbol,
-                                        paste0(input$special_gene, "_", input$special_gene_mutation_1_name),
-                                        paste0(input$special_gene, "_", input$special_gene_mutation_2_name),
-                                        paste0(input$special_gene, "_NOS"))))
+        candidate_genes = sort(unique(c(Data_MAF_target$Hugo_Symbol, paste0(input$special_gene, "_", input$special_gene_mutation_1_name), paste0(input$special_gene, "_", input$special_gene_mutation_2_name), paste0(input$special_gene, "_NOS"))))
         candidate_genes = candidate_genes[!candidate_genes %in% c("", "_", "_NOS", paste0(input$special_gene, "_"))]
         candidate_genes = candidate_genes[!is.na(candidate_genes)]
         Top_gene = unique(names(sort(table(Data_MAF_target$Hugo_Symbol), decreasing = T)))
@@ -114,9 +90,9 @@ survival_CTx_analysis2_logic_control <- function() {
         OUTPUT_DATA$figure_surv_interactive_Top_gene_control = Top_gene
         OUTPUT_DATA$figure_surv_interactive_candidate_genes_control = candidate_genes
         OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control = candidate_drugs[!is.na(candidate_drugs)]
-        OUTPUT_DATA$figure_surv_interactive_candidate_Age_control = sort(unique(Data_survival_interactive$YoungOld))
-        OUTPUT_DATA$figure_surv_interactive_candidate_Sex_control = sort(unique(Data_survival_interactive$症例.基本情報.性別.名称.))
-        OUTPUT_DATA$figure_surv_interactive_candidate_Histology_control = sort(unique(Data_survival_interactive$Cancers))
+        OUTPUT_DATA$figure_surv_interactive_candidate_Age_control = sort(unique(Data_survival$YoungOld))
+        OUTPUT_DATA$figure_surv_interactive_candidate_Sex_control = sort(unique(Data_survival$症例.基本情報.性別.名称.))
+        OUTPUT_DATA$figure_surv_interactive_candidate_Histology_control = sort(unique(Data_survival$Cancers))
       }
       incProgress(1 / 13)
     })
@@ -126,7 +102,7 @@ survival_CTx_analysis2_logic_control <- function() {
 }
 
 # =========================================================================
-# GLOBAL HELPERS (Tamura & Ikegami Model Ver 2.3.2 実データ 修正版2)
+# 2. Global Helpers
 # =========================================================================
 gen_sim_times_robust <- function(fit, newdata, dist_type = c("weibull", "llogis")) {
   dist_type <- match.arg(dist_type)
@@ -136,9 +112,7 @@ gen_sim_times_robust <- function(fit, newdata, dist_type = c("weibull", "llogis"
   base_scale <- fit$res["scale", "est"]
 
   form <- fit$my_formula
-  if (is.null(form)) {
-    form <- tryCatch(eval(fit$call$formula, envir = parent.frame()), error = function(e) fit$call$formula)
-  }
+  if (is.null(form)) form <- tryCatch(eval(fit$call$formula, envir = parent.frame()), error = function(e) fit$call$formula)
 
   if (length(fit$coefficients) == 2) {
     scale_vec <- rep(base_scale, nrow(newdata))
@@ -159,22 +133,28 @@ gen_sim_times_robust <- function(fit, newdata, dist_type = c("weibull", "llogis"
   }
 
   u <- pmax(pmin(runif(nrow(newdata)), 0.9999), 0.0001)
-  if (dist_type == "weibull") { return(scale_vec * (-log(u))^(1 / shape))
-  } else { return(scale_vec * ((1 - u) / u)^(1 / shape)) }
+  if (dist_type == "weibull") return(scale_vec * (-log(u))^(1 / shape)) else return(scale_vec * ((1 - u) / u)^(1 / shape))
 }
 
 calculate_calibrated_iptw <- function(data, ref_surv_list) {
+  message("\n--- [DEBUG] STARTING IPTW CALIBRATION ---")
   data$iptw <- 1.0
   t_points_days <- (1:5) * 365.25
 
   for (ag in unique(data$age_class)) {
-    if (!(ag %in% names(ref_surv_list))) next
+    if (!(ag %in% names(ref_surv_list))) {
+      message(sprintf("[DEBUG] 年齢層 '%s' がレジストリにないためスキップします", ag))
+      next
+    }
 
     S_macro_target <- pmax(pmin(ref_surv_list[[ag]][1:5] / 100, 0.999), 0.001)
     ag_data_idx <- which(data$age_class == ag)
     ag_data <- data[ag_data_idx, , drop = FALSE]
 
-    if (nrow(ag_data) < 5) next
+    if (nrow(ag_data) < 5) {
+      message(sprintf("[DEBUG] 年齢層 '%s' はサンプルが少なすぎる(N=%d)ため重み1.0のままスキップします", ag, nrow(ag_data)))
+      next
+    }
 
     time_pre_years <- pmax(ag_data$time_pre / 365.25, 0.01)
 
@@ -188,7 +168,6 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
 
       S_est <- approx(km$time, km$surv, xout = t_points_days, method = "constant", f = 0, rule = 2)$y
       S_est[is.na(S_est)] <- min(S_est, na.rm = TRUE)
-
       return(sum((S_est - S_macro_target)^2) + 0.001 * theta^2)
     }
 
@@ -200,34 +179,28 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
     upper_bound <- quantile(w_opt, 0.99, na.rm = TRUE)
     w_opt <- pmax(lower_bound, pmin(w_opt, upper_bound))
 
-    data$iptw[ag_data_idx] <- w_opt / mean(w_opt)
+    final_weights <- w_opt / mean(w_opt)
+    data$iptw[ag_data_idx] <- final_weights
+
+    message(sprintf("[DEBUG] 年齢層 '%s' (N=%d) -> ターゲット1-5年: %s | 最適化Theta: %.3f | 平均重み: %.2f",
+                    ag, nrow(ag_data), paste(round(S_macro_target, 2), collapse=","), theta_hat, mean(final_weights)))
   }
   return(data)
 }
 
 # =========================================================================
-# 生存曲線プロット (figure_survival_CTx_interactive_1_control)
+# 3. 生存曲線プロット (figure_survival_CTx_interactive_1_control)
 # =========================================================================
 output$figure_survival_CTx_interactive_1_control = renderPlot({
-  req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
-      OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
-      OUTPUT_DATA$figure_surv_CTx_Data_drug_control)
+  message("\n\n======== [DEBUG] RENDER PLOT (SURVIVAL CURVE) TRIGGERED ========")
 
-  # 【完全修正】動的UIの入力値を確実に感知させるためのリスト化
-  ui_triggers <- list(
-    input$survival_data_source, input$registry_cancer_type,
-    input$surv_all_1y, input$surv_u40_1y
-  )
+  # UIの入力値を明示的に読み込んで反応(Reactivity)を強制
+  req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control)
 
-  # デバッグ用：UIの値がどこまで取れているかをコンソールに表示
-  cat("\n--- 生存曲線描画トリガー検知 ---\n")
-  cat("Source: ", input$survival_data_source, "\n")
-  cat("Registry Type: ", input$registry_cancer_type, "\n")
+  src_val <- input$survival_data_source
+  reg_val <- input$registry_cancer_type
 
-  lapply(1:2, function(i) {
-    prefix <- paste0("gene_survival_interactive_", i, "_")
-    list(input[[paste0(prefix, "P_1_control")]], input[[paste0(prefix, "P_2_control")]], input[[paste0(prefix, "W_control")]], input[[paste0(prefix, "A_control")]], input[[paste0(prefix, "S_control")]], input[[paste0(prefix, "H_control")]], input[[paste0(prefix, "D_control")]])
-  })
+  message(sprintf("[DEBUG] UI Input -> Data Source: %s, Registry Type: %s", src_val, reg_val))
 
   Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
@@ -242,33 +215,26 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
       )
     )
 
-  # ========================================================
-  # UI入力に応じたマクロデータ（ref_surv_list）の構築
-  # ========================================================
   ref_surv_list <- list()
   age_groups_all <- c("40未満", "40代", "50代", "60代", "70代", "80以上", "全年齢")
 
-  if (!is.null(input$survival_data_source)) {
-    if (input$survival_data_source == "registry") {
-      if (!is.null(input$registry_cancer_type) && exists("Data_age_survival_5_year")) {
-        if (input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
-          cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
-          fallback_surv <- cancer_data[["全年齢"]]
-          for (ag in age_groups_all) {
-            if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
-              ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
-            } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
-              ref_surv_list[[ag]] <- as.numeric(fallback_surv)
-            }
-          }
-          cat("-> レジストリデータをロードしました\n")
+  if (!is.null(src_val)) {
+    if (src_val == "registry" && !is.null(reg_val)) {
+      if (exists("Data_age_survival_5_year") && reg_val %in% names(Data_age_survival_5_year)) {
+        message("[DEBUG] 院内がん登録データから ", reg_val, " をロードします")
+        cancer_data <- Data_age_survival_5_year[[reg_val]]
+        fallback_surv <- cancer_data[["全年齢"]]
+        for (ag in age_groups_all) {
+          if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
+          else if (!is.null(fallback_surv) && length(fallback_surv) == 5) ref_surv_list[[ag]] <- as.numeric(fallback_surv)
         }
+      } else {
+        message("[DEBUG] 警告: Data_age_survival_5_year オブジェクトが存在しないか、該当がん種がありません")
       }
-    } else if (input$survival_data_source == "manual_all") {
+    } else if (src_val == "manual_all") {
       vals <- c(input$surv_all_1y, input$surv_all_2y, input$surv_all_3y, input$surv_all_4y, input$surv_all_5y)
       for (ag in age_groups_all) ref_surv_list[[ag]] <- vals
-      cat("-> Manual All データをロードしました\n")
-    } else if (input$survival_data_source == "manual_age") {
+    } else if (src_val == "manual_age") {
       ref_surv_list[["40未満"]] <- c(input$surv_u40_1y, input$surv_u40_2y, input$surv_u40_3y, input$surv_u40_4y, input$surv_u40_5y)
       ref_surv_list[["40代"]] <- c(input$surv_40s_1y, input$surv_40s_2y, input$surv_40s_3y, input$surv_40s_4y, input$surv_40s_5y)
       ref_surv_list[["50代"]] <- c(input$surv_50s_1y, input$surv_50s_2y, input$surv_50s_3y, input$surv_50s_4y, input$surv_50s_5y)
@@ -276,31 +242,30 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
       ref_surv_list[["70代"]] <- c(input$surv_70s_1y, input$surv_70s_2y, input$surv_70s_3y, input$surv_70s_4y, input$surv_70s_5y)
       ref_surv_list[["80以上"]] <- c(input$surv_80s_1y, input$surv_80s_2y, input$surv_80s_3y, input$surv_80s_4y, input$surv_80s_5y)
       ref_surv_list[["全年齢"]] <- ref_surv_list[["60代"]]
-      cat("-> Manual Age データをロードしました\n")
     }
   }
 
   if (length(ref_surv_list) == 0) {
+    message("[DEBUG] 参照データが見つからないためダミー値をセットします")
     for (ag in age_groups_all) ref_surv_list[[ag]] <- c(50, 30, 20, 15, 10)
-    cat("-> (警告) データ取得失敗。ダミーデータを適用します\n")
   }
 
-  if (length(ref_surv_list) > 0) {
-    Data_survival_interactive <- calculate_calibrated_iptw(Data_survival_interactive, ref_surv_list)
-  } else {
-    Data_survival_interactive$iptw <- 1.0
-  }
+  Data_survival_interactive <- calculate_calibrated_iptw(Data_survival_interactive, ref_surv_list)
   Data_survival_interactive$iptw <- ifelse(is.na(Data_survival_interactive$iptw) | Data_survival_interactive$iptw <= 0, 1.0, Data_survival_interactive$iptw)
 
   extract_group_ids <- function(group_num) {
     IDs <- unique(Data_survival_interactive$C.CAT調査結果.基本項目.ハッシュID)
     input_prefix <- paste0("gene_survival_interactive_", group_num, "_")
+
+    # 【追加修正】ここで各グループの抽出条件も明示的にリアクティブにする
     p1_input <- input[[paste0(input_prefix, "P_1_control")]]
-    if(!all(is.null(p1_input))) IDs <- intersect(IDs, (Data_MAF_target %>% dplyr::filter(Hugo_Symbol %in% p1_input))$Tumor_Sample_Barcode)
     p2_input <- input[[paste0(input_prefix, "P_2_control")]]
-    if(!all(is.null(p2_input))) IDs <- intersect(IDs, (Data_MAF_target %>% dplyr::filter(Hugo_Symbol %in% p2_input))$Tumor_Sample_Barcode)
     w_input <- input[[paste0(input_prefix, "W_control")]]
+
+    if(!all(is.null(p1_input))) IDs <- intersect(IDs, (Data_MAF_target %>% dplyr::filter(Hugo_Symbol %in% p1_input))$Tumor_Sample_Barcode)
+    if(!all(is.null(p2_input))) IDs <- intersect(IDs, (Data_MAF_target %>% dplyr::filter(Hugo_Symbol %in% p2_input))$Tumor_Sample_Barcode)
     if(!all(is.null(w_input))) IDs <- setdiff(IDs, (Data_MAF_target %>% dplyr::filter(Hugo_Symbol %in% w_input))$Tumor_Sample_Barcode)
+
     clinical_filters <- list(A_control = "YoungOld", S_control = "症例.基本情報.性別.名称.", H_control = "Cancers")
     for(filter_key in names(clinical_filters)) {
       filter_input <- input[[paste0(input_prefix, filter_key)]]
@@ -310,10 +275,6 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
         IDs <- intersect(IDs, (Data_survival_interactive %>% dplyr::filter(!!rlang::parse_expr(filter_expr)))$C.CAT調査結果.基本項目.ハッシュID)
       }
     }
-    d_input <- input[[paste0(input_prefix, "D_control")]]
-    if(!all(is.null(d_input))) IDs <- intersect(IDs, (Data_drug %>% dplyr::filter(Drug %in% d_input))$ID)
-    nd_input <- input[[paste0(input_prefix, "ND_control")]]
-    if(!all(is.null(nd_input))) IDs <- setdiff(IDs, (Data_drug %>% dplyr::filter(Drug %in% nd_input))$ID)
     return(IDs)
   }
 
@@ -329,8 +290,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
       time_pre_event = 1,
       Sex = as.factor(`症例.基本情報.性別.名称.`),
       Cancers = as.factor(Cancers)
-    ) %>%
-    dplyr::filter(time_pre > 0, time_all > time_pre)
+    ) %>% dplyr::filter(time_pre > 0, time_all > time_pre)
 
   shiny::validate(shiny::need(nrow(Data_model) > 0, "No valid data to fit the model."))
   Data_model$Group <- factor(Data_model$Group, levels = c("EP0", "1", "2"))
@@ -352,6 +312,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 
   req(requireNamespace("flexsurv", quietly = TRUE))
 
+  message("[DEBUG] T1/T2モデルをフィッティング中...")
   form_t1 <- as.formula(paste("Surv(time_pre, time_pre_event) ~", paste(valid_covariates, collapse = " + ")))
   fit_t1 <- tryCatch(flexsurv::flexsurvreg(form_t1, data = Data_model, weights = iptw, dist = "weibull"), error = function(e) NULL)
   if (!is.null(fit_t1)) fit_t1$my_formula <- form_t1
@@ -362,6 +323,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 
   shiny::validate(shiny::need(!is.null(fit_t1) && !is.null(fit_t2), "Model fitting failed. The dataset might be too sparse."))
 
+  message("[DEBUG] G-computation シミュレーション開始")
   set.seed(2024)
   idx_pseudo <- sample(seq_len(nrow(Data_model)), size = 5000, replace = TRUE, prob = Data_model$iptw)
   pseudo_base <- Data_model[idx_pseudo, ]
@@ -394,6 +356,8 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   Data_survival_simulated <- do.call(rbind, simulated_data) %>% dplyr::filter(is.finite(time_all))
   shiny::validate(shiny::need(nrow(Data_survival_simulated) > 0, "Simulation yielded no data."))
 
+  message("[DEBUG] シミュレーション完了、プロット描画へ")
+
   survival_compare_and_plot_CTx(
     data = Data_survival_simulated,
     time_var1 = "time_pre", time_var2 = "time_all", status_var = "censor", group_var = "Group",
@@ -403,18 +367,16 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 })
 
 # =========================================================================
-# フォレストプロット (forest_plot_multivariate)
+# 4. フォレストプロット (forest_plot_multivariate)
 # =========================================================================
 output$forest_plot_multivariate = renderPlot({
-  req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control, OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control)
+  req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control)
   shiny::validate(shiny::need(requireNamespace("patchwork", quietly = TRUE), "Please install the 'patchwork' package."))
   shiny::validate(shiny::need(requireNamespace("splines", quietly = TRUE), "Please install the 'splines' package."))
 
-  # 【完全修正】動的UIの入力値を確実に感知
-  ui_triggers <- list(
-    input$survival_data_source, input$registry_cancer_type,
-    input$surv_all_1y, input$surv_u40_1y
-  )
+  # UIの入力値を明示的に読み込んで反応(Reactivity)を強制
+  src_val <- input$survival_data_source
+  reg_val <- input$registry_cancer_type
 
   Data_survival_interactive = OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control
   Data_MAF_target = OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control
@@ -429,31 +391,23 @@ output$forest_plot_multivariate = renderPlot({
       )
     )
 
-  # ========================================================
-  # UI入力に応じたマクロデータ（ref_surv_list）の構築
-  # ========================================================
   ref_surv_list <- list()
   age_groups_all <- c("40未満", "40代", "50代", "60代", "70代", "80以上", "全年齢")
 
-  if (!is.null(input$survival_data_source)) {
-    if (input$survival_data_source == "registry") {
-      if (!is.null(input$registry_cancer_type) && exists("Data_age_survival_5_year")) {
-        if (input$registry_cancer_type %in% names(Data_age_survival_5_year)) {
-          cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
-          fallback_surv <- cancer_data[["全年齢"]]
-          for (ag in age_groups_all) {
-            if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
-              ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
-            } else if (!is.null(fallback_surv) && length(fallback_surv) == 5) {
-              ref_surv_list[[ag]] <- as.numeric(fallback_surv)
-            }
-          }
+  if (!is.null(src_val)) {
+    if (src_val == "registry" && !is.null(reg_val)) {
+      if (exists("Data_age_survival_5_year") && reg_val %in% names(Data_age_survival_5_year)) {
+        cancer_data <- Data_age_survival_5_year[[reg_val]]
+        fallback_surv <- cancer_data[["全年齢"]]
+        for (ag in age_groups_all) {
+          if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) ref_surv_list[[ag]] <- as.numeric(cancer_data[[ag]])
+          else if (!is.null(fallback_surv) && length(fallback_surv) == 5) ref_surv_list[[ag]] <- as.numeric(fallback_surv)
         }
       }
-    } else if (input$survival_data_source == "manual_all") {
+    } else if (src_val == "manual_all") {
       vals <- c(input$surv_all_1y, input$surv_all_2y, input$surv_all_3y, input$surv_all_4y, input$surv_all_5y)
       for (ag in age_groups_all) ref_surv_list[[ag]] <- vals
-    } else if (input$survival_data_source == "manual_age") {
+    } else if (src_val == "manual_age") {
       ref_surv_list[["40未満"]] <- c(input$surv_u40_1y, input$surv_u40_2y, input$surv_u40_3y, input$surv_u40_4y, input$surv_u40_5y)
       ref_surv_list[["40代"]] <- c(input$surv_40s_1y, input$surv_40s_2y, input$surv_40s_3y, input$surv_40s_4y, input$surv_40s_5y)
       ref_surv_list[["50代"]] <- c(input$surv_50s_1y, input$surv_50s_2y, input$surv_50s_3y, input$surv_50s_4y, input$surv_50s_5y)
@@ -468,11 +422,7 @@ output$forest_plot_multivariate = renderPlot({
     for (ag in age_groups_all) ref_surv_list[[ag]] <- c(50, 30, 20, 15, 10)
   }
 
-  if (length(ref_surv_list) > 0) {
-    Data_survival_interactive <- calculate_calibrated_iptw(Data_survival_interactive, ref_surv_list)
-  } else {
-    Data_survival_interactive$iptw <- 1.0
-  }
+  Data_survival_interactive <- calculate_calibrated_iptw(Data_survival_interactive, ref_surv_list)
   Data_survival_interactive$iptw <- ifelse(is.na(Data_survival_interactive$iptw) | Data_survival_interactive$iptw <= 0, 1.0, Data_survival_interactive$iptw)
 
   Data_forest <- Data_survival_interactive %>%
@@ -542,7 +492,6 @@ output$forest_plot_multivariate = renderPlot({
   pseudo_forest <- Data_forest[idx_pseudo, ]
 
   pseudo_forest$sim_T1 <- gen_sim_times_robust(fit_t1, pseudo_forest, dist_type = "weibull")
-
   pseudo_forest$logT1_sim_scale <- log(pmax(pseudo_forest$sim_T1 / 365.25, 1e-6))
   ns_sim <- tryCatch(predict(ns_obj, pseudo_forest$logT1_sim_scale), error = function(e) matrix(0, nrow(pseudo_forest), attr(ns_obj, "df")))
   colnames(ns_sim) <- paste0("ns", seq_len(ncol(ns_sim)))
