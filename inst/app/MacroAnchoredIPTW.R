@@ -392,8 +392,13 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   if (length(unique(Data_cgp$Histology)) > 1) valid_covs <- c(valid_covs, "Histology")
 
   # spline(logT1)
+  # spline(logT1)
   Data_cgp$logT1_scale <- log(pmax(Data_cgp$T1 / 365.25, 1e-6))
-  ns_obj <- ns(Data_cgp$logT1_scale, df = 3)
+  ns_obj <- tryCatch(ns(Data_cgp$logT1_scale, df = 3), error = function(e) NULL)
+
+  # スプライン生成に失敗した場合は、このイテレーションをスキップ（NULLを返す）
+  if (is.null(ns_obj)) return(NULL)
+
   ns_mat <- as.matrix(ns_obj)
   colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
   for (j in seq_len(ncol(ns_mat))) Data_cgp[[colnames(ns_mat)[j]]] <- ns_mat[, j]

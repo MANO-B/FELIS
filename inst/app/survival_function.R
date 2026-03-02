@@ -193,8 +193,11 @@ surv_curv_entry <- function(fit, data, title, legend_, diff_0, diff_1, diff_2=NU
   )
 
   # --- Median OS（群ごとに必ず作る） ---
-  tab <- as.data.frame(summary(fit)$table)
-
+  tab0 <- summary(fit)$table
+  tab  <- if (is.null(dim(tab0))) as.data.frame(t(tab0)) else as.data.frame(tab0)
+  if (nrow(tab) == 1 && (is.null(rownames(tab)) || rownames(tab)[1] == "")) {
+    rownames(tab) <- "All"
+  }
   get_col <- function(df, cand) {
     nm <- names(df)
     hit <- cand[cand %in% nm]
