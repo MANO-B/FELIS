@@ -30,68 +30,74 @@ find_censoring_param <- function(T2, target_rate, pattern) {
   }
 }
 
-gen_sim_times <- function(fit, newdata, dist_type = c("weibull", "llogis", "gengamma")) {
-  dist_type <- match.arg(dist_type)
-  if (is.null(fit) || is.null(newdata) || nrow(newdata) == 0) return(rep(NA_real_, nrow(newdata)))
+# =========================================================
+# gen_sim_times(): weibull / llogis / gengamma 安全版
+#  - predict(type="lp") を使わず、fit$res から手組みで lp を作る
+#  - flexsurvreg の covariate は location(=mu or log(scale)) に入る前提
+# =========================================================
+gen_sim_times <- function(fit, newdata, dist_type = NULL) {
+  if (is.null(fit) || nrow(newdata) == 0) return(rep(NA_real_, nrow(newdata)))
+  if (is.null(dist_type)) dist_type <- fit$dlist$name
 
   res_m <- fit$res
   n <- nrow(newdata)
 
-  # 分布パラメータ行名（係数行ではない）
-  dist_pars <- c("scale", "shape", "mu", "sigma", "Q")
-  coef_rows <- setdiff(rownames(res_m), dist_pars)
-
-  # base location
+  # --- location のベース（切片） ---
+  # weibull/llogis: rowname "scale" がある（AFT: mu = log(scale)）
+  # gengamma: rowname "mu" がある
   if (dist_type == "gengamma") {
     if (!("mu" %in% rownames(res_m))) return(rep(NA_real_, n))
-    base_loc <- res_m["mu", "est"]
+    base_loc <- as.numeric(res_m["mu","est"])
   } else {
     if (!("scale" %in% rownames(res_m))) return(rep(NA_real_, n))
-    base_loc <- log(res_m["scale", "est"])
+    base_loc <- log(as.numeric(res_m["scale","est"]))
   }
 
-  # 手動 lp（存在する列だけ加算）
+  # --- covariate 行（分布パラメータ以外）を拾って lp を作る ---
+  dist_pars <- c("shape","scale","mu","sigma","Q")
+  cov_rows <- setdiff(rownames(res_m), dist_pars)
+
   lp <- rep(0, n)
 
-  add_bin <- function(varname, level_val, coefname) {
-    if (coefname %in% coef_rows && varname %in% names(newdata)) {
-      lp <<- lp + res_m[coefname, "est"] * as.numeric(newdata[[varname]] == level_val)
-    }
-  }
-  add_cont <- function(varname, coefname) {
-    if (coefname %in% coef_rows && varname %in% names(newdata)) {
-      lp <<- lp + res_m[coefname, "est"] * as.numeric(newdata[[varname]])
-    }
-  }
+  # 主要共変量（存在すれば足す）
+  if ("XMutated" %in% cov_rows)      lp <- lp + res_m["XMutated","est"] * as.numeric(newdata$X == "Mutated")
+  if ("Age" %in% cov_rows)           lp <- lp + res_m["Age","est"]       * as.numeric(newdata$Age)
+  if ("SexFemale" %in% cov_rows)     lp <- lp + res_m["SexFemale","est"] * as.numeric(newdata$Sex == "Female")
+  if ("HistologyREAD" %in% cov_rows) lp <- lp + res_m["HistologyREAD","est"] * as.numeric(newdata$Histology == "READ")
+  if ("HistologyCOADREAD" %in% cov_rows) lp <- lp + res_m["HistologyCOADREAD","est"] * as.numeric(newdata$Histology == "COADREAD")
 
-  add_bin("X", "Mutated", "XMutated")
-  add_cont("Age", "Age")
-  add_bin("Sex", "Female", "SexFemale")
-  add_bin("Histology", "READ", "HistologyREAD")
-  add_bin("Histology", "COADREAD", "HistologyCOADREAD")
-
-  # スプライン(ns1, ns2, …)は自動
-  for (v in coef_rows) {
-    if (grepl("^ns[0-9]+$", v) && v %in% names(newdata)) {
-      lp <- lp + res_m[v, "est"] * as.numeric(newdata[[v]])
+  # スプライン ns1,ns2,... を足す
+  for (v in cov_rows) {
+    if (grepl("^ns[0-9]+$", v) && (v %in% names(newdata))) {
+      lp <- lp + res_m[v,"est"] * as.numeric(newdata[[v]])
     }
   }
 
   loc <- base_loc + lp
 
-  if (dist_type == "weibull") {
-    shape <- res_m["shape", "est"]
-    return(stats::rweibull(n, shape = shape, scale = exp(loc)))
+  # --- 乱数生成 ---
+  if (dist_type %in% c("weibull","weibullPH","weibullph")) {
+    shape <- as.numeric(res_m["shape","est"])
+    return(rweibull(n, shape = shape, scale = exp(loc)))
   }
-  if (dist_type == "llogis") {
-    shape <- res_m["shape", "est"]
+
+  if (dist_type %in% c("llogis","loglogistic")) {
+    # flexsurv::rllogis(n, shape, scale)
+    # ここではあなたの既存実装方針に合わせ、scale=exp(loc) とする
+    # shape は fit$res["shape","est"] でよい（環境差が出にくい）
+    shape <- as.numeric(res_m["shape","est"])
     return(flexsurv::rllogis(n, shape = shape, scale = exp(loc)))
   }
-  # gengamma
-  sigma <- res_m["sigma", "est"]
-  Q <- res_m["Q", "est"]
-  return(flexsurv::rgengamma(n, mu = loc, sigma = sigma, Q = Q))
+
+  if (dist_type %in% c("gengamma","gen_gamma","generalized gamma")) {
+    sigma <- as.numeric(res_m["sigma","est"])
+    Q     <- as.numeric(res_m["Q","est"])
+    return(flexsurv::rgengamma(n, mu = loc, sigma = sigma, Q = Q))
+  }
+
+  return(rep(NA_real_, n))
 }
+
 
 calculate_calibrated_iptw <- function(data, ref_surv_list) {
   data$iptw <- 1.0
@@ -129,220 +135,270 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
 }
 
 # =========================================================================
-# Core Simulation Engine
-#  - 1:5(1〜5年) の5点キャリブレーション維持（calculate_calibrated_iptwに依存）
-#  - T2モデルを gengamma に変更
-#  - G-computationのT2生成も gengamma で実行（重要）
+# Core Simulation Engine (TOTAL EFFECT version)
+#  - 1:5(1〜5年) の5点キャリブレーション維持
+#  - T2 = gengamma
+#  - Step3 を do(X=0/1) の2世界で回し、総効果AFを回収
+#  - ただし curve_prop は「自然分布X」の擬似コホートで作り、従来の図を維持
 # =========================================================================
 run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shape,
                               t1_pat, cens_pat, cens_rate, return_data = FALSE) {
 
   suppressPackageStartupMessages({
-    library(survival)
-    library(flexsurv)
-    library(splines)
+    library(survival); library(flexsurv); library(splines)
   })
 
-  # --- DGP (元のまま) ---
+  # --- DGP ---
   N_macro <- 100000
   Age <- round(runif(N_macro, 40, 80))
-  Sex <- sample(c("Male", "Female"), N_macro, replace = TRUE, prob = c(0.55, 0.45))
-  Histology <- sample(c("COAD", "READ", "COADREAD"), N_macro, replace = TRUE, prob = c(0.60, 0.30, 0.10))
-  X <- rbinom(N_macro, 1, Mut_Freq)
+  Sex <- sample(c("Male","Female"), N_macro, replace=TRUE, prob=c(0.55,0.45))
+  Histology <- sample(c("COAD","READ","COADREAD"), N_macro, replace=TRUE, prob=c(0.60,0.30,0.10))
+  Xbin <- rbinom(N_macro, 1, Mut_Freq)
 
+  # 背景AF
   AF_bg <- 1.0 * (0.85 ^ ((Age - 60) / 10)) *
-    ifelse(Sex == "Female", 1.10, 1.0) *
-    ifelse(Histology == "READ", 0.90, ifelse(Histology == "COADREAD", 0.95, 1.0))
-  AF_total <- AF_bg * ifelse(X == 1, True_AF_X, 1.0)
+    ifelse(Sex=="Female", 1.10, 1.0) *
+    ifelse(Histology=="READ", 0.90, ifelse(Histology=="COADREAD", 0.95, 1.0))
 
+  # 未測定進行速度U（Xと独立）※依存LTの「構造依存」を担う
+  U <- rlnorm(N_macro, meanlog = 0, sdlog = 0.35)
+
+  # 真の総効果：XはT1とT2の両方に同じ倍率で効く（総効果の定義に合わせる）
+  AF_total <- AF_bg * U * ifelse(Xbin==1, True_AF_X, 1.0)
+
+  # ベースOS（log-logistic）
   u <- pmax(pmin(runif(N_macro), 0.999), 0.001)
-  T_true_base <- (True_Med * 365.25) * ((1 - u) / u)^(1 / True_Shape)
+  T_true_base <- (True_Med * 365.25) * ((1-u)/u)^(1/True_Shape)
 
+  # ベースT1（臨床設定）
   if (is.null(t1_pat)) t1_pat <- "indep"
   if (t1_pat == "early") {
     T1_base <- runif(N_macro, 30, pmax(31, T_true_base * 0.3))
-  } else if (t1_pat %in% c("dep_1yr", "real")) {
-    T1_base <- pmax(30, T_true_base - rlnorm(N_macro, log(365.25 * 1.0), 0.4))
-  } else if (t1_pat %in% c("dep_2yr", "rev")) {
-    T1_base <- pmax(30, T_true_base - rlnorm(N_macro, log(365.25 * 2.0), 0.4))
+  } else if (t1_pat %in% c("dep_1yr","real")) {
+    T1_base <- pmax(30, T_true_base - rlnorm(N_macro, log(365.25*1.0), 0.4))
+  } else if (t1_pat %in% c("dep_2yr","rev")) {
+    T1_base <- pmax(30, T_true_base - rlnorm(N_macro, log(365.25*2.0), 0.4))
   } else {
     T1_base <- runif(N_macro, 30, pmax(31, T_true_base))
   }
 
   T2_base <- pmax(0.1, T_true_base - T1_base)
 
+  # 総効果をT1,T2へ
   T1 <- T1_base * AF_total
   T2_true <- T2_base * AF_total
   T_true <- T1 + T2_true
 
-  cgp_indices <- which(T_true > T1 & T1 <= 365.25 * 10)
+  # 左切断（CGPに到達した者）
+  cgp_indices <- which(T_true > T1 & T1 <= 365.25*10)
   if (length(cgp_indices) < N_target) return(NULL)
 
+  # 年齢で選抜バイアス
   prob_select <- ifelse(Age[cgp_indices] < 60, 0.9, 0.1)
-  selected_indices <- sample(cgp_indices, size = N_target, prob = prob_select, replace = FALSE)
+  selected_indices <- sample(cgp_indices, size=N_target, prob=prob_select, replace=FALSE)
 
   Data_cgp <- data.frame(
     ID = 1:N_target,
     Age = Age[selected_indices],
     Age_class = ifelse(Age[selected_indices] < 60, "Young", "Old"),
-    Sex = factor(Sex[selected_indices], levels = c("Male", "Female")),
-    Histology = factor(Histology[selected_indices], levels = c("COAD", "READ", "COADREAD")),
-    X = factor(ifelse(X[selected_indices] == 1, "Mutated", "WT"), levels = c("WT", "Mutated")),
+    Sex = factor(Sex[selected_indices], levels=c("Male","Female")),
+    Histology = factor(Histology[selected_indices], levels=c("COAD","READ","COADREAD")),
+    X = factor(ifelse(Xbin[selected_indices]==1, "Mutated","WT"), levels=c("WT","Mutated")),
     T_true = T_true[selected_indices],
     T1 = T1[selected_indices]
   )
   Data_cgp$T2_true <- Data_cgp$T_true - Data_cgp$T1
 
-  # --- Censoring (元のまま; find_censoring_param を前提) ---
+  # --- censoring on T2 ---
   params <- find_censoring_param(Data_cgp$T2_true, cens_rate, cens_pat)
   if (isTRUE(params$is_ushape)) {
     u_c <- runif(N_target)
-    C2 <- ifelse(
-      u_c < 0.5,
-      rweibull(N_target, shape = 0.5, scale = params$scale),
-      rweibull(N_target, shape = 3.0, scale = params$scale * 2)
-    )
-  } else if (cens_pat == "indep") {
-    C2 <- rexp(N_target, rate = 1 / params$scale)
+    C2 <- ifelse(u_c < 0.5,
+                 rweibull(N_target, shape=0.5, scale=params$scale),
+                 rweibull(N_target, shape=3.0, scale=params$scale*2))
+  } else if (cens_pat=="indep") {
+    C2 <- rexp(N_target, rate=1/params$scale)
   } else {
-    C2 <- rweibull(N_target, shape = params$shape, scale = params$scale)
+    C2 <- rweibull(N_target, shape=params$shape, scale=params$scale)
   }
 
   Data_cgp$C2 <- C2
   Data_cgp$T2_obs <- pmin(Data_cgp$T2_true, C2)
-  Data_cgp$Event <- ifelse(Data_cgp$T2_true <= C2, 1, 0)
-  Data_cgp$T_obs <- Data_cgp$T1 + Data_cgp$T2_obs
+  Data_cgp$Event  <- ifelse(Data_cgp$T2_true <= C2, 1, 0)
+  Data_cgp$T_obs  <- Data_cgp$T1 + Data_cgp$T2_obs
   if (sum(Data_cgp$Event) < 20) return(NULL)
 
-  # --- Step 1: IPTW (1:5 の5点キャリブレーション維持) ---
+  # --- Step1 IPTW (1:5の5点キャリブレーション維持) ---
   ref_surv_list <- list()
-  age_label_macro <- ifelse(Age < 60, "Young", "Old")
-  for (ag in c("Young", "Old")) {
-    ref_surv_list[[ag]] <- sapply(1:5, function(y) mean(T_true[age_label_macro == ag] > y * 365.25) * 100)
+  age_label_macro <- ifelse(Age < 60, "Young","Old")
+  for (ag in c("Young","Old")) {
+    ref_surv_list[[ag]] <- sapply(1:5, function(y) mean(T_true[age_label_macro==ag] > y*365.25)*100)
   }
   Data_cgp <- calculate_calibrated_iptw(Data_cgp, ref_surv_list)
-
-  # 重み正規化＆ESS
   Data_cgp$iptw <- Data_cgp$iptw / mean(Data_cgp$iptw)
   ESS <- (sum(Data_cgp$iptw)^2) / sum(Data_cgp$iptw^2)
 
-  # --- covariates（元のロジックを踏襲） ---
-  valid_covs <- c("X", "Age")
+  # covariates
+  valid_covs <- c("X","Age")
   if (length(unique(Data_cgp$Sex)) > 1) valid_covs <- c(valid_covs, "Sex")
   if (length(unique(Data_cgp$Histology)) > 1) valid_covs <- c(valid_covs, "Histology")
 
   # spline(logT1)
-  Data_cgp$logT1_scale <- log(pmax(Data_cgp$T1 / 365.25, 1e-6))
-  ns_obj <- ns(Data_cgp$logT1_scale, df = 3)
+  Data_cgp$logT1_scale <- log(pmax(Data_cgp$T1/365.25, 1e-6))
+  ns_obj <- ns(Data_cgp$logT1_scale, df=3)
   ns_mat <- as.matrix(ns_obj)
   colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
-  for (j in seq_len(ncol(ns_mat))) Data_cgp[[colnames(ns_mat)[j]]] <- ns_mat[, j]
+  for (j in seq_len(ncol(ns_mat))) Data_cgp[[colnames(ns_mat)[j]]] <- ns_mat[,j]
 
-  # --- Baseline comparator models (そのまま) ---
-  form_naive <- as.formula(paste("Surv(T_obs, Event) ~", paste(valid_covs, collapse = " + ")))
-  form_lt    <- as.formula(paste("Surv(T1, T_obs, Event) ~", paste(valid_covs, collapse = " + ")))
+  # comparator
+  form_naive <- as.formula(paste("Surv(T_obs, Event) ~", paste(valid_covs, collapse=" + ")))
+  form_lt    <- as.formula(paste("Surv(T1, T_obs, Event) ~", paste(valid_covs, collapse=" + ")))
+  fit_naive <- tryCatch(flexsurvreg(form_naive, data=Data_cgp, dist="llogis"), error=function(e) NULL)
+  fit_lt    <- tryCatch(flexsurvreg(form_lt,    data=Data_cgp, dist="llogis"), error=function(e) NULL)
 
-  fit_naive <- tryCatch(flexsurvreg(form_naive, data = Data_cgp, dist = "llogis"), error = function(e) NULL)
-  fit_lt    <- tryCatch(flexsurvreg(form_lt,    data = Data_cgp, dist = "llogis"), error = function(e) NULL)
-
-  # --- Step 2: Decoupled AFT ---
-  # T1: Weibull（既存通り）
+  # --- Step2 decoupled AFT ---
   Data_cgp$T1_event <- 1
-  form_t1 <- as.formula(paste("Surv(T1, T1_event) ~", paste(valid_covs, collapse = " + ")))
-  fit_t1 <- tryCatch(
-    flexsurvreg(form_t1, data = Data_cgp, weights = Data_cgp$iptw, dist = "weibull"),
-    error = function(e) NULL
-  )
+  form_t1 <- as.formula(paste("Surv(T1, T1_event) ~", paste(valid_covs, collapse=" + ")))
+  fit_t1 <- tryCatch(flexsurvreg(form_t1, data=Data_cgp, weights=Data_cgp$iptw, dist="weibull"),
+                     error=function(e) NULL)
 
-  # T2: gengamma（ここが主変更点）
-  form_t2 <- as.formula(paste("Surv(T2_obs, Event) ~", paste(c(valid_covs, colnames(ns_mat)), collapse = " + ")))
-  fit_t2 <- tryCatch(
-    flexsurvreg(form_t2, data = Data_cgp, weights = Data_cgp$iptw, dist = "gengamma"),
-    error = function(e) NULL
-  )
+  form_t2 <- as.formula(paste("Surv(T2_obs, Event) ~", paste(c(valid_covs, colnames(ns_mat)), collapse=" + ")))
+  fit_t2 <- tryCatch(flexsurvreg(form_t2, data=Data_cgp, weights=Data_cgp$iptw, dist="gengamma"),
+                     error=function(e) NULL)
+
   if (is.null(fit_t1) || is.null(fit_t2)) return(NULL)
 
-  # --- Step 3: Calibrated G-computation (T2も gengamma で生成) ---
-  idx_pseudo <- sample(seq_len(nrow(Data_cgp)), size = 10000, replace = TRUE, prob = Data_cgp$iptw)
-  pseudo_cgp <- Data_cgp[idx_pseudo, , drop = FALSE]
+  # ---- Step3A: 曲線用（自然分布Xのまま） ----
+  idx_nat <- sample(seq_len(nrow(Data_cgp)), size=10000, replace=TRUE, prob=Data_cgp$iptw)
+  pseudo_nat <- Data_cgp[idx_nat, , drop=FALSE]
 
-  pseudo_cgp$sim_T1 <- gen_sim_times(fit_t1, pseudo_cgp, dist_type = "weibull")
+  pseudo_nat$sim_T1 <- gen_sim_times(fit_t1, pseudo_nat, "weibull")
+  pseudo_nat$logT1_sim_scale <- log(pmax(pseudo_nat$sim_T1/365.25, 1e-6))
+  ns_sim_nat <- tryCatch(predict(ns_obj, pseudo_nat$logT1_sim_scale), error=function(e) NULL)
+  if (is.null(ns_sim_nat)) ns_sim_nat <- matrix(0, nrow(pseudo_nat), attr(ns_obj,"df"))
+  colnames(ns_sim_nat) <- paste0("ns", seq_len(ncol(ns_sim_nat)))
+  for (j in seq_len(ncol(ns_sim_nat))) pseudo_nat[[colnames(ns_sim_nat)[j]]] <- ns_sim_nat[,j]
 
-  pseudo_cgp$logT1_sim_scale <- log(pmax(pseudo_cgp$sim_T1 / 365.25, 1e-6))
-  ns_sim <- tryCatch(predict(ns_obj, pseudo_cgp$logT1_sim_scale), error = function(e) NULL)
-  if (is.null(ns_sim)) ns_sim <- matrix(0, nrow(pseudo_cgp), attr(ns_obj, "df"))
-  colnames(ns_sim) <- paste0("ns", seq_len(ncol(ns_sim)))
-  for (j in seq_len(ncol(ns_sim))) pseudo_cgp[[colnames(ns_sim)[j]]] <- ns_sim[, j]
+  pseudo_nat$sim_T2 <- gen_sim_times(fit_t2, pseudo_nat, "gengamma")
+  pseudo_nat$sim_OS <- pseudo_nat$sim_T1 + pseudo_nat$sim_T2
+  pseudo_nat$sim_Event <- 1
 
-  # ★ここが重要：fit_t2 が gengamma なので sim_T2 も gengamma で生成
-  pseudo_cgp$sim_T2 <- gen_sim_times(fit_t2, pseudo_cgp, dist_type = "gengamma")
+  # ---- Step3B: 総効果AF推定用（do(X=0/1) の2世界） ----
+  pseudo0 <- pseudo_nat; pseudo0$X <- factor("WT", levels=c("WT","Mutated"))
+  pseudo1 <- pseudo_nat; pseudo1$X <- factor("Mutated", levels=c("WT","Mutated"))
 
-  pseudo_cgp$sim_OS <- pseudo_cgp$sim_T1 + pseudo_cgp$sim_T2
-  pseudo_cgp$sim_Event <- 1
+  pseudo0$sim_T1 <- gen_sim_times(fit_t1, pseudo0, "weibull")
+  pseudo1$sim_T1 <- gen_sim_times(fit_t1, pseudo1, "weibull")
 
-  # 点推定用 final model（既存踏襲：llogis）
-  form_prop_final <- as.formula(paste("Surv(sim_OS, sim_Event) ~", paste(valid_covs, collapse = " + ")))
-  fit_prop_final <- tryCatch(flexsurvreg(form_prop_final, data = pseudo_cgp, dist = "llogis"), error = function(e) NULL)
+  pseudo0$logT1_sim_scale <- log(pmax(pseudo0$sim_T1/365.25, 1e-6))
+  pseudo1$logT1_sim_scale <- log(pmax(pseudo1$sim_T1/365.25, 1e-6))
 
-  # ---------- ここから out をフルセットで返す ----------
+  ns0 <- tryCatch(predict(ns_obj, pseudo0$logT1_sim_scale), error=function(e) NULL)
+  ns1 <- tryCatch(predict(ns_obj, pseudo1$logT1_sim_scale), error=function(e) NULL)
+  if (is.null(ns0)) ns0 <- matrix(0, nrow(pseudo0), attr(ns_obj,"df"))
+  if (is.null(ns1)) ns1 <- matrix(0, nrow(pseudo1), attr(ns_obj,"df"))
+  colnames(ns0) <- paste0("ns", seq_len(ncol(ns0)))
+  colnames(ns1) <- paste0("ns", seq_len(ncol(ns1)))
+  for (j in seq_len(ncol(ns0))) pseudo0[[colnames(ns0)[j]]] <- ns0[,j]
+  for (j in seq_len(ncol(ns1))) pseudo1[[colnames(ns1)[j]]] <- ns1[,j]
 
-  # AFフル抽出（UIが期待）
+  pseudo0$sim_T2 <- gen_sim_times(fit_t2, pseudo0, "gengamma")
+  pseudo1$sim_T2 <- gen_sim_times(fit_t2, pseudo1, "gengamma")
+
+  pseudo0$sim_OS <- pseudo0$sim_T1 + pseudo0$sim_T2
+  pseudo1$sim_OS <- pseudo1$sim_T1 + pseudo1$sim_T2
+  pseudo0$sim_Event <- 1
+  pseudo1$sim_Event <- 1
+
+  # do(X)データを結合して最終AFT（TR）を取る（UI既存の抽出関数と整合）
+  pseudo_do <- rbind(pseudo0, pseudo1)
+
+  form_prop_final <- as.formula(paste("Surv(sim_OS, sim_Event) ~", paste(valid_covs, collapse=" + ")))
+  fit_prop_final <- tryCatch(flexsurvreg(form_prop_final, data=pseudo_do, dist="llogis"),
+                             error=function(e) NULL)
+
+  # SE借用（あなたの元仕様に合わせて観測データの重み付きから拾う）
+  form_prop_obs <- as.formula(paste("Surv(T_obs, Event) ~", paste(valid_covs, collapse=" + ")))
+  fit_prop_obs <- tryCatch(flexsurvreg(form_prop_obs, data=Data_cgp, weights=Data_cgp$iptw, dist="llogis"),
+                           error=function(e) NULL)
+
+  # --- 抽出（UI互換フル版） ---
   extract_af_full <- function(fit) {
     blank_res <- c(AF_X_est=NA, AF_X_L=NA, AF_X_U=NA, AF_Age_est=NA, AF_Age_L=NA, AF_Age_U=NA,
                    AF_Sex_est=NA, AF_Sex_L=NA, AF_Sex_U=NA, AF_READ_est=NA, AF_READ_L=NA, AF_READ_U=NA,
                    AF_COADREAD_est=NA, AF_COADREAD_L=NA, AF_COADREAD_U=NA)
     if (is.null(fit)) return(blank_res)
     res_m <- fit$res
-    get_est <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname,"est"] * mult) else NA_real_
-    get_L   <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname,"L95%"] * mult) else NA_real_
-    get_U   <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname,"U95%"] * mult) else NA_real_
+    get_est <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname,"est"]*mult) else NA_real_
+    get_L   <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname,"L95%"]*mult) else NA_real_
+    get_U   <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname,"U95%"]*mult) else NA_real_
 
-    c(AF_X_est = get_est("XMutated"), AF_X_L = get_L("XMutated"), AF_X_U = get_U("XMutated"),
-      AF_Age_est = get_est("Age", 10), AF_Age_L = get_L("Age", 10), AF_Age_U = get_U("Age", 10),
-      AF_Sex_est = get_est("SexFemale"), AF_Sex_L = get_L("SexFemale"), AF_Sex_U = get_U("SexFemale"),
-      AF_READ_est = get_est("HistologyREAD"), AF_READ_L = get_L("HistologyREAD"), AF_READ_U = get_U("HistologyREAD"),
-      AF_COADREAD_est = get_est("HistologyCOADREAD"), AF_COADREAD_L = get_L("HistologyCOADREAD"), AF_COADREAD_U = get_U("HistologyCOADREAD"))
+    c(AF_X_est = get_est("XMutated"), AF_X_L=get_L("XMutated"), AF_X_U=get_U("XMutated"),
+      AF_Age_est=get_est("Age",10), AF_Age_L=get_L("Age",10), AF_Age_U=get_U("Age",10),
+      AF_Sex_est=get_est("SexFemale"), AF_Sex_L=get_L("SexFemale"), AF_Sex_U=get_U("SexFemale"),
+      AF_READ_est=get_est("HistologyREAD"), AF_READ_L=get_L("HistologyREAD"), AF_READ_U=get_U("HistologyREAD"),
+      AF_COADREAD_est=get_est("HistologyCOADREAD"), AF_COADREAD_L=get_L("HistologyCOADREAD"), AF_COADREAD_U=get_U("HistologyCOADREAD"))
   }
 
-  # metrics & curve
-  calc_marginal_metrics <- function(sim_times) {
-    if (is.null(sim_times) || all(is.na(sim_times))) return(c(Med=NA_real_, S5=NA_real_))
-    c(Med = stats::median(sim_times, na.rm=TRUE)/365.25,
-      S5  = mean(sim_times > 5*365.25, na.rm=TRUE)*100)
-  }
-  t_seq_days <- seq(0, 365.25*5, length.out = 100)
-  calc_marginal_curve <- function(t_data) {
-    if (is.null(t_data) || all(is.na(t_data))) return(rep(NA_real_, 100))
-    km <- survival::survfit(Surv(t_data, rep(1, length(t_data))) ~ 1)
-    approx(km$time, km$surv, xout=t_seq_days, method="constant", f=0, rule=2)$y
+  extract_af_prop <- function(fit_final, fit_obs) {
+    blank_res <- c(AF_X_est=NA, AF_X_L=NA, AF_X_U=NA, AF_Age_est=NA, AF_Age_L=NA, AF_Age_U=NA,
+                   AF_Sex_est=NA, AF_Sex_L=NA, AF_Sex_U=NA, AF_READ_est=NA, AF_READ_L=NA, AF_READ_U=NA,
+                   AF_COADREAD_est=NA, AF_COADREAD_L=NA, AF_COADREAD_U=NA)
+    if (is.null(fit_final) || is.null(fit_obs)) return(blank_res)
+
+    res_final <- fit_final$res
+    res_obs   <- fit_obs$res
+
+    get_prop <- function(rname, mult=1) {
+      if (rname %in% rownames(res_final) && rname %in% rownames(res_obs)) {
+        est <- res_final[rname,"est"]
+        se  <- (res_obs[rname,"U95%"] - res_obs[rname,"L95%"]) / (2*1.95996)
+        c(est=exp(est*mult), L=exp((est-1.95996*se)*mult), U=exp((est+1.95996*se)*mult))
+      } else c(est=NA_real_, L=NA_real_, U=NA_real_)
+    }
+
+    vX    <- get_prop("XMutated")
+    vAge  <- get_prop("Age",10)
+    vSex  <- get_prop("SexFemale")
+    vREAD <- get_prop("HistologyREAD")
+    vCOAD <- get_prop("HistologyCOADREAD")
+
+    c(AF_X_est=vX["est"], AF_X_L=vX["L"], AF_X_U=vX["U"],
+      AF_Age_est=vAge["est"], AF_Age_L=vAge["L"], AF_Age_U=vAge["U"],
+      AF_Sex_est=vSex["est"], AF_Sex_L=vSex["L"], AF_Sex_U=vSex["U"],
+      AF_READ_est=vREAD["est"], AF_READ_L=vREAD["L"], AF_READ_U=vREAD["U"],
+      AF_COADREAD_est=vCOAD["est"], AF_COADREAD_L=vCOAD["L"], AF_COADREAD_U=vCOAD["U"])
   }
 
-  # 各モデルの疑似OS生成（Naive/LTは llogis のまま）
-  sim_naive <- if(!is.null(fit_naive)) gen_sim_times(fit_naive, Data_cgp, dist_type="llogis") else rep(NA_real_, nrow(Data_cgp))
-  sim_lt    <- if(!is.null(fit_lt))    gen_sim_times(fit_lt,    Data_cgp, dist_type="llogis") else rep(NA_real_, nrow(Data_cgp))
+  t_seq <- seq(0, 365.25*5, length.out=100)
+  calc_curve <- function(times) {
+    if (is.null(times) || all(is.na(times))) return(rep(NA_real_, length(t_seq)))
+    km <- survfit(Surv(times, rep(1, length(times))) ~ 1)
+    approx(km$time, km$surv, xout=t_seq, method="constant", f=0, rule=2)$y
+  }
+  calc_metrics <- function(times) {
+    if (is.null(times) || all(is.na(times))) return(c(Med=NA_real_, S5=NA_real_))
+    c(Med=median(times, na.rm=TRUE)/365.25, S5=mean(times > 5*365.25, na.rm=TRUE)*100)
+  }
 
-  # proposed の疑似OSは pseudo_cgp$sim_OS を使う（すでに生成済み）
+  sim_naive <- if(!is.null(fit_naive)) gen_sim_times(fit_naive, Data_cgp, "llogis") else rep(NA_real_, nrow(Data_cgp))
+  sim_lt    <- if(!is.null(fit_lt))    gen_sim_times(fit_lt,    Data_cgp, "llogis") else rep(NA_real_, nrow(Data_cgp))
+
   out <- list(
     ESS = ESS,
-    True_Metrics = calc_marginal_metrics(T_true),
-
-    Naive_AF = extract_af_full(fit_naive),
-    Naive_Metrics = calc_marginal_metrics(sim_naive),
-
-    LT_AF = extract_af_full(fit_lt),
-    LT_Metrics = calc_marginal_metrics(sim_lt),
-
-    Prop_AF = extract_af_full(fit_prop_final),
-    Prop_Metrics = calc_marginal_metrics(pseudo_cgp$sim_OS),
-
-    curve_true  = calc_marginal_curve(T_true),
-    curve_naive = calc_marginal_curve(sim_naive),
-    curve_lt    = calc_marginal_curve(sim_lt),
-    curve_prop  = calc_marginal_curve(pseudo_cgp$sim_OS),
-
+    True_Metrics = calc_metrics(T_true),
+    Naive_AF = extract_af_full(fit_naive), Naive_Metrics = calc_metrics(sim_naive),
+    LT_AF    = extract_af_full(fit_lt),    LT_Metrics    = calc_metrics(sim_lt),
+    Prop_AF  = extract_af_prop(fit_prop_final, fit_prop_obs),
+    Prop_Metrics = calc_metrics(pseudo_nat$sim_OS),
+    curve_true  = calc_curve(T_true),
+    curve_naive = calc_curve(sim_naive),
+    curve_lt    = calc_curve(sim_lt),
+    curve_prop  = calc_curve(pseudo_nat$sim_OS),
     sample_t1 = Data_cgp$T1[1:min(500, nrow(Data_cgp))],
     sample_t2 = Data_cgp$T2_true[1:min(500, nrow(Data_cgp))]
   )
+
   out
 }
 
