@@ -489,20 +489,6 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
     ess = ESS,
     n_pseudo = n_pseudo
   )
-  # ---------- Proposed CI ONLY: Bootstrap percentile CI (B=200) ----------
-  # Processing unchanged: point estimate from fit_prop_final; CI from bootstrap
-  if (!is.null(fit_prop_final)) {
-    ci_boot <- bootstrap_prop_ci(Data_cgp = Data_cgp, valid_covs = valid_covs, B = B_boot, n_pseudo = n_pseudo)
-
-    if (is.finite(ci_boot["L"]) && is.finite(ci_boot["U"])) {
-      Prop_AF["AF_X_L"] <- ci_boot["L"]
-      Prop_AF["AF_X_U"] <- ci_boot["U"]
-    } else {
-      # keep NA if bootstrap fails
-      Prop_AF["AF_X_L"] <- NA_real_
-      Prop_AF["AF_X_U"] <- NA_real_
-    }
-  }
 
   # ---------- curves/metrics (unchanged intent) ----------
   # naive/lt sim times for metrics/curves (same approach as before)
