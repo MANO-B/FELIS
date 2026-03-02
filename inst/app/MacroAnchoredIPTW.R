@@ -30,64 +30,67 @@ find_censoring_param <- function(T2, target_rate, pattern) {
   }
 }
 
-# =========================================================
-# gen_sim_times(): weibull / llogis / gengamma 対応版
-#   - flexsurvreg の fitted model と newdata から乱数生成
-#   - gengamma は rgengamma を使用（mu, sigma, Q）
-# =========================================================
-gen_sim_times <- function(fit, newdata, dist_type = NULL) {
-  if (is.null(fit)) stop("fit is NULL")
-  if (is.null(dist_type)) dist_type <- fit$dlist$name
+gen_sim_times <- function(fit, newdata, dist_type = c("weibull", "llogis", "gengamma")) {
+  dist_type <- match.arg(dist_type)
+  if (is.null(fit) || is.null(newdata) || nrow(newdata) == 0) return(rep(NA_real_, nrow(newdata)))
 
-  # --- 線形予測子（location; mu） ---
-  # flexsurvreg の covariate は通常 location（=mu）に入る
-  mu <- tryCatch(
-    predict(fit, newdata = newdata, type = "lp"),
-    error = function(e) NULL
-  )
-  if (is.null(mu)) {
-    # predictが失敗する場合のフォールバック（model.matrixで係数積）
-    # flexsurvreg の係数は fit$res の covariate 行に入っている想定
-    # ただしモデル式が複雑な場合は predict が通る方が安全です
-    stop("predict(fit, type='lp') failed. Please check flexsurv version / model formula.")
-  }
-
+  res_m <- fit$res
   n <- nrow(newdata)
 
-  if (dist_type %in% c("weibull", "weibullPH", "weibullph")) {
-    # flexsurv の weibull は AFT parameterization:
-    #   S(t) = exp(-(t/scale)^shape)
-    # flexsurvreg: mu = log(scale)
-    shape <- as.numeric(fit$res["shape", "est"])
-    scale <- exp(mu)
-    return(rweibull(n, shape = shape, scale = scale))
+  # 分布パラメータ行名（係数行ではない）
+  dist_pars <- c("scale", "shape", "mu", "sigma", "Q")
+  coef_rows <- setdiff(rownames(res_m), dist_pars)
+
+  # base location
+  if (dist_type == "gengamma") {
+    if (!("mu" %in% rownames(res_m))) return(rep(NA_real_, n))
+    base_loc <- res_m["mu", "est"]
+  } else {
+    if (!("scale" %in% rownames(res_m))) return(rep(NA_real_, n))
+    base_loc <- log(res_m["scale", "est"])
   }
 
-  if (dist_type %in% c("llogis", "loglogistic")) {
-    # flexsurv の llogis: location = mu, ancillary = scale (sigma)
-    # rllogis in flexsurv uses (shape, scale) OR (location, scale) depending on function;
-    # flexsurv provides rllogis with 'scale' and 'shape' (AFT):
-    # We'll use flexsurv::rllogis where:
-    #   location = exp(mu), shape = 1/scale? -> ここは混乱しやすいので
-    #   safest: use flexsurv::rflexsurvdist via fitted distribution's r function.
-    # ただし多くの環境で flexsurv::rllogis(n, shape, scale) が使えます。
-    scl <- as.numeric(fit$res["scale", "est"])
-    # AFT: mu = log(scale_param) という形で実装されている版が多いので
-    # ここはあなたの既存実装に合わせるのが最も安全です。
-    # 既存が "exp(mu)" を使っていた想定で踏襲：
-    scale_param <- exp(mu)
-    shape_param <- 1 / scl
-    return(flexsurv::rllogis(n, shape = shape_param, scale = scale_param))
+  # 手動 lp（存在する列だけ加算）
+  lp <- rep(0, n)
+
+  add_bin <- function(varname, level_val, coefname) {
+    if (coefname %in% coef_rows && varname %in% names(newdata)) {
+      lp <<- lp + res_m[coefname, "est"] * as.numeric(newdata[[varname]] == level_val)
+    }
+  }
+  add_cont <- function(varname, coefname) {
+    if (coefname %in% coef_rows && varname %in% names(newdata)) {
+      lp <<- lp + res_m[coefname, "est"] * as.numeric(newdata[[varname]])
+    }
   }
 
-  if (dist_type %in% c("gengamma", "gen_gamma", "generalized gamma")) {
-    # flexsurv::rgengamma(n, mu, sigma, Q)
-    sigma <- as.numeric(fit$res["sigma", "est"])
-    Q     <- as.numeric(fit$res["Q", "est"])
-    return(flexsurv::rgengamma(n, mu = mu, sigma = sigma, Q = Q))
+  add_bin("X", "Mutated", "XMutated")
+  add_cont("Age", "Age")
+  add_bin("Sex", "Female", "SexFemale")
+  add_bin("Histology", "READ", "HistologyREAD")
+  add_bin("Histology", "COADREAD", "HistologyCOADREAD")
+
+  # スプライン(ns1, ns2, …)は自動
+  for (v in coef_rows) {
+    if (grepl("^ns[0-9]+$", v) && v %in% names(newdata)) {
+      lp <- lp + res_m[v, "est"] * as.numeric(newdata[[v]])
+    }
   }
 
-  stop(paste0("Unsupported dist_type: ", dist_type))
+  loc <- base_loc + lp
+
+  if (dist_type == "weibull") {
+    shape <- res_m["shape", "est"]
+    return(stats::rweibull(n, shape = shape, scale = exp(loc)))
+  }
+  if (dist_type == "llogis") {
+    shape <- res_m["shape", "est"]
+    return(flexsurv::rllogis(n, shape = shape, scale = exp(loc)))
+  }
+  # gengamma
+  sigma <- res_m["sigma", "est"]
+  Q <- res_m["Q", "est"]
+  return(flexsurv::rgengamma(n, mu = loc, sigma = sigma, Q = Q))
 }
 
 calculate_calibrated_iptw <- function(data, ref_surv_list) {
@@ -281,23 +284,64 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   form_prop_final <- as.formula(paste("Surv(sim_OS, sim_Event) ~", paste(valid_covs, collapse = " + ")))
   fit_prop_final <- tryCatch(flexsurvreg(form_prop_final, data = pseudo_cgp, dist = "llogis"), error = function(e) NULL)
 
-  # --- 抽出関数（最低限：Xのみ返す簡易版） ---
-  extract_af_x <- function(fit) {
-    if (is.null(fit)) return(c(AF_X_est=NA, AF_X_L=NA, AF_X_U=NA))
+  # ---------- ここから out をフルセットで返す ----------
+
+  # AFフル抽出（UIが期待）
+  extract_af_full <- function(fit) {
+    blank_res <- c(AF_X_est=NA, AF_X_L=NA, AF_X_U=NA, AF_Age_est=NA, AF_Age_L=NA, AF_Age_U=NA,
+                   AF_Sex_est=NA, AF_Sex_L=NA, AF_Sex_U=NA, AF_READ_est=NA, AF_READ_L=NA, AF_READ_U=NA,
+                   AF_COADREAD_est=NA, AF_COADREAD_L=NA, AF_COADREAD_U=NA)
+    if (is.null(fit)) return(blank_res)
     res_m <- fit$res
-    if (!("XMutated" %in% rownames(res_m))) return(c(AF_X_est=NA, AF_X_L=NA, AF_X_U=NA))
-    c(AF_X_est = exp(res_m["XMutated","est"]),
-      AF_X_L   = exp(res_m["XMutated","L95%"]),
-      AF_X_U   = exp(res_m["XMutated","U95%"]))
+    get_est <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname,"est"] * mult) else NA_real_
+    get_L   <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname,"L95%"] * mult) else NA_real_
+    get_U   <- function(rname, mult=1) if (rname %in% rownames(res_m)) exp(res_m[rname,"U95%"] * mult) else NA_real_
+
+    c(AF_X_est = get_est("XMutated"), AF_X_L = get_L("XMutated"), AF_X_U = get_U("XMutated"),
+      AF_Age_est = get_est("Age", 10), AF_Age_L = get_L("Age", 10), AF_Age_U = get_U("Age", 10),
+      AF_Sex_est = get_est("SexFemale"), AF_Sex_L = get_L("SexFemale"), AF_Sex_U = get_U("SexFemale"),
+      AF_READ_est = get_est("HistologyREAD"), AF_READ_L = get_L("HistologyREAD"), AF_READ_U = get_U("HistologyREAD"),
+      AF_COADREAD_est = get_est("HistologyCOADREAD"), AF_COADREAD_L = get_L("HistologyCOADREAD"), AF_COADREAD_U = get_U("HistologyCOADREAD"))
   }
 
+  # metrics & curve
+  calc_marginal_metrics <- function(sim_times) {
+    if (is.null(sim_times) || all(is.na(sim_times))) return(c(Med=NA_real_, S5=NA_real_))
+    c(Med = stats::median(sim_times, na.rm=TRUE)/365.25,
+      S5  = mean(sim_times > 5*365.25, na.rm=TRUE)*100)
+  }
+  t_seq_days <- seq(0, 365.25*5, length.out = 100)
+  calc_marginal_curve <- function(t_data) {
+    if (is.null(t_data) || all(is.na(t_data))) return(rep(NA_real_, 100))
+    km <- survival::survfit(Surv(t_data, rep(1, length(t_data))) ~ 1)
+    approx(km$time, km$surv, xout=t_seq_days, method="constant", f=0, rule=2)$y
+  }
+
+  # 各モデルの疑似OS生成（Naive/LTは llogis のまま）
+  sim_naive <- if(!is.null(fit_naive)) gen_sim_times(fit_naive, Data_cgp, dist_type="llogis") else rep(NA_real_, nrow(Data_cgp))
+  sim_lt    <- if(!is.null(fit_lt))    gen_sim_times(fit_lt,    Data_cgp, dist_type="llogis") else rep(NA_real_, nrow(Data_cgp))
+
+  # proposed の疑似OSは pseudo_cgp$sim_OS を使う（すでに生成済み）
   out <- list(
     ESS = ESS,
-    Naive_AF_X = extract_af_x(fit_naive),
-    LT_AF_X    = extract_af_x(fit_lt),
-    Prop_AF_X  = extract_af_x(fit_prop_final),
-    sample_t1  = Data_cgp$T1[1:min(500, nrow(Data_cgp))],
-    sample_t2  = Data_cgp$T2_true[1:min(500, nrow(Data_cgp))]
+    True_Metrics = calc_marginal_metrics(T_true),
+
+    Naive_AF = extract_af_full(fit_naive),
+    Naive_Metrics = calc_marginal_metrics(sim_naive),
+
+    LT_AF = extract_af_full(fit_lt),
+    LT_Metrics = calc_marginal_metrics(sim_lt),
+
+    Prop_AF = extract_af_full(fit_prop_final),
+    Prop_Metrics = calc_marginal_metrics(pseudo_cgp$sim_OS),
+
+    curve_true  = calc_marginal_curve(T_true),
+    curve_naive = calc_marginal_curve(sim_naive),
+    curve_lt    = calc_marginal_curve(sim_lt),
+    curve_prop  = calc_marginal_curve(pseudo_cgp$sim_OS),
+
+    sample_t1 = Data_cgp$T1[1:min(500, nrow(Data_cgp))],
+    sample_t2 = Data_cgp$T2_true[1:min(500, nrow(Data_cgp))]
   )
   out
 }
