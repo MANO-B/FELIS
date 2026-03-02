@@ -484,8 +484,11 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   fit_prop_final <- safe_try(flexsurvreg(form_prop_final, data = pseudo_cgp, dist = "llogis"), default = NULL)
 
   # If proposed fails, still return required structures as NA (no crash)
-  Prop_AF <- extract_af_full(fit_prop_final)
-
+  Prop_AF <- extract_af_full_ess_scaled(
+    fit = fit_prop_final,
+    ess = ESS,
+    n_pseudo = n_pseudo
+  )
   # ---------- Proposed CI ONLY: Bootstrap percentile CI (B=200) ----------
   # Processing unchanged: point estimate from fit_prop_final; CI from bootstrap
   if (!is.null(fit_prop_final)) {
@@ -805,3 +808,60 @@ observeEvent(input$run_sim_multi, {
       theme(plot.title = element_text(face = "bold"))
   })
 })
+
+extract_af_full_ess_scaled <- function(fit, ess, n_pseudo) {
+  blank_res <- c(
+    AF_X_est=NA, AF_X_L=NA, AF_X_U=NA,
+    AF_Age_est=NA, AF_Age_L=NA, AF_Age_U=NA,
+    AF_Sex_est=NA, AF_Sex_L=NA, AF_Sex_U=NA,
+    AF_READ_est=NA, AF_READ_L=NA, AF_READ_U=NA,
+    AF_COADREAD_est=NA, AF_COADREAD_L=NA, AF_COADREAD_U=NA
+  )
+  if (is.null(fit)) return(blank_res)
+  if (!is.finite(ess) || ess <= 0 || !is.finite(n_pseudo) || n_pseudo <= 0) return(extract_af_full(fit))
+
+  # flexsurvreg の係数分散（パラメータ全体）を取得
+  V <- tryCatch(vcov(fit), error = function(e) NULL)
+  if (is.null(V)) return(extract_af_full(fit))
+
+  # “擬似コホート n_pseudo”によるSE過小評価を ESS に合わせて補正
+  scale_fac <- n_pseudo / ess
+  if (!is.finite(scale_fac) || scale_fac <= 0) return(extract_af_full(fit))
+
+  V2 <- V * scale_fac
+
+  # 係数名（covariate location のパラメータ名）を vcov から参照
+  par_names <- colnames(V2)
+  if (is.null(par_names)) return(extract_af_full(fit))
+
+  get_ci <- function(name, mult = 1) {
+    # fit$res の est は “回帰係数” (β)（log-time scale）なので exp(β*mult)
+    res_m <- fit$res
+    if (!(name %in% rownames(res_m))) return(c(est=NA, L=NA, U=NA))
+    beta <- as.numeric(res_m[name, "est"])
+
+    # vcov の対角からSE
+    if (!(name %in% par_names)) return(c(est=exp(beta*mult), L=NA, U=NA))
+    se <- sqrt(as.numeric(V2[name, name]))
+
+    z <- 1.959963984540054
+    est <- exp(beta * mult)
+    L   <- exp((beta - z * se) * mult)
+    U   <- exp((beta + z * se) * mult)
+    c(est=est, L=L, U=U)
+  }
+
+  vX    <- get_ci("XMutated", 1)
+  vAge  <- get_ci("Age", 10)
+  vSex  <- get_ci("SexFemale", 1)
+  vREAD <- get_ci("HistologyREAD", 1)
+  vCOAD <- get_ci("HistologyCOADREAD", 1)
+
+  c(
+    AF_X_est=vX["est"], AF_X_L=vX["L"], AF_X_U=vX["U"],
+    AF_Age_est=vAge["est"], AF_Age_L=vAge["L"], AF_Age_U=vAge["U"],
+    AF_Sex_est=vSex["est"], AF_Sex_L=vSex["L"], AF_Sex_U=vSex["U"],
+    AF_READ_est=vREAD["est"], AF_READ_L=vREAD["L"], AF_READ_U=vREAD["U"],
+    AF_COADREAD_est=vCOAD["est"], AF_COADREAD_L=vCOAD["L"], AF_COADREAD_U=vCOAD["U"]
+  )
+}
