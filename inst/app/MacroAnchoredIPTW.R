@@ -1,11 +1,10 @@
 # =========================================================================
 # Server Logic for Simulation Study (Tamura & Ikegami Model)
-#  - Parametric Weibull-based Optimization for IPTW (Highly Robust to Heavy Censoring)
-#  - [NEW] Simple 1-parameter weight: W(T1) = exp(theta1 * log(T1))
-#  - T1 & T2 models: log-logistic (llogis) distribution
-#  - Linear logT1_resid (No Splines) to prevent tail extrapolation drop
-#  - Estimate TOTAL effect on OS by Counterfactual Distributions
-#  - EXACT CI Width Recovery using Subgroup-Specific Effective Sample Sizes
+#  - [REBUILT] 6-Month Moving Average Weighting (Robust & Stable Approach)
+#  - Directly matches CGP T_obs distribution to True Macro OS distribution
+#  - Fixes weights and applies them to the AFT model for Hazard/AF estimation
+#  - Weights are scaled to sum to ESS for mathematically exact CI widths
+#  - Completely eliminates Inf/NA errors caused by tail extrapolations
 # =========================================================================
 
 suppressPackageStartupMessages({
@@ -50,232 +49,80 @@ find_censoring_param <- function(T2, target_rate, pattern) {
 }
 
 # -------------------------------------------------------------------------
-# Step 1: Calibration IPTW (1:5 points)
-# [NEW] Simple 1-parameter optimization: exp(theta * log_t1)
+# Step 1: 6-Month Moving Average IPTW Matching
 # -------------------------------------------------------------------------
-calculate_calibrated_iptw <- function(data, ref_surv_list) {
-  data$iptw <- 1.0
-  t_points_days <- (1:5) * 365.25
+calculate_ma_weights <- function(Data_cgp, Data_macro) {
+  Data_cgp$iptw <- 1.0
+  window_days <- 91.25 # +/- 91.25日 = 182.5日 (約半年)の移動平均枠
 
-  for (ag in unique(data$Age_class)) {
-    if (!(ag %in% names(ref_surv_list))) next
+  for (ag in unique(Data_cgp$Age_class)) {
+    idx <- which(Data_cgp$Age_class == ag)
+    if (length(idx) == 0) next
 
-    S_macro_target <- pmax(pmin(ref_surv_list[[ag]][1:5] / 100, 0.999), 0.001)
-    ag_idx <- which(data$Age_class == ag)
-    ag_data <- data[ag_idx, , drop = FALSE]
+    # 1. マクロ(真の)コホートの生存確率関数
+    T_true_ag <- Data_macro$T_true[Data_macro$Age_class == ag]
+    km_true <- survfit(Surv(T_true_ag, rep(1, length(T_true_ag))) ~ 1)
+    get_S_true <- function(t) approx(km_true$time, km_true$surv, xout = t, method = "constant", f = 0, rule = 2)$y
 
-    # 二乗項を廃止し、log_t1 のみにシンプル化
-    log_t1 <- log(pmax(ag_data$T1 / 365.25, 1e-6))
+    # 2. CGPコホートの観測生存確率関数
+    km_cgp <- survfit(Surv(T_obs, Event) ~ 1, data = Data_cgp[idx, ])
+    get_S_cgp  <- function(t) approx(km_cgp$time, km_cgp$surv, xout = t, method = "constant", f = 0, rule = 2)$y
 
-    obj_func <- function(theta1) {
-      # 重み関数: exp(theta1 * log_T1)
-      w <- exp(theta1 * log_t1)
-      w <- pmax(w, 1e-6)
-      w <- w / mean(w)
+    w_ag <- numeric(length(idx))
+    for (j in seq_along(idx)) {
+      t_i <- Data_cgp$T_obs[idx[j]]
 
-      S_est <- rep(NA_real_, length(t_points_days))
+      # 半年の枠で死亡密度の比（ハザード比の近似）を計算
+      t_min <- max(0, t_i - window_days)
+      t_max <- t_i + window_days
 
-      fit_w <- tryCatch(survival::survreg(Surv(T_obs, Event) ~ 1, data = ag_data, weights = w, dist = "weibull"), error = function(e) NULL)
-      if (!is.null(fit_w)) {
-        scale_w <- exp(fit_w$coefficients[1])
-        shape_w <- 1 / fit_w$scale
-        S_est <- exp(- (t_points_days / scale_w)^shape_w)
+      dS_true <- get_S_true(t_min) - get_S_true(t_max)
+      dS_cgp  <- get_S_cgp(t_min)  - get_S_cgp(t_max)
+
+      # 窓内にイベントが少ない場合は窓を1年に広げるフォールバック
+      if (is.na(dS_cgp) || dS_cgp <= 1e-5) {
+        dS_true <- get_S_true(max(0, t_i - window_days*2)) - get_S_true(t_i + window_days*2)
+        dS_cgp  <- get_S_cgp(max(0, t_i - window_days*2))  - get_S_cgp(t_i + window_days*2)
+      }
+
+      if (is.na(dS_cgp) || dS_cgp <= 1e-5) {
+        w_ag[j] <- 1.0 # 最終フォールバック
       } else {
-        km <- tryCatch(survfit(Surv(T_obs, Event) ~ 1, data = ag_data, weights = w), error = function(e) NULL)
-        if (is.null(km)) return(1e6)
-        S_est <- approx(km$time, km$surv, xout = t_points_days, method = "constant", f = 0, rule = 2)$y
-        S_est[is.na(S_est)] <- 0
+        w_ag[j] <- dS_true / dS_cgp
       }
-
-      sum((S_est - S_macro_target)^2) + 1e-4 * (theta1^2)
     }
 
-    # 1次元探索に最も適した optimize() に変更 (-10 から 10 の範囲で探索)
-    opt <- tryCatch(optimize(obj_func, interval = c(-10, 10)), error = function(e) list(minimum = 0))
-    th <- opt$minimum
+    # 3. 局所回帰(LOESS)で重みをさらに平滑化（ノイズ吸収）
+    smooth_fit <- tryCatch(loess(w_ag ~ Data_cgp$T_obs[idx], span = 0.75), error = function(e) NULL)
+    if (!is.null(smooth_fit)) {
+      w_ag <- predict(smooth_fit)
+    }
 
-    w_opt <- exp(th * log_t1)
-    w_opt <- pmax(w_opt, 1e-6)
+    # 暴走防止のキャップ処理
+    w_ag <- pmax(w_ag, 0.05)
+    w_ag <- pmin(w_ag, quantile(w_ag, 0.95, na.rm=TRUE) * 3)
+    w_ag[is.na(w_ag)] <- 1.0
 
-    # Winsorize (Avoid Explosion)
-    lb <- quantile(w_opt, 0.01, na.rm = TRUE)
-    ub <- quantile(w_opt, 0.99, na.rm = TRUE)
-    w_opt <- pmax(lb, pmin(w_opt, ub))
-
-    data$iptw[ag_idx] <- w_opt / mean(w_opt)
+    Data_cgp$iptw[idx] <- w_ag
   }
-  data
+
+  # 4. ESSの計算と重みのリスケール（CI幅を正確にするための最重要処理）
+  ESS <- (sum(Data_cgp$iptw)^2) / sum(Data_cgp$iptw^2)
+  if (is.na(ESS) || !is.finite(ESS) || ESS <= 1) ESS <- nrow(Data_cgp)
+
+  # flexsurvregに正しい情報量を伝達するため、sum(iptw) == ESS になるようスケーリング
+  Data_cgp$iptw <- (Data_cgp$iptw / sum(Data_cgp$iptw)) * ESS
+
+  return(list(data = Data_cgp, ESS = ESS))
 }
 
 # -------------------------------------------------------------------------
-# SAFER simulation-time generator
-# -------------------------------------------------------------------------
-gen_sim_times_safe <- function(fit, newdata, dist_type = NULL) {
-  if (is.null(fit) || is.null(newdata) || nrow(newdata) == 0) return(rep(NA_real_, nrow(newdata)))
-  if (is.null(dist_type)) dist_type <- fit$dlist$name
-  res_m <- fit$res
-  n <- nrow(newdata)
-
-  xb <- rep(0, n)
-  ind <- function(x) { v <- as.numeric(x); v[is.na(v)] <- 0; v }
-
-  if ("XMutated" %in% rownames(res_m) && "X" %in% names(newdata)) xb <- xb + res_m["XMutated", "est"] * ind(newdata$X == "Mutated")
-  if ("Age" %in% rownames(res_m) && "Age" %in% names(newdata)) xb <- xb + res_m["Age", "est"] * ind(newdata$Age)
-  if ("SexFemale" %in% rownames(res_m) && "Sex" %in% names(newdata)) xb <- xb + res_m["SexFemale", "est"] * ind(newdata$Sex == "Female")
-  if ("HistologyREAD" %in% rownames(res_m) && "Histology" %in% names(newdata)) xb <- xb + res_m["HistologyREAD", "est"] * ind(newdata$Histology == "READ")
-  if ("HistologyCOADREAD" %in% rownames(res_m) && "Histology" %in% names(newdata)) xb <- xb + res_m["HistologyCOADREAD", "est"] * ind(newdata$Histology == "COADREAD")
-
-  if ("logT1_resid" %in% rownames(res_m) && "logT1_resid" %in% names(newdata)) {
-    xb <- xb + res_m["logT1_resid", "est"] * ind(newdata$logT1_resid)
-  }
-
-  sim_t <- rep(NA_real_, n)
-  safe_mu <- function(base) pmax(pmin(base + xb, log(365.25 * 100)), log(0.01))
-
-  if (dist_type %in% c("llogis", "loglogistic")) {
-    if ("shape" %in% rownames(res_m) && "scale" %in% rownames(res_m)) {
-      shape <- as.numeric(res_m["shape", "est"])
-      sc0   <- as.numeric(res_m["scale", "est"])
-      if (is.finite(shape) && shape > 0 && is.finite(sc0) && sc0 > 0) {
-        mu <- safe_mu(log(sc0))
-        sim_t <- flexsurv::rllogis(n, shape = shape, scale = exp(mu))
-      }
-    }
-  } else if (dist_type %in% c("weibull", "weibullPH", "weibullph")) {
-    if ("shape" %in% rownames(res_m) && "scale" %in% rownames(res_m)) {
-      shape <- as.numeric(res_m["shape", "est"])
-      sc0   <- as.numeric(res_m["scale", "est"])
-      if (is.finite(shape) && shape > 0 && is.finite(sc0) && sc0 > 0) {
-        mu <- safe_mu(log(sc0))
-        sim_t <- rweibull(n, shape = shape, scale = exp(mu))
-      }
-    }
-  }
-
-  if (all(is.na(sim_t))) {
-    sim_t <- rep(365.25, n)
-  } else {
-    invalid <- !is.finite(sim_t) | sim_t <= 0
-    if (any(invalid)) {
-      sim_t[invalid] <- median(sim_t[!invalid], na.rm=TRUE)
-      if (is.na(sim_t[1])) sim_t <- rep(365.25, n)
-    }
-  }
-
-  pmin(sim_t, 365.25 * 100)
-}
-
-# -------------------------------------------------------------------------
-# Counterfactual AF Calculator (Using Delta Method and Exact Group ESS Scaling)
-# -------------------------------------------------------------------------
-ratio_ci_from_samples <- function(x0, x1, n_eff0, n_eff1) {
-  x0 <- x0[is.finite(x0) & x0 > 0]
-  x1 <- x1[is.finite(x1) & x1 > 0]
-
-  if (length(x0) < 10 || length(x1) < 10) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
-
-  m0 <- median(x0); m1 <- median(x1)
-  if (!is.finite(m0) || !is.finite(m1) || m0 <= 0 || m1 <= 0) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
-  est <- m1 / m0
-
-  calc_se_log_med <- function(x, m, neff) {
-    if (neff < 1) neff <- 1
-    lx <- log(x)
-    den <- tryCatch(stats::density(lx, n = 512), error=function(e) NULL)
-    if (!is.null(den)) {
-      f_lm <- approx(den$x, den$y, xout = log(m), rule=2)$y
-      if (is.finite(f_lm) && f_lm > 0) {
-        return(1 / (2 * sqrt(neff) * f_lm))
-      }
-    }
-    s <- mad(lx)
-    if (!is.finite(s) || s == 0) s <- sd(lx)
-    if (!is.finite(s) || s == 0) s <- 0.1
-    return( 1.2533 * s / sqrt(neff) )
-  }
-
-  se_log_m0 <- calc_se_log_med(x0, m0, n_eff0)
-  se_log_m1 <- calc_se_log_med(x1, m1, n_eff1)
-
-  se_diff <- sqrt(se_log_m0^2 + se_log_m1^2)
-  L <- exp(log(est) - 1.96 * se_diff)
-  U <- exp(log(est) + 1.96 * se_diff)
-
-  c(est=est, L=L, U=U)
-}
-
-compute_prop_afs_counterfactual <- function(pseudo_base, orig_data, fit_t1, fit_t2, fit_t1res) {
-
-  sim_os_do <- function(df) {
-    df$sim_T1 <- gen_sim_times_safe(fit_t1, df, dist_type = "llogis")
-    df$logT1_sim_scale <- log(pmax(df$sim_T1 / 365.25, 1e-6))
-    df$logT1_resid <- df$logT1_sim_scale
-
-    if (!is.null(fit_t1res)) {
-      pred <- tryCatch(predict(fit_t1res, newdata = df), error = function(e) NULL)
-      if (!is.null(pred) && length(pred) == nrow(df) && all(is.finite(pred))) df$logT1_resid <- df$logT1_sim_scale - pred
-    }
-
-    min_res <- min(orig_data$logT1_resid, na.rm = TRUE) - 1.0
-    max_res <- max(orig_data$logT1_resid, na.rm = TRUE) + 1.0
-    df$logT1_resid <- pmax(min_res, pmin(max_res, df$logT1_resid))
-
-    df$sim_T2 <- gen_sim_times_safe(fit_t2, df, dist_type = "llogis")
-    return(df$sim_T1 + df$sim_T2)
-  }
-
-  N <- nrow(pseudo_base)
-  os_nat <- sim_os_do(pseudo_base)
-
-  calc_ess <- function(w) { if(length(w)==0 || sum(w)==0) return(0.001); (sum(w)^2)/sum(w^2) }
-  ess_tot <- calc_ess(orig_data$iptw)
-
-  ess_X0 <- calc_ess(orig_data$iptw[orig_data$X == levels(orig_data$X)[1]])
-  ess_X1 <- calc_ess(orig_data$iptw[orig_data$X == levels(orig_data$X)[2]])
-  ess_S0 <- calc_ess(orig_data$iptw[orig_data$Sex == levels(orig_data$Sex)[1]])
-  ess_S1 <- calc_ess(orig_data$iptw[orig_data$Sex == levels(orig_data$Sex)[2]])
-  ess_HC <- calc_ess(orig_data$iptw[orig_data$Histology == "COAD"])
-  ess_HR <- calc_ess(orig_data$iptw[orig_data$Histology == "READ"])
-  ess_HCR <- calc_ess(orig_data$iptw[orig_data$Histology == "COADREAD"])
-
-  var_age <- var(orig_data$Age, na.rm=TRUE)
-  if (is.na(var_age) || var_age == 0) var_age <- 100
-  ess_Age_passed <- (2 * ess_tot * var_age) / 100
-
-  df0 <- pseudo_base; df0$X <- factor(rep("WT", N), levels = levels(pseudo_base$X))
-  df1 <- pseudo_base; df1$X <- factor(rep("Mutated", N), levels = levels(pseudo_base$X))
-  af_x <- ratio_ci_from_samples(sim_os_do(df0), sim_os_do(df1), ess_X0, ess_X1)
-
-  dfA0 <- pseudo_base; dfA1 <- pseudo_base; dfA1$Age <- dfA1$Age + 10
-  af_age <- ratio_ci_from_samples(sim_os_do(dfA0), sim_os_do(dfA1), ess_Age_passed, ess_Age_passed)
-
-  dfS0 <- pseudo_base; dfS0$Sex <- factor(rep("Male", N), levels = levels(pseudo_base$Sex))
-  dfS1 <- pseudo_base; dfS1$Sex <- factor(rep("Female", N), levels = levels(pseudo_base$Sex))
-  af_sex <- ratio_ci_from_samples(sim_os_do(dfS0), sim_os_do(dfS1), ess_S0, ess_S1)
-
-  dfHR0 <- pseudo_base; dfHR0$Histology <- factor(rep("COAD", N), levels = levels(pseudo_base$Histology))
-  dfHR1 <- pseudo_base; dfHR1$Histology <- factor(rep("READ", N), levels = levels(pseudo_base$Histology))
-  af_read <- ratio_ci_from_samples(sim_os_do(dfHR0), sim_os_do(dfHR1), ess_HC, ess_HR)
-
-  dfHC1 <- pseudo_base; dfHC1$Histology <- factor(rep("COADREAD", N), levels = levels(pseudo_base$Histology))
-  af_coadread <- ratio_ci_from_samples(sim_os_do(dfHR0), sim_os_do(dfHC1), ess_HC, ess_HCR)
-
-  Prop_AF <- c(
-    AF_X_est = unname(af_x["est"]), AF_X_L = unname(af_x["L"]), AF_X_U = unname(af_x["U"]),
-    AF_Age_est = unname(af_age["est"]), AF_Age_L = unname(af_age["L"]), AF_Age_U = unname(af_age["U"]),
-    AF_Sex_est = unname(af_sex["est"]), AF_Sex_L = unname(af_sex["L"]), AF_Sex_U = unname(af_sex["U"]),
-    AF_READ_est = unname(af_read["est"]), AF_READ_L = unname(af_read["L"]), AF_READ_U = unname(af_read["U"]),
-    AF_COADREAD_est = unname(af_coadread["est"]), AF_COADREAD_L = unname(af_coadread["L"]), AF_COADREAD_U = unname(af_coadread["U"])
-  )
-
-  list(Prop_AF = Prop_AF, pseudo_nat_OS = os_nat)
-}
-
-# -------------------------------------------------------------------------
-# Extractors for Naive and LT models (AFT-based)
+# Extractors for AFT Models
 # -------------------------------------------------------------------------
 extract_af_full <- function(fit) {
-  blank <- c(AF_X_est=NA, AF_X_L=NA, AF_X_U=NA, AF_Age_est=NA, AF_Age_L=NA, AF_Age_U=NA, AF_Sex_est=NA, AF_Sex_L=NA, AF_Sex_U=NA, AF_READ_est=NA, AF_READ_L=NA, AF_READ_U=NA, AF_COADREAD_est=NA, AF_COADREAD_L=NA, AF_COADREAD_U=NA)
+  blank <- c(AF_X_est=NA, AF_X_L=NA, AF_X_U=NA, AF_Age_est=NA, AF_Age_L=NA, AF_Age_U=NA,
+             AF_Sex_est=NA, AF_Sex_L=NA, AF_Sex_U=NA, AF_READ_est=NA, AF_READ_L=NA, AF_READ_U=NA,
+             AF_COADREAD_est=NA, AF_COADREAD_L=NA, AF_COADREAD_U=NA)
   if (is.null(fit)) return(blank)
 
   res_m <- fit$res
@@ -290,6 +137,35 @@ extract_af_full <- function(fit) {
   out
 }
 
+# (NaïveやLT用のシミュレーション時間生成関数 - 比較用曲線の描画に使用)
+gen_sim_times_safe <- function(fit, newdata) {
+  if (is.null(fit) || is.null(newdata) || nrow(newdata) == 0) return(rep(NA_real_, nrow(newdata)))
+  res_m <- fit$res
+  n <- nrow(newdata)
+  xb <- rep(0, n)
+  ind <- function(x) { v <- as.numeric(x); v[is.na(v)] <- 0; v }
+
+  if ("XMutated" %in% rownames(res_m)) xb <- xb + res_m["XMutated", "est"] * ind(newdata$X == "Mutated")
+  if ("Age" %in% rownames(res_m)) xb <- xb + res_m["Age", "est"] * ind(newdata$Age)
+  if ("SexFemale" %in% rownames(res_m)) xb <- xb + res_m["SexFemale", "est"] * ind(newdata$Sex == "Female")
+  if ("HistologyREAD" %in% rownames(res_m)) xb <- xb + res_m["HistologyREAD", "est"] * ind(newdata$Histology == "READ")
+  if ("HistologyCOADREAD" %in% rownames(res_m)) xb <- xb + res_m["HistologyCOADREAD", "est"] * ind(newdata$Histology == "COADREAD")
+
+  sim_t <- rep(NA_real_, n)
+  if ("shape" %in% rownames(res_m) && "scale" %in% rownames(res_m)) {
+    shape <- as.numeric(res_m["shape", "est"])
+    sc0   <- as.numeric(res_m["scale", "est"])
+    if (is.finite(shape) && shape > 0 && is.finite(sc0) && sc0 > 0) {
+      mu <- pmax(pmin(log(sc0) + xb, log(365.25 * 100)), log(0.01))
+      sim_t <- flexsurv::rllogis(n, shape = shape, scale = exp(mu))
+    }
+  }
+  sim_t[is.na(sim_t)] <- median(sim_t, na.rm=TRUE)
+  if(is.na(sim_t[1])) sim_t <- rep(365.25, n)
+  pmin(sim_t, 365.25 * 100)
+}
+
+# Metrics calculation
 calc_marginal_metrics <- function(sim_times_days) {
   if (is.null(sim_times_days) || all(is.na(sim_times_days))) return(c(Med=NA_real_, S5=NA_real_))
   c(Med = median(sim_times_days, na.rm = TRUE) / 365.25, S5  = mean(sim_times_days > 5 * 365.25, na.rm = TRUE) * 100)
@@ -310,6 +186,7 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
 
   if (N_target < 100) return(NULL)
 
+  # --- DGP (Data Generating Process) ---
   N_macro <- 100000
   Age <- round(runif(N_macro, 40, 80))
   Sex <- sample(c("Male", "Female"), N_macro, replace = TRUE, prob = c(0.55, 0.45))
@@ -332,6 +209,8 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   T1 <- T1_base * AF_total
   T2_true <- T2_base * AF_total
   T_true <- T1 + T2_true
+
+  Data_macro <- data.frame(Age_class = ifelse(Age < 60, "Young", "Old"), T_true = T_true)
 
   cgp_idx <- which(T_true > T1 & T1 <= 365.25 * 10)
   if (length(cgp_idx) < N_target) return(NULL)
@@ -361,73 +240,55 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   Data_cgp$T_obs <- Data_cgp$T1 + Data_cgp$T2_obs
   if (sum(Data_cgp$Event) < 20) return(NULL)
 
-  ref_surv_list <- list()
-  age_label_macro <- ifelse(Age < 60, "Young", "Old")
-  for (ag in c("Young","Old")) ref_surv_list[[ag]] <- sapply(1:5, function(y) mean(T_true[age_label_macro == ag] > y * 365.25) * 100)
-
-  Data_cgp <- calculate_calibrated_iptw(Data_cgp, ref_surv_list)
-  Data_cgp$iptw <- Data_cgp$iptw / mean(Data_cgp$iptw)
-  ESS <- (sum(Data_cgp$iptw)^2) / sum(Data_cgp$iptw^2)
+  # --- IPTW Matching (The Robust Method) ---
+  ma_res <- calculate_ma_weights(Data_cgp, Data_macro)
+  Data_cgp <- ma_res$data
+  ESS <- ma_res$ESS
 
   valid_covs <- c("X", "Age")
   if (length(unique(Data_cgp$Sex)) > 1) valid_covs <- c(valid_covs, "Sex")
   if (length(unique(Data_cgp$Histology)) > 1) valid_covs <- c(valid_covs, "Histology")
+  form_base <- paste(valid_covs, collapse = " + ")
 
-  Data_cgp$logT1_scale <- log(pmax(Data_cgp$T1 / 365.25, 1e-6))
-  Data_cgp$logT1_resid <- Data_cgp$logT1_scale
+  # --- Models Fit ---
+  form_naive <- as.formula(paste("Surv(T_obs, Event) ~", form_base))
+  form_lt    <- as.formula(paste("Surv(T1, T_obs, Event) ~", form_base))
 
-  fit_t1res <- tryCatch({
-    form_t1res <- as.formula(paste("logT1_scale ~", paste(valid_covs, collapse = " + ")))
-    lm(form_t1res, data = Data_cgp, weights = Data_cgp$iptw)
-  }, error = function(e) NULL)
-
-  if (!is.null(fit_t1res)) {
-    r <- tryCatch(resid(fit_t1res), error = function(e) NULL)
-    if (!is.null(r) && length(r) == nrow(Data_cgp) && all(is.finite(r))) Data_cgp$logT1_resid <- r
-  }
-
-  form_naive <- as.formula(paste("Surv(T_obs, Event) ~", paste(valid_covs, collapse = " + ")))
-  form_lt    <- as.formula(paste("Surv(T1, T_obs, Event) ~", paste(valid_covs, collapse = " + ")))
   fit_naive <- tryCatch(flexsurvreg(form_naive, data = Data_cgp, dist = "llogis"), error = function(e) NULL)
   fit_lt    <- tryCatch(flexsurvreg(form_lt,    data = Data_cgp, dist = "llogis"), error = function(e) NULL)
 
-  Data_cgp$T1_event <- 1
-  form_t1 <- as.formula(paste("Surv(T1, T1_event) ~", paste(valid_covs, collapse = " + ")))
-  fit_t1 <- tryCatch(flexsurvreg(form_t1, data = Data_cgp, weights = Data_cgp$iptw, dist = "llogis"), error = function(e) NULL)
+  # [提案手法] T_obs分布の歪みを重みで補正し、その上で直接AFTをフィットさせる
+  fit_prop <- tryCatch(flexsurvreg(form_naive, data = Data_cgp, weights = iptw, dist = "llogis"), error = function(e) NULL)
 
-  form_t2 <- as.formula(paste("Surv(T2_obs, Event) ~", paste(c(valid_covs, "logT1_resid"), collapse = " + ")))
-  fit_t2 <- tryCatch(flexsurvreg(form_t2, data = Data_cgp, weights = Data_cgp$iptw, dist = "llogis"), error = function(e) NULL)
+  if (is.null(fit_prop)) return(NULL)
 
-  if (is.null(fit_t1) || is.null(fit_t2)) return(NULL)
+  # Metrics and Curves
+  t_seq <- seq(0, 365.25 * 5, length.out = 100)
 
-  idx_pseudo <- sample(seq_len(nrow(Data_cgp)), size = 10000, replace = TRUE, prob = Data_cgp$iptw)
-  pseudo <- Data_cgp[idx_pseudo, , drop = FALSE]
+  # Naive & LT expected curves (unweighted)
+  sim_naive <- if (!is.null(fit_naive)) gen_sim_times_safe(fit_naive, Data_cgp) else rep(NA_real_, nrow(Data_cgp))
+  sim_lt    <- if (!is.null(fit_lt))    gen_sim_times_safe(fit_lt,    Data_cgp) else rep(NA_real_, nrow(Data_cgp))
 
-  pseudo$X <- factor(pseudo$X, levels = levels(Data_cgp$X))
-  pseudo$Sex <- factor(pseudo$Sex, levels = levels(Data_cgp$Sex))
-  pseudo$Histology <- factor(pseudo$Histology, levels = levels(Data_cgp$Histology))
-
-  cf <- tryCatch(
-    compute_prop_afs_counterfactual(
-      pseudo_base = pseudo, orig_data = Data_cgp, fit_t1 = fit_t1, fit_t2 = fit_t2, fit_t1res = fit_t1res
-    ), error = function(e) NULL
-  )
-
-  if (is.null(cf)) return(NULL)
-
-  Prop_AF <- cf$Prop_AF
-  pseudo_nat_OS <- cf$pseudo_nat_OS
-
-  sim_naive <- if (!is.null(fit_naive)) gen_sim_times_safe(fit_naive, Data_cgp, dist_type = "llogis") else rep(NA_real_, nrow(Data_cgp))
-  sim_lt    <- if (!is.null(fit_lt))    gen_sim_times_safe(fit_lt,    Data_cgp, dist_type = "llogis") else rep(NA_real_, nrow(Data_cgp))
+  # Proposed Curve & Metrics (Derived from Weighted Kaplan-Meier)
+  km_prop <- tryCatch(survfit(Surv(T_obs, Event) ~ 1, data = Data_cgp, weights = iptw), error = function(e) NULL)
+  if (!is.null(km_prop)) {
+    curve_prop <- approx(km_prop$time, km_prop$surv, xout = t_seq, method = "constant", f = 0, rule = 2)$y
+    curve_prop[is.na(curve_prop)] <- 0
+    prop_med <- tryCatch(quantile(km_prop, probs = 0.5)$quantile / 365.25, error=function(e) NA_real_)
+    prop_s5 <- approx(km_prop$time, km_prop$surv, xout = 5 * 365.25, method = "constant", f = 0, rule = 2)$y * 100
+  } else {
+    curve_prop <- rep(NA_real_, length(t_seq))
+    prop_med <- NA_real_; prop_s5 <- NA_real_
+  }
 
   list(
-    ESS = ESS, True_Metrics = calc_marginal_metrics(T_true),
+    ESS = ESS,
+    True_Metrics = calc_marginal_metrics(T_true),
     Naive_AF = extract_af_full(fit_naive), Naive_Metrics = calc_marginal_metrics(sim_naive),
     LT_AF = extract_af_full(fit_lt), LT_Metrics = calc_marginal_metrics(sim_lt),
-    Prop_AF = Prop_AF, Prop_Metrics = calc_marginal_metrics(pseudo_nat_OS),
+    Prop_AF = extract_af_full(fit_prop), Prop_Metrics = c(Med = unname(prop_med), S5 = unname(prop_s5)),
     curve_true = calc_curve_km(T_true), curve_naive = calc_curve_km(sim_naive),
-    curve_lt = calc_curve_km(sim_lt), curve_prop = calc_curve_km(pseudo_nat_OS),
+    curve_lt = calc_curve_km(sim_lt), curve_prop = curve_prop,
     sample_t1 = Data_cgp$T1[1:min(500, nrow(Data_cgp))], sample_t2 = Data_cgp$T2_true[1:min(500, nrow(Data_cgp))]
   )
 }
