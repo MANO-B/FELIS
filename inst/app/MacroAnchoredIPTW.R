@@ -78,39 +78,24 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
     log_t1 <- log(pmax(ag_data$T1 / 365.25, 1e-6))
     log_t1_sq <- log_t1^2
 
-    # unweighted X mean in this Age_class (target to preserve)
-    x_ind <- as.numeric(ag_data$X == "Mutated")
-    x_mean_target <- mean(x_ind, na.rm = TRUE)
-
     obj_func <- function(theta) {
       w <- exp(theta[1] * log_t1 + theta[2] * log_t1_sq)
       w <- pmax(w, 1e-6)
       w <- w / mean(w)
 
-      km <- tryCatch(
-        survfit(Surv(T_obs, Event) ~ 1, data = ag_data, weights = w),
-        error = function(e) NULL
-      )
+      km <- tryCatch(survfit(Surv(T_obs, Event) ~ 1, data = ag_data, weights = w), error = function(e) NULL)
       if (is.null(km)) return(1e12)
 
       S_est <- approx(km$time, km$surv, xout = t_points_days, method = "constant", f = 0, rule = 2)$y
-
-      # soft constraint: preserve X distribution (weighted mean of X)
-      x_mean_w <- sum(w * x_ind, na.rm = TRUE) / sum(w, na.rm = TRUE)
-      pen_x <- (x_mean_w - x_mean_target)^2
-
-      # objective
-      sum((S_est - S_macro_target)^2) + 0.001 * sum(theta^2) + 0.10 * pen_x
+      sum((S_est - S_macro_target)^2) + 0.001 * sum(theta^2)
     }
 
-    opt <- tryCatch(optim(c(0, 0), obj_func, method = "BFGS"),
-                    error = function(e) list(par = c(0, 0)))
+    opt <- tryCatch(optim(c(0, 0), obj_func, method = "BFGS"), error = function(e) list(par = c(0, 0)))
     th <- opt$par
 
     w_opt <- exp(th[1] * log_t1 + th[2] * log_t1_sq)
     w_opt <- pmax(w_opt, 1e-6)
 
-    # winsorize (avoid explosion)
     lb <- quantile(w_opt, 0.01, na.rm = TRUE)
     ub <- quantile(w_opt, 0.99, na.rm = TRUE)
     w_opt <- pmax(lb, pmin(w_opt, ub))
@@ -158,31 +143,46 @@ gen_sim_times_safe <- function(fit, newdata, dist_type = NULL) {
     }
   }
 
+  # ---- numeric guard helpers ----
+  clip <- function(x, lo = -20, hi = 20) pmin(pmax(x, lo), hi)   # exp(20) ~ 4.85e8 days scale ok
+  safe_num <- function(x) ifelse(is.finite(x), x, NA_real_)
+
   if (dist_type %in% c("weibull", "weibullPH", "weibullph")) {
-    base <- if ("scale" %in% rownames(res_m)) log(as.numeric(res_m["scale", "est"])) else 0
-    mu <- base + xb
-    shape <- as.numeric(res_m["shape", "est"])
+    if (!("shape" %in% rownames(res_m)) || !("scale" %in% rownames(res_m))) return(rep(NA_real_, n))
+    shape <- safe_num(as.numeric(res_m["shape","est"]))
+    sc0   <- safe_num(as.numeric(res_m["scale","est"]))
+    if (!is.finite(shape) || !is.finite(sc0) || shape <= 0 || sc0 <= 0) return(rep(NA_real_, n))
+
+    mu <- log(sc0) + xb
+    mu <- clip(mu)
     return(rweibull(n, shape = shape, scale = exp(mu)))
   }
 
   if (dist_type %in% c("llogis", "loglogistic")) {
-    base <- if ("scale" %in% rownames(res_m)) log(as.numeric(res_m["scale", "est"])) else 0
-    mu <- base + xb
-    shape <- as.numeric(res_m["shape", "est"])
+    if (!("shape" %in% rownames(res_m)) || !("scale" %in% rownames(res_m))) return(rep(NA_real_, n))
+    shape <- safe_num(as.numeric(res_m["shape","est"]))
+    sc0   <- safe_num(as.numeric(res_m["scale","est"]))
+    if (!is.finite(shape) || !is.finite(sc0) || shape <= 0 || sc0 <= 0) return(rep(NA_real_, n))
+
+    mu <- log(sc0) + xb
+    mu <- clip(mu)
     return(flexsurv::rllogis(n, shape = shape, scale = exp(mu)))
   }
 
   if (dist_type %in% c("gengamma", "gen_gamma", "generalized gamma")) {
-    base <- if ("mu" %in% rownames(res_m)) as.numeric(res_m["mu", "est"]) else 0
-    mu <- base + xb
-    sigma <- as.numeric(res_m["sigma", "est"])
-    Q <- as.numeric(res_m["Q", "est"])
+    if (!all(c("mu","sigma","Q") %in% rownames(res_m))) return(rep(NA_real_, n))
+    mu0   <- safe_num(as.numeric(res_m["mu","est"]))
+    sigma <- safe_num(as.numeric(res_m["sigma","est"]))
+    Q     <- safe_num(as.numeric(res_m["Q","est"]))
+    if (!is.finite(mu0) || !is.finite(sigma) || !is.finite(Q) || sigma <= 0) return(rep(NA_real_, n))
+
+    mu <- mu0 + xb
+    mu <- clip(mu)  # gengammaでも暴走防止（計算安定化）
     return(flexsurv::rgengamma(n, mu = mu, sigma = sigma, Q = Q))
   }
 
   rep(NA_real_, n)
 }
-
 # -------------------------------------------------------------------------
 # Extractors for Naive/LT (AFT coefficient-based; for comparators only)
 # -------------------------------------------------------------------------
@@ -265,19 +265,22 @@ median_se_uncens <- function(x) {
 ratio_ci_from_samples <- function(xA, xB) {
   xA <- xA[is.finite(xA) & !is.na(xA) & xA > 0]
   xB <- xB[is.finite(xB) & !is.na(xB) & xB > 0]
-  if (length(xA) < 50 || length(xB) < 50) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
+
+  # estは「最低限」出す（極端に少ない時だけ NA）
+  if (length(xA) < 10 || length(xB) < 10) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
 
   mA <- median(xA)
   mB <- median(xB)
+  if (!is.finite(mA) || !is.finite(mB) || mA <= 0 || mB <= 0) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
   est <- mB / mA
 
+  # CIは作れなければ NA-NA で返す（estは保持）
   seA <- median_se_uncens(xA)
   seB <- median_se_uncens(xB)
   if (!is.finite(seA) || !is.finite(seB) || seA <= 0 || seB <= 0) {
     return(c(est=est, L=NA_real_, U=NA_real_))
   }
 
-  # delta on log ratio
   var_log <- (seB / mB)^2 + (seA / mA)^2
   se_log <- sqrt(var_log)
   L <- exp(log(est) - 1.95996 * se_log)
