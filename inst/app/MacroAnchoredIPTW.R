@@ -1,6 +1,7 @@
 # =========================================================================
 # Server Logic for Simulation Study (Tamura & Ikegami Model)
 #  - Parametric Weibull-based Optimization for IPTW (Highly Robust to Heavy Censoring)
+#  - [NEW] Simple 1-parameter weight: W(T1) = exp(theta1 * log(T1))
 #  - T1 & T2 models: log-logistic (llogis) distribution
 #  - Linear logT1_resid (No Splines) to prevent tail extrapolation drop
 #  - Estimate TOTAL effect on OS by Counterfactual Distributions
@@ -50,7 +51,7 @@ find_censoring_param <- function(T2, target_rate, pattern) {
 
 # -------------------------------------------------------------------------
 # Step 1: Calibration IPTW (1:5 points)
-# [NEW] Uses Parametric Weibull fit inside objective function to survive heavy censoring
+# [NEW] Simple 1-parameter optimization: exp(theta * log_t1)
 # -------------------------------------------------------------------------
 calculate_calibrated_iptw <- function(data, ref_surv_list) {
   data$iptw <- 1.0
@@ -63,38 +64,37 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
     ag_idx <- which(data$Age_class == ag)
     ag_data <- data[ag_idx, , drop = FALSE]
 
+    # 二乗項を廃止し、log_t1 のみにシンプル化
     log_t1 <- log(pmax(ag_data$T1 / 365.25, 1e-6))
-    log_t1_sq <- log_t1^2
 
-    obj_func <- function(theta) {
-      w <- exp(theta[1] * log_t1 + theta[2] * log_t1_sq)
+    obj_func <- function(theta1) {
+      # 重み関数: exp(theta1 * log_T1)
+      w <- exp(theta1 * log_t1)
       w <- pmax(w, 1e-6)
       w <- w / mean(w)
 
       S_est <- rep(NA_real_, length(t_points_days))
 
-      # 1. パラメトリックWeibullを用いた滑らかで打ち切りに強い生存率推定
       fit_w <- tryCatch(survival::survreg(Surv(T_obs, Event) ~ 1, data = ag_data, weights = w, dist = "weibull"), error = function(e) NULL)
       if (!is.null(fit_w)) {
         scale_w <- exp(fit_w$coefficients[1])
         shape_w <- 1 / fit_w$scale
         S_est <- exp(- (t_points_days / scale_w)^shape_w)
       } else {
-        # 2. Weibullが失敗した場合のみKM法にフォールバック
         km <- tryCatch(survfit(Surv(T_obs, Event) ~ 1, data = ag_data, weights = w), error = function(e) NULL)
         if (is.null(km)) return(1e6)
         S_est <- approx(km$time, km$surv, xout = t_points_days, method = "constant", f = 0, rule = 2)$y
         S_est[is.na(S_est)] <- 0
       }
 
-      # L2 Error + L2 Penalty to prevent extreme weights
-      sum((S_est - S_macro_target)^2) + 1e-4 * sum(theta^2)
+      sum((S_est - S_macro_target)^2) + 1e-4 * (theta1^2)
     }
 
-    opt <- tryCatch(optim(c(0, 0), obj_func, method = "BFGS"), error = function(e) list(par = c(0, 0)))
-    th <- opt$par
+    # 1次元探索に最も適した optimize() に変更 (-10 から 10 の範囲で探索)
+    opt <- tryCatch(optimize(obj_func, interval = c(-10, 10)), error = function(e) list(minimum = 0))
+    th <- opt$minimum
 
-    w_opt <- exp(th[1] * log_t1 + th[2] * log_t1_sq)
+    w_opt <- exp(th * log_t1)
     w_opt <- pmax(w_opt, 1e-6)
 
     # Winsorize (Avoid Explosion)
