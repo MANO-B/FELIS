@@ -1,10 +1,10 @@
 # =========================================================================
 # Server Logic for Simulation Study (Tamura & Ikegami Model)
-#  - 1:5 (1-5y) calibration 유지
-#  - Nelder-Mead Optimization for IPTW
-#  - [抜本的変更] Spline廃止 & Log-logistic分布への統一 (Robust to Censoring)
+#  - Parametric Weibull-based Optimization for IPTW (Highly Robust to Heavy Censoring)
+#  - T1 & T2 models: log-logistic (llogis) distribution
+#  - Linear logT1_resid (No Splines) to prevent tail extrapolation drop
 #  - Estimate TOTAL effect on OS by Counterfactual Distributions
-#  - EXACT CI Width Recovery using Subgroup-Specific Effective Sample Sizes (ESS)
+#  - EXACT CI Width Recovery using Subgroup-Specific Effective Sample Sizes
 # =========================================================================
 
 suppressPackageStartupMessages({
@@ -12,7 +12,6 @@ suppressPackageStartupMessages({
   library(flexsurv)
   library(survival)
   library(ggplot2)
-  library(splines)
   library(scales)
 })
 
@@ -51,6 +50,7 @@ find_censoring_param <- function(T2, target_rate, pattern) {
 
 # -------------------------------------------------------------------------
 # Step 1: Calibration IPTW (1:5 points)
+# [NEW] Uses Parametric Weibull fit inside objective function to survive heavy censoring
 # -------------------------------------------------------------------------
 calculate_calibrated_iptw <- function(data, ref_surv_list) {
   data$iptw <- 1.0
@@ -71,21 +71,33 @@ calculate_calibrated_iptw <- function(data, ref_surv_list) {
       w <- pmax(w, 1e-6)
       w <- w / mean(w)
 
-      km <- tryCatch(survfit(Surv(T_obs, Event) ~ 1, data = ag_data, weights = w), error = function(e) NULL)
-      if (is.null(km)) return(1e6)
+      S_est <- rep(NA_real_, length(t_points_days))
 
-      S_est <- approx(km$time, km$surv, xout = t_points_days, method = "constant", f = 0, rule = 2)$y
-      S_est[is.na(S_est)] <- 0
+      # 1. パラメトリックWeibullを用いた滑らかで打ち切りに強い生存率推定
+      fit_w <- tryCatch(survival::survreg(Surv(T_obs, Event) ~ 1, data = ag_data, weights = w, dist = "weibull"), error = function(e) NULL)
+      if (!is.null(fit_w)) {
+        scale_w <- exp(fit_w$coefficients[1])
+        shape_w <- 1 / fit_w$scale
+        S_est <- exp(- (t_points_days / scale_w)^shape_w)
+      } else {
+        # 2. Weibullが失敗した場合のみKM法にフォールバック
+        km <- tryCatch(survfit(Surv(T_obs, Event) ~ 1, data = ag_data, weights = w), error = function(e) NULL)
+        if (is.null(km)) return(1e6)
+        S_est <- approx(km$time, km$surv, xout = t_points_days, method = "constant", f = 0, rule = 2)$y
+        S_est[is.na(S_est)] <- 0
+      }
 
-      sum((S_est - S_macro_target)^2) + 1e-5 * sum(theta^2)
+      # L2 Error + L2 Penalty to prevent extreme weights
+      sum((S_est - S_macro_target)^2) + 1e-4 * sum(theta^2)
     }
 
-    opt <- tryCatch(optim(c(0, 0), obj_func, method = "Nelder-Mead", control=list(maxit=500)), error = function(e) list(par = c(0, 0)))
+    opt <- tryCatch(optim(c(0, 0), obj_func, method = "BFGS"), error = function(e) list(par = c(0, 0)))
     th <- opt$par
 
     w_opt <- exp(th[1] * log_t1 + th[2] * log_t1_sq)
     w_opt <- pmax(w_opt, 1e-6)
 
+    # Winsorize (Avoid Explosion)
     lb <- quantile(w_opt, 0.01, na.rm = TRUE)
     ub <- quantile(w_opt, 0.99, na.rm = TRUE)
     w_opt <- pmax(lb, pmin(w_opt, ub))
@@ -113,7 +125,6 @@ gen_sim_times_safe <- function(fit, newdata, dist_type = NULL) {
   if ("HistologyREAD" %in% rownames(res_m) && "Histology" %in% names(newdata)) xb <- xb + res_m["HistologyREAD", "est"] * ind(newdata$Histology == "READ")
   if ("HistologyCOADREAD" %in% rownames(res_m) && "Histology" %in% names(newdata)) xb <- xb + res_m["HistologyCOADREAD", "est"] * ind(newdata$Histology == "COADREAD")
 
-  # Spline廃止に伴い、線形のlogT1_residを処理
   if ("logT1_resid" %in% rownames(res_m) && "logT1_resid" %in% names(newdata)) {
     xb <- xb + res_m["logT1_resid", "est"] * ind(newdata$logT1_resid)
   }
@@ -205,7 +216,6 @@ compute_prop_afs_counterfactual <- function(pseudo_base, orig_data, fit_t1, fit_
       if (!is.null(pred) && length(pred) == nrow(df) && all(is.finite(pred))) df$logT1_resid <- df$logT1_sim_scale - pred
     }
 
-    # CLAMP: 範囲外への暴走を防ぐが、少し緩めにマージン(+/- 1)を取る
     min_res <- min(orig_data$logT1_resid, na.rm = TRUE) - 1.0
     max_res <- max(orig_data$logT1_resid, na.rm = TRUE) + 1.0
     df$logT1_resid <- pmax(min_res, pmin(max_res, df$logT1_resid))
@@ -267,6 +277,7 @@ compute_prop_afs_counterfactual <- function(pseudo_base, orig_data, fit_t1, fit_
 extract_af_full <- function(fit) {
   blank <- c(AF_X_est=NA, AF_X_L=NA, AF_X_U=NA, AF_Age_est=NA, AF_Age_L=NA, AF_Age_U=NA, AF_Sex_est=NA, AF_Sex_L=NA, AF_Sex_U=NA, AF_READ_est=NA, AF_READ_L=NA, AF_READ_U=NA, AF_COADREAD_est=NA, AF_COADREAD_L=NA, AF_COADREAD_U=NA)
   if (is.null(fit)) return(blank)
+
   res_m <- fit$res
   get <- function(r, col) if (r %in% rownames(res_m)) res_m[r, col] else NA_real_
 
@@ -382,11 +393,8 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
 
   Data_cgp$T1_event <- 1
   form_t1 <- as.formula(paste("Surv(T1, T1_event) ~", paste(valid_covs, collapse = " + ")))
-
-  # [抜本的変更] T1モデルを llogis に統一
   fit_t1 <- tryCatch(flexsurvreg(form_t1, data = Data_cgp, weights = Data_cgp$iptw, dist = "llogis"), error = function(e) NULL)
 
-  # [抜本的変更] スプライン(ns)を廃止し、logT1_resid をそのまま線形項として投入（過学習・テール落ち防止）
   form_t2 <- as.formula(paste("Surv(T2_obs, Event) ~", paste(c(valid_covs, "logT1_resid"), collapse = " + ")))
   fit_t2 <- tryCatch(flexsurvreg(form_t2, data = Data_cgp, weights = Data_cgp$iptw, dist = "llogis"), error = function(e) NULL)
 
