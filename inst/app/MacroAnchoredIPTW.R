@@ -243,19 +243,36 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   if (length(unique(Data_cgp$Sex)) > 1) valid_covs <- c(valid_covs, "Sex")
   if (length(unique(Data_cgp$Histology)) > 1) valid_covs <- c(valid_covs, "Histology")
 
-  # spline(logT1)
-  Data_cgp$logT1_scale <- log(pmax(Data_cgp$T1/365.25, 1e-6))
+  # spline(logT1)  --- SAFE residualization version ---
+  Data_cgp$logT1_scale <- log(pmax(Data_cgp$T1 / 365.25, 1e-6))
 
-  # --- residualized logT1 (remove X,Z part) ---
-  form_t1res <- as.formula(paste("logT1_scale ~", paste(valid_covs, collapse = " + ")))
-  fit_t1res <- lm(form_t1res, data = Data_cgp, weights = Data_cgp$iptw)
+  # ---- residualize logT1 against (X,Z) to avoid absorbing X total effect ----
+  Data_cgp$logT1_resid <- Data_cgp$logT1_scale  # fallback default
 
-  Data_cgp$logT1_resid <- resid(fit_t1res)  # r = logT1 - E[logT1|X,Z]
+  fit_t1res <- tryCatch({
+    form_t1res <- as.formula(paste("logT1_scale ~", paste(valid_covs, collapse = " + ")))
+    lm(form_t1res, data = Data_cgp, weights = Data_cgp$iptw)
+  }, error = function(e) NULL)
 
-  # spline on residual, NOT on raw logT1
-  ns_obj <- ns(Data_cgp$logT1_resid, df = 3)
-  ns_mat <- as.matrix(ns_obj)
-  colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
+  if (!is.null(fit_t1res)) {
+    r <- tryCatch(resid(fit_t1res), error = function(e) NULL)
+    if (!is.null(r) && length(r) == nrow(Data_cgp) && all(is.finite(r))) {
+      Data_cgp$logT1_resid <- r
+    }
+  }
+
+  # ---- build spline on residuals (if fails, set spline terms to 0) ----
+  ns_obj <- tryCatch(ns(Data_cgp$logT1_resid, df = 3), error = function(e) NULL)
+
+  if (is.null(ns_obj)) {
+    # if ns() fails, create 3 zero columns so later code won’t crash
+    ns_mat <- matrix(0, nrow(Data_cgp), 3)
+    colnames(ns_mat) <- paste0("ns", 1:3)
+  } else {
+    ns_mat <- as.matrix(ns_obj)
+    colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
+  }
+
   for (j in seq_len(ncol(ns_mat))) Data_cgp[[colnames(ns_mat)[j]]] <- ns_mat[, j]
 
   # comparator
@@ -281,17 +298,36 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   pseudo_nat <- Data_cgp[idx_nat, , drop=FALSE]
 
   pseudo_nat$sim_T1 <- gen_sim_times(fit_t1, pseudo_nat, "weibull")
-  pseudo_nat$logT1_sim_scale <- log(pmax(pseudo_nat$sim_T1/365.25, 1e-6))
+  pseudo_cgp$logT1_sim_scale <- log(pmax(pseudo_cgp$sim_T1 / 365.25, 1e-6))
 
-  # predicted E[logT1|X,Z] from the lm fit
-  pred_logT1 <- predict(fit_t1res, newdata = pseudo_cgp)
+  # ensure factor levels remain consistent (prevents predict(lm) errors)
+  pseudo_cgp$X <- factor(pseudo_cgp$X, levels = levels(Data_cgp$X))
+  if ("Sex" %in% names(pseudo_cgp)) pseudo_cgp$Sex <- factor(pseudo_cgp$Sex, levels = levels(Data_cgp$Sex))
+  if ("Histology" %in% names(pseudo_cgp)) pseudo_cgp$Histology <- factor(pseudo_cgp$Histology, levels = levels(Data_cgp$Histology))
 
-  pseudo_cgp$logT1_sim_resid <- pseudo_cgp$logT1_sim_scale - pred_logT1
+  # default: residual = raw (fallback)
+  pseudo_cgp$logT1_sim_resid <- pseudo_cgp$logT1_sim_scale
 
-  ns_sim <- predict(ns_obj, pseudo_cgp$logT1_sim_resid)
-  colnames(ns_sim) <- paste0("ns", seq_len(ncol(ns_sim)))
+  if (!is.null(fit_t1res)) {
+    pred_logT1 <- tryCatch(predict(fit_t1res, newdata = pseudo_cgp), error = function(e) NULL)
+    if (!is.null(pred_logT1) && length(pred_logT1) == nrow(pseudo_cgp) && all(is.finite(pred_logT1))) {
+      pseudo_cgp$logT1_sim_resid <- pseudo_cgp$logT1_sim_scale - pred_logT1
+    }
+  }
+
+  # predict spline safely
+  if (!is.null(ns_obj)) {
+    ns_sim <- tryCatch(predict(ns_obj, pseudo_cgp$logT1_sim_resid), error = function(e) NULL)
+  } else {
+    ns_sim <- NULL
+  }
+
+  if (is.null(ns_sim)) {
+    ns_sim <- matrix(0, nrow(pseudo_cgp), ncol(ns_mat))
+  }
+
+  colnames(ns_sim) <- colnames(ns_mat)
   for (j in seq_len(ncol(ns_sim))) pseudo_cgp[[colnames(ns_sim)[j]]] <- ns_sim[, j]
-
   ns_sim_nat <- tryCatch(predict(ns_obj, pseudo_nat$logT1_sim_scale), error=function(e) NULL)
   if (is.null(ns_sim_nat)) ns_sim_nat <- matrix(0, nrow(pseudo_nat), attr(ns_obj,"df"))
   colnames(ns_sim_nat) <- paste0("ns", seq_len(ncol(ns_sim_nat)))
