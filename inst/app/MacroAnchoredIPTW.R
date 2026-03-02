@@ -585,6 +585,7 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   if (is.null(fit_t1) || is.null(fit_t2)) return(NULL)
 
   # --- Step 3: G-computation pseudo size = ESS (CI widening) ---
+  # --- Step 3: G-computation pseudo size = ESS (CI widening) ---
   n_pseudo <- as.integer(round(ESS))
   if (!is.finite(n_pseudo) || is.na(n_pseudo)) n_pseudo <- 1000L
   n_pseudo <- max(500L, min(10000L, n_pseudo))
@@ -600,7 +601,9 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
       fit_t2 = fit_t2,
       fit_t1res = fit_t1res,
       ns_obj = ns_obj,
-      ns_colnames = colnames(ns_mat)
+      ns_colnames = colnames(ns_mat),
+      Data_cgp_logT1_resid = Data_cgp$logT1_resid, # ★これを追加（クランプ用）
+      n_eff = ESS                                 # ★ESSペナルティ用
     ),
     error = function(e) NULL
   )
@@ -929,94 +932,132 @@ observeEvent(input$run_sim_multi, {
   })
 })
 
-# --- median SE (quick, distribution-free-ish) ---
+# -------------------------------------------------------------------------
+# Robust Median SE and Ratio CI (Delta Method)
+# -------------------------------------------------------------------------
 median_se_uncens <- function(x) {
-  x <- x[is.finite(x) & !is.na(x)]
+  x <- x[is.finite(x) & !is.na(x) & x > 0]
   n <- length(x)
   if (n < 30) return(NA_real_)
-  # robust scale -> approximate SE of median
-  s <- mad(x, constant = 1.4826)
-  if (!is.finite(s) || s <= 0) s <- sd(x)
-  if (!is.finite(s) || s <= 0) return(NA_real_)
-  1.253314 * s / sqrt(n)  # ~sqrt(pi/2)*sd/sqrt(n)
+
+  m <- median(x)
+  if (m <= 0) return(NA_real_)
+
+  # 対数スケール上でカーネル密度推定を行う（生存時間における最も安定したSE推定）
+  lx <- log(x)
+  den <- tryCatch(stats::density(lx, n = 512), error = function(e) NULL)
+
+  if (is.null(den)) {
+    # Fallback (Densityが失敗した場合)
+    s <- mad(x, constant = 1.4826)
+    if (!is.finite(s) || s <= 0) s <- sd(x)
+    return(if (is.finite(s) && s > 0) 1.253314 * s / sqrt(n) else NA_real_)
+  }
+
+  f_lm <- approx(den$x, den$y, xout = log(m), rule = 2)$y
+  f_m <- f_lm / m
+  if (!is.finite(f_m) || f_m <= 0) return(NA_real_)
+
+  # Medianの標準誤差
+  sqrt(0.25 / (n * f_m^2))
 }
 
 ratio_ci_from_samples <- function(x0, x1, n_eff = NULL) {
   x0 <- x0[is.finite(x0) & !is.na(x0) & x0 > 0]
   x1 <- x1[is.finite(x1) & !is.na(x1) & x1 > 0]
+
   if (length(x0) < 30 || length(x1) < 30) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
 
   m0 <- median(x0); m1 <- median(x1)
   if (!is.finite(m0) || !is.finite(m1) || m0 <= 0 || m1 <= 0) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
   est <- m1 / m0
 
-  # SE of medians; optionally inflate by n_eff
   se0 <- median_se_uncens(x0)
   se1 <- median_se_uncens(x1)
   if (!is.finite(se0) || !is.finite(se1) || se0 <= 0 || se1 <= 0) return(c(est=est, L=NA_real_, U=NA_real_))
 
-  # if you want to reflect ESS rather than raw pseudo size:
+  # Pseudo sample size から本来の ESS レベルへ信頼区間をペナルティ拡張
   if (!is.null(n_eff) && is.finite(n_eff) && n_eff > 0) {
-    n0 <- length(x0); n1 <- length(x1)
-    se0 <- se0 * sqrt(n0 / n_eff)
-    se1 <- se1 * sqrt(n1 / n_eff)
+    se0 <- se0 * sqrt(length(x0) / n_eff)
+    se1 <- se1 * sqrt(length(x1) / n_eff)
   }
 
-  se_log <- sqrt( (se1/m1)^2 + (se0/m0)^2 )
+  se_log <- sqrt((se1/m1)^2 + (se0/m0)^2)
   L <- exp(log(est) - 1.95996 * se_log)
   U <- exp(log(est) + 1.95996 * se_log)
   c(est=est, L=L, U=U)
 }
 
-make_prop_af_from_counterfactual <- function(pseudo_base, fit_t1, fit_t2, ns_obj, fit_t1res,
-                                             valid_covs, ns_cols, n_eff_for_ci = NULL) {
-  # do(X=0) and do(X=1) cohorts
-  p0 <- pseudo_base
-  p1 <- pseudo_base
-  p0$X <- factor("WT", levels = levels(pseudo_base$X))
-  p1$X <- factor("Mutated", levels = levels(pseudo_base$X))
+# -------------------------------------------------------------------------
+# Proposed TOTAL EFFECT AFs by counterfactual OS distributions
+# -------------------------------------------------------------------------
+compute_prop_afs_counterfactual <- function(pseudo_base, fit_t1, fit_t2, fit_t1res, ns_obj, ns_colnames, Data_cgp_logT1_resid, n_eff) {
 
-  # --- simulate T1 ---
-  p0$sim_T1 <- gen_sim_times_safe(fit_t1, p0, dist_type = "weibull")
-  p1$sim_T1 <- gen_sim_times_safe(fit_t1, p1, dist_type = "weibull")
+  # 内部関数: 与えられたデータフレームに対してOSをシミュレートする
+  sim_os_do <- function(df) {
+    df$sim_T1 <- gen_sim_times_safe(fit_t1, df, dist_type = "weibull")
+    df$logT1_sim_scale <- log(pmax(df$sim_T1 / 365.25, 1e-6))
+    df$logT1_sim_resid <- df$logT1_sim_scale
 
-  # --- residualized logT1 for dependence spline ---
-  p0$logT1_sim_scale <- log(pmax(p0$sim_T1 / 365.25, 1e-6))
-  p1$logT1_sim_scale <- log(pmax(p1$sim_T1 / 365.25, 1e-6))
-  p0$logT1_sim_resid <- p0$logT1_sim_scale
-  p1$logT1_sim_resid <- p1$logT1_sim_scale
+    if (!is.null(fit_t1res)) {
+      pred <- tryCatch(predict(fit_t1res, newdata = df), error = function(e) NULL)
+      if (!is.null(pred) && length(pred) == nrow(df) && all(is.finite(pred))) {
+        df$logT1_sim_resid <- df$logT1_sim_scale - pred
+      }
+    }
 
-  if (!is.null(fit_t1res)) {
-    pred0 <- tryCatch(predict(fit_t1res, newdata = p0), error = function(e) NULL)
-    pred1 <- tryCatch(predict(fit_t1res, newdata = p1), error = function(e) NULL)
-    if (!is.null(pred0) && length(pred0) == nrow(p0) && all(is.finite(pred0))) p0$logT1_sim_resid <- p0$logT1_sim_scale - pred0
-    if (!is.null(pred1) && length(pred1) == nrow(p1) && all(is.finite(pred1))) p1$logT1_sim_resid <- p1$logT1_sim_scale - pred1
+    # ★極めて重要なCLAMP処理（外挿によるT2の暴走・0への潰れを防止）★
+    min_res <- min(Data_cgp_logT1_resid, na.rm = TRUE)
+    max_res <- max(Data_cgp_logT1_resid, na.rm = TRUE)
+    df$logT1_sim_resid <- pmax(min_res, pmin(max_res, df$logT1_sim_resid))
+
+    ns_sim <- tryCatch(predict(ns_obj, df$logT1_sim_resid), error = function(e) NULL)
+    if (is.null(ns_sim)) {
+      ns_sim <- matrix(0, nrow(df), length(ns_colnames))
+    } else {
+      ns_sim <- as.matrix(ns_sim)
+    }
+    colnames(ns_sim) <- ns_colnames
+    for (j in seq_along(ns_colnames)) df[[ns_colnames[j]]] <- ns_sim[, j]
+
+    df$sim_T2 <- gen_sim_times_safe(fit_t2, df, dist_type = "gengamma")
+    return(df$sim_T1 + df$sim_T2)
   }
 
-  ns0 <- tryCatch(predict(ns_obj, p0$logT1_sim_resid), error = function(e) NULL)
-  ns1 <- tryCatch(predict(ns_obj, p1$logT1_sim_resid), error = function(e) NULL)
-  if (is.null(ns0)) ns0 <- matrix(0, nrow(p0), length(ns_cols))
-  if (is.null(ns1)) ns1 <- matrix(0, nrow(p1), length(ns_cols))
-  colnames(ns0) <- ns_cols
-  colnames(ns1) <- ns_cols
-  for (j in seq_along(ns_cols)) {
-    p0[[ns_cols[j]]] <- ns0[, j]
-    p1[[ns_cols[j]]] <- ns1[, j]
-  }
+  # 1. Natural OS (Baseline)
+  os_nat <- sim_os_do(pseudo_base)
 
-  # --- simulate T2 (gengamma) ---
-  p0$sim_T2 <- gen_sim_times_safe(fit_t2, p0, dist_type = "gengamma")
-  p1$sim_T2 <- gen_sim_times_safe(fit_t2, p1, dist_type = "gengamma")
+  # 2. X (Mutated vs WT)
+  df0 <- pseudo_base; df0$X <- factor("WT", levels = levels(pseudo_base$X))
+  df1 <- pseudo_base; df1$X <- factor("Mutated", levels = levels(pseudo_base$X))
+  af_x <- ratio_ci_from_samples(sim_os_do(df0), sim_os_do(df1), n_eff)
 
-  os0 <- p0$sim_T1 + p0$sim_T2
-  os1 <- p1$sim_T1 + p1$sim_T2
+  # 3. Age (+10y shift)
+  dfA0 <- pseudo_base
+  dfA1 <- pseudo_base; dfA1$Age <- dfA1$Age + 10
+  af_age <- ratio_ci_from_samples(sim_os_do(dfA0), sim_os_do(dfA1), n_eff)
 
-  rr <- ratio_ci_from_samples(os0, os1, n_eff = n_eff_for_ci)
+  # 4. Sex (Female vs Male)
+  dfS0 <- pseudo_base; dfS0$Sex <- factor("Male", levels = levels(pseudo_base$Sex))
+  dfS1 <- pseudo_base; dfS1$Sex <- factor("Female", levels = levels(pseudo_base$Sex))
+  af_sex <- ratio_ci_from_samples(sim_os_do(dfS0), sim_os_do(dfS1), n_eff)
 
-  # return in the same shape as extract_af_full() expects for X
-  c(AF_X_est = rr["est"], AF_X_L = rr["L"], AF_X_U = rr["U"],
-    AF_Age_est=NA, AF_Age_L=NA, AF_Age_U=NA,
-    AF_Sex_est=NA, AF_Sex_L=NA, AF_Sex_U=NA,
-    AF_READ_est=NA, AF_READ_L=NA, AF_READ_U=NA,
-    AF_COADREAD_est=NA, AF_COADREAD_L=NA, AF_COADREAD_U=NA)
+  # 5. Histology (READ vs COAD)
+  dfHR0 <- pseudo_base; dfHR0$Histology <- factor("COAD", levels = levels(pseudo_base$Histology))
+  dfHR1 <- pseudo_base; dfHR1$Histology <- factor("READ", levels = levels(pseudo_base$Histology))
+  af_read <- ratio_ci_from_samples(sim_os_do(dfHR0), sim_os_do(dfHR1), n_eff)
+
+  # 6. Histology (COADREAD vs COAD)
+  dfHC1 <- pseudo_base; dfHC1$Histology <- factor("COADREAD", levels = levels(pseudo_base$Histology))
+  af_coadread <- ratio_ci_from_samples(sim_os_do(dfHR0), sim_os_do(dfHC1), n_eff)
+
+  Prop_AF <- c(
+    AF_X_est = af_x["est"], AF_X_L = af_x["L"], AF_X_U = af_x["U"],
+    AF_Age_est = af_age["est"], AF_Age_L = af_age["L"], AF_Age_U = af_age["U"],
+    AF_Sex_est = af_sex["est"], AF_Sex_L = af_sex["L"], AF_Sex_U = af_sex["U"],
+    AF_READ_est = af_read["est"], AF_READ_L = af_read["L"], AF_READ_U = af_read["U"],
+    AF_COADREAD_est = af_coadread["est"], AF_COADREAD_L = af_coadread["L"], AF_COADREAD_U = af_coadread["U"]
+  )
+
+  list(Prop_AF = Prop_AF, pseudo_nat_OS = os_nat)
 }
