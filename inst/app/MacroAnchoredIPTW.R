@@ -258,11 +258,6 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
   for (j in seq_len(ncol(ns_mat))) Data_cgp[[colnames(ns_mat)[j]]] <- ns_mat[, j]
 
-  ns_obj <- ns(Data_cgp$logT1_scale, df=3)
-  ns_mat <- as.matrix(ns_obj)
-  colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
-  for (j in seq_len(ncol(ns_mat))) Data_cgp[[colnames(ns_mat)[j]]] <- ns_mat[,j]
-
   # comparator
   form_naive <- as.formula(paste("Surv(T_obs, Event) ~", paste(valid_covs, collapse=" + ")))
   form_lt    <- as.formula(paste("Surv(T1, T_obs, Event) ~", paste(valid_covs, collapse=" + ")))
@@ -287,8 +282,6 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
 
   pseudo_nat$sim_T1 <- gen_sim_times(fit_t1, pseudo_nat, "weibull")
   pseudo_nat$logT1_sim_scale <- log(pmax(pseudo_nat$sim_T1/365.25, 1e-6))
-
-  pseudo_cgp$logT1_sim_scale <- log(pmax(pseudo_cgp$sim_T1 / 365.25, 1e-6))
 
   # predicted E[logT1|X,Z] from the lm fit
   pred_logT1 <- predict(fit_t1res, newdata = pseudo_cgp)
