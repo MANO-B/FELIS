@@ -287,7 +287,6 @@ ratio_ci_from_samples <- function(xA, xB) {
   U <- exp(log(est) + 1.95996 * se_log)
   c(est=est, L=L, U=U)
 }
-
 # -------------------------------------------------------------------------
 # Helper: build ns terms for a pseudo dataset (given fitted residual model + ns_obj)
 # -------------------------------------------------------------------------
@@ -588,40 +587,50 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   if (!is.finite(n_pseudo) || is.na(n_pseudo)) n_pseudo <- 1000L
   n_pseudo <- max(500L, min(10000L, n_pseudo))
 
+  # --- Step 3: G-computation base cohort size = ESS (min 500) ---
+  n_pseudo <- max(500, as.integer(round(ESS)))
   idx_pseudo <- sample(seq_len(nrow(Data_cgp)), size = n_pseudo, replace = TRUE, prob = Data_cgp$iptw)
   pseudo_base <- Data_cgp[idx_pseudo, , drop = FALSE]
 
-  # counterfactual TOTAL effects + natural pseudo OS for curve/metrics
-  cf <- tryCatch(
-    compute_prop_afs_counterfactual(
-      pseudo_base = pseudo_base,
-      fit_t1 = fit_t1,
-      fit_t2 = fit_t2,
-      fit_t1res = fit_t1res,
-      ns_obj = ns_obj,
-      ns_colnames = colnames(ns_mat)
-    ),
-    error = function(e) NULL
+  pseudo_base$X <- factor(pseudo_base$X, levels = levels(Data_cgp$X))
+  pseudo_base$Sex <- factor(pseudo_base$Sex, levels = levels(Data_cgp$Sex))
+  pseudo_base$Histology <- factor(pseudo_base$Histology, levels = levels(Data_cgp$Histology))
+
+  # --- Proposed TOTAL effect AF from counterfactual OS distributions ---
+  ns_cols <- colnames(ns_mat)
+  Prop_AF <- make_prop_af_from_counterfactual(
+    pseudo_base = pseudo_base,
+    fit_t1 = fit_t1,
+    fit_t2 = fit_t2,
+    ns_obj = ns_obj,
+    fit_t1res = fit_t1res,
+    valid_covs = valid_covs,
+    ns_cols = ns_cols,
+    n_eff_for_ci = ESS
   )
-  if (is.null(cf)) return(NULL)
 
-  Prop_AF <- cf$Prop_AF
-  pseudo_nat_OS <- cf$pseudo_nat_OS
+  # For plotting / metrics, keep "observed-mix" pseudo OS as before (optional)
+  # (If you want Prop_Metrics/curve from the observed mix, keep your existing pseudo simulation.)
+  # Here, simplest: reuse do(X observed) distribution:
+  pseudo_mix <- pseudo_base
+  pseudo_mix$sim_T1 <- gen_sim_times_safe(fit_t1, pseudo_mix, dist_type = "weibull")
+  pseudo_mix$logT1_sim_scale <- log(pmax(pseudo_mix$sim_T1 / 365.25, 1e-6))
+  pseudo_mix$logT1_sim_resid <- pseudo_mix$logT1_sim_scale
+  if (!is.null(fit_t1res)) {
+    predm <- tryCatch(predict(fit_t1res, newdata = pseudo_mix), error = function(e) NULL)
+    if (!is.null(predm) && length(predm) == nrow(pseudo_mix) && all(is.finite(predm))) {
+      pseudo_mix$logT1_sim_resid <- pseudo_mix$logT1_sim_scale - predm
+    }
+  }
+  ns_sim <- tryCatch(predict(ns_obj, pseudo_mix$logT1_sim_resid), error = function(e) NULL)
+  if (is.null(ns_sim)) ns_sim <- matrix(0, nrow(pseudo_mix), ncol(ns_mat))
+  colnames(ns_sim) <- colnames(ns_mat)
+  for (j in seq_len(ncol(ns_sim))) pseudo_mix[[colnames(ns_sim)[j]]] <- ns_sim[, j]
+  pseudo_mix$sim_T2 <- gen_sim_times_safe(fit_t2, pseudo_mix, dist_type = "gengamma")
+  pseudo_mix$sim_OS <- pseudo_mix$sim_T1 + pseudo_mix$sim_T2
 
-  # --- curves / metrics ---
-  True_Metrics <- calc_marginal_metrics(T_true)
-  curve_true   <- calc_curve_km(T_true)
-
-  sim_naive <- if (!is.null(fit_naive)) gen_sim_times_safe(fit_naive, Data_cgp, dist_type = "llogis") else rep(NA_real_, nrow(Data_cgp))
-  sim_lt    <- if (!is.null(fit_lt))    gen_sim_times_safe(fit_lt,    Data_cgp, dist_type = "llogis") else rep(NA_real_, nrow(Data_cgp))
-
-  Naive_Metrics <- calc_marginal_metrics(sim_naive)
-  LT_Metrics    <- calc_marginal_metrics(sim_lt)
-  Prop_Metrics  <- calc_marginal_metrics(pseudo_nat_OS)
-
-  curve_naive <- calc_curve_km(sim_naive)
-  curve_lt    <- calc_curve_km(sim_lt)
-  curve_prop  <- calc_curve_km(pseudo_nat_OS)
+  Prop_Metrics <- calc_marginal_metrics(pseudo_mix$sim_OS)
+  curve_prop   <- calc_curve_km(pseudo_mix$sim_OS)
 
   out <- list(
     ESS = ESS,
@@ -927,3 +936,95 @@ observeEvent(input$run_sim_multi, {
       theme(plot.title = element_text(face = "bold"))
   })
 })
+
+# --- median SE (quick, distribution-free-ish) ---
+median_se_uncens <- function(x) {
+  x <- x[is.finite(x) & !is.na(x)]
+  n <- length(x)
+  if (n < 30) return(NA_real_)
+  # robust scale -> approximate SE of median
+  s <- mad(x, constant = 1.4826)
+  if (!is.finite(s) || s <= 0) s <- sd(x)
+  if (!is.finite(s) || s <= 0) return(NA_real_)
+  1.253314 * s / sqrt(n)  # ~sqrt(pi/2)*sd/sqrt(n)
+}
+
+ratio_ci_from_samples <- function(x0, x1, n_eff = NULL) {
+  x0 <- x0[is.finite(x0) & !is.na(x0) & x0 > 0]
+  x1 <- x1[is.finite(x1) & !is.na(x1) & x1 > 0]
+  if (length(x0) < 30 || length(x1) < 30) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
+
+  m0 <- median(x0); m1 <- median(x1)
+  if (!is.finite(m0) || !is.finite(m1) || m0 <= 0 || m1 <= 0) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
+  est <- m1 / m0
+
+  # SE of medians; optionally inflate by n_eff
+  se0 <- median_se_uncens(x0)
+  se1 <- median_se_uncens(x1)
+  if (!is.finite(se0) || !is.finite(se1) || se0 <= 0 || se1 <= 0) return(c(est=est, L=NA_real_, U=NA_real_))
+
+  # if you want to reflect ESS rather than raw pseudo size:
+  if (!is.null(n_eff) && is.finite(n_eff) && n_eff > 0) {
+    n0 <- length(x0); n1 <- length(x1)
+    se0 <- se0 * sqrt(n0 / n_eff)
+    se1 <- se1 * sqrt(n1 / n_eff)
+  }
+
+  se_log <- sqrt( (se1/m1)^2 + (se0/m0)^2 )
+  L <- exp(log(est) - 1.95996 * se_log)
+  U <- exp(log(est) + 1.95996 * se_log)
+  c(est=est, L=L, U=U)
+}
+
+make_prop_af_from_counterfactual <- function(pseudo_base, fit_t1, fit_t2, ns_obj, fit_t1res,
+                                             valid_covs, ns_cols, n_eff_for_ci = NULL) {
+  # do(X=0) and do(X=1) cohorts
+  p0 <- pseudo_base
+  p1 <- pseudo_base
+  p0$X <- factor("WT", levels = levels(pseudo_base$X))
+  p1$X <- factor("Mutated", levels = levels(pseudo_base$X))
+
+  # --- simulate T1 ---
+  p0$sim_T1 <- gen_sim_times_safe(fit_t1, p0, dist_type = "weibull")
+  p1$sim_T1 <- gen_sim_times_safe(fit_t1, p1, dist_type = "weibull")
+
+  # --- residualized logT1 for dependence spline ---
+  p0$logT1_sim_scale <- log(pmax(p0$sim_T1 / 365.25, 1e-6))
+  p1$logT1_sim_scale <- log(pmax(p1$sim_T1 / 365.25, 1e-6))
+  p0$logT1_sim_resid <- p0$logT1_sim_scale
+  p1$logT1_sim_resid <- p1$logT1_sim_scale
+
+  if (!is.null(fit_t1res)) {
+    pred0 <- tryCatch(predict(fit_t1res, newdata = p0), error = function(e) NULL)
+    pred1 <- tryCatch(predict(fit_t1res, newdata = p1), error = function(e) NULL)
+    if (!is.null(pred0) && length(pred0) == nrow(p0) && all(is.finite(pred0))) p0$logT1_sim_resid <- p0$logT1_sim_scale - pred0
+    if (!is.null(pred1) && length(pred1) == nrow(p1) && all(is.finite(pred1))) p1$logT1_sim_resid <- p1$logT1_sim_scale - pred1
+  }
+
+  ns0 <- tryCatch(predict(ns_obj, p0$logT1_sim_resid), error = function(e) NULL)
+  ns1 <- tryCatch(predict(ns_obj, p1$logT1_sim_resid), error = function(e) NULL)
+  if (is.null(ns0)) ns0 <- matrix(0, nrow(p0), length(ns_cols))
+  if (is.null(ns1)) ns1 <- matrix(0, nrow(p1), length(ns_cols))
+  colnames(ns0) <- ns_cols
+  colnames(ns1) <- ns_cols
+  for (j in seq_along(ns_cols)) {
+    p0[[ns_cols[j]]] <- ns0[, j]
+    p1[[ns_cols[j]]] <- ns1[, j]
+  }
+
+  # --- simulate T2 (gengamma) ---
+  p0$sim_T2 <- gen_sim_times_safe(fit_t2, p0, dist_type = "gengamma")
+  p1$sim_T2 <- gen_sim_times_safe(fit_t2, p1, dist_type = "gengamma")
+
+  os0 <- p0$sim_T1 + p0$sim_T2
+  os1 <- p1$sim_T1 + p1$sim_T2
+
+  rr <- ratio_ci_from_samples(os0, os1, n_eff = n_eff_for_ci)
+
+  # return in the same shape as extract_af_full() expects for X
+  c(AF_X_est = rr["est"], AF_X_L = rr["L"], AF_X_U = rr["U"],
+    AF_Age_est=NA, AF_Age_L=NA, AF_Age_U=NA,
+    AF_Sex_est=NA, AF_Sex_L=NA, AF_Sex_U=NA,
+    AF_READ_est=NA, AF_READ_L=NA, AF_READ_U=NA,
+    AF_COADREAD_est=NA, AF_COADREAD_L=NA, AF_COADREAD_U=NA)
+}
