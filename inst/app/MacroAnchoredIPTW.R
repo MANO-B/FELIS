@@ -245,6 +245,19 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
 
   # spline(logT1)
   Data_cgp$logT1_scale <- log(pmax(Data_cgp$T1/365.25, 1e-6))
+
+  # --- residualized logT1 (remove X,Z part) ---
+  form_t1res <- as.formula(paste("logT1_scale ~", paste(valid_covs, collapse = " + ")))
+  fit_t1res <- lm(form_t1res, data = Data_cgp, weights = Data_cgp$iptw)
+
+  Data_cgp$logT1_resid <- resid(fit_t1res)  # r = logT1 - E[logT1|X,Z]
+
+  # spline on residual, NOT on raw logT1
+  ns_obj <- ns(Data_cgp$logT1_resid, df = 3)
+  ns_mat <- as.matrix(ns_obj)
+  colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
+  for (j in seq_len(ncol(ns_mat))) Data_cgp[[colnames(ns_mat)[j]]] <- ns_mat[, j]
+
   ns_obj <- ns(Data_cgp$logT1_scale, df=3)
   ns_mat <- as.matrix(ns_obj)
   colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
@@ -274,6 +287,18 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
 
   pseudo_nat$sim_T1 <- gen_sim_times(fit_t1, pseudo_nat, "weibull")
   pseudo_nat$logT1_sim_scale <- log(pmax(pseudo_nat$sim_T1/365.25, 1e-6))
+
+  pseudo_cgp$logT1_sim_scale <- log(pmax(pseudo_cgp$sim_T1 / 365.25, 1e-6))
+
+  # predicted E[logT1|X,Z] from the lm fit
+  pred_logT1 <- predict(fit_t1res, newdata = pseudo_cgp)
+
+  pseudo_cgp$logT1_sim_resid <- pseudo_cgp$logT1_sim_scale - pred_logT1
+
+  ns_sim <- predict(ns_obj, pseudo_cgp$logT1_sim_resid)
+  colnames(ns_sim) <- paste0("ns", seq_len(ncol(ns_sim)))
+  for (j in seq_len(ncol(ns_sim))) pseudo_cgp[[colnames(ns_sim)[j]]] <- ns_sim[, j]
+
   ns_sim_nat <- tryCatch(predict(ns_obj, pseudo_nat$logT1_sim_scale), error=function(e) NULL)
   if (is.null(ns_sim_nat)) ns_sim_nat <- matrix(0, nrow(pseudo_nat), attr(ns_obj,"df"))
   colnames(ns_sim_nat) <- paste0("ns", seq_len(ncol(ns_sim_nat)))
