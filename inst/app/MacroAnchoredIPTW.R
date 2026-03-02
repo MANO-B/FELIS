@@ -383,13 +383,27 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
 
   sim_naive <- if(!is.null(fit_naive)) gen_sim_times(fit_naive, Data_cgp, "llogis") else rep(NA_real_, nrow(Data_cgp))
   sim_lt    <- if(!is.null(fit_lt))    gen_sim_times(fit_lt,    Data_cgp, "llogis") else rep(NA_real_, nrow(Data_cgp))
+  OS0 <- pseudo0$sim_OS
+  OS1 <- pseudo1$sim_OS
+
+  AF_est <- median(OS1) / median(OS0)
+
+  Prop_AF <- c(
+    AF_X_est = AF_est,
+    AF_X_L = NA,
+    AF_X_U = NA,
+    AF_Age_est = NA, AF_Age_L = NA, AF_Age_U = NA,
+    AF_Sex_est = NA, AF_Sex_L = NA, AF_Sex_U = NA,
+    AF_READ_est = NA, AF_READ_L = NA, AF_READ_U = NA,
+    AF_COADREAD_est = NA, AF_COADREAD_L = NA, AF_COADREAD_U = NA
+  )
 
   out <- list(
     ESS = ESS,
     True_Metrics = calc_metrics(T_true),
     Naive_AF = extract_af_full(fit_naive), Naive_Metrics = calc_metrics(sim_naive),
     LT_AF    = extract_af_full(fit_lt),    LT_Metrics    = calc_metrics(sim_lt),
-    Prop_AF  = extract_af_prop(fit_prop_final, fit_prop_obs),
+    Prop_AF  = Prop_AF,
     Prop_Metrics = calc_metrics(pseudo_nat$sim_OS),
     curve_true  = calc_curve(T_true),
     curve_naive = calc_curve(sim_naive),
