@@ -405,7 +405,7 @@ custering_analysis_logic <- function() {
         testSummary$Pvalue = rep(rep(1, length(Diseases)), max(Data_case_target$cluster,na.rm = T))
 
         selected_genes = rep("", max(Data_survival$cluster,na.rm = T))
-        cluster_set = sort(unique(Data_survival$cluster))
+        cluster_set = 1:max(Data_MAF_target$cluster,na.rm = T)
         for(i in 1:length(cluster_set)){
           pos_num = data.frame(Diseases)
           pos_num$n = 0
@@ -481,7 +481,7 @@ custering_analysis_logic <- function() {
         testSummary$OddsRatio = rep(rep(1, length(Mutations)), max(Data_MAF_target$cluster,na.rm = T))
         testSummary$Pvalue = rep(rep(1, length(Mutations)), max(Data_MAF_target$cluster,na.rm = T))
 
-        cluster_set = sort(unique(Data_MAF_target$cluster))
+        cluster_set = 1:max(Data_MAF_target$cluster,na.rm = T)
         for(i in 1:length(cluster_set)){
           pos_num = data.frame(Mutations)
           pos_num$n = 0

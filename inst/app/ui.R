@@ -144,8 +144,10 @@ ui <- dashboardPage(
       ),
       hr(),
       h3("Instruction"),
-      menuItem("About FELIS", tabName = "Instruction", icon = icon("th")),
-      menuItem("Tips", tabName = "Tips", icon = icon("th")),
+      menuItem("About FELIS (in Japanese)", tabName = "Instruction", icon = icon("th")),
+      menuItem("About FELIS (in English)", tabName = "Instruction_Eng", icon = icon("th")),
+      menuItem("Tips (in Japanese)", tabName = "Tips", icon = icon("th")),
+      menuItem("Tips (in English)", tabName = "Tips_Eng", icon = icon("th")),
       hr()
     )
   ),
@@ -2093,8 +2095,14 @@ ui <- dashboardPage(
       tabItem("Instruction",
               includeMarkdown("www/README.md")
       ),
+      tabItem("Instruction_Eng",
+              includeMarkdown("www/README_ENG.md")
+      ),
       tabItem("Tips",
               includeMarkdown("www/Tips.md")
+      ),
+      tabItem("Tips_Eng",
+              includeMarkdown("www/Tips_ENG.md")
       )
     ),
     hr(),
