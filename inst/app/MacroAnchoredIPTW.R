@@ -221,16 +221,32 @@ median_se_uncens <- function(x) {
 }
 
 ratio_ci_from_samples <- function(x0, x1, n_eff = NULL) {
-  x0 <- x0[is.finite(x0) & !is.na(x0) & x0 > 0]
-  x1 <- x1[is.finite(x1) & !is.na(x1) & x1 > 0]
+  # keep raw copies for fallback
+  x0_raw <- x0
+  x1_raw <- x1
 
-  if (length(x0) < 30 || length(x1) < 30) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
+  x0 <- x0[is.finite(x0) & !is.na(x0) & x0 > 1e-12]
+  x1 <- x1[is.finite(x1) & !is.na(x1) & x1 > 1e-12]
 
-  m0 <- median(x0); m1 <- median(x1)
+  # --- ALWAYS compute point estimate if possible ---
+  # if filtered too much, fall back to raw with pmax
+  if (length(x0) < 5 || length(x1) < 5) {
+    x0 <- pmax(x0_raw[is.finite(x0_raw) & !is.na(x0_raw)], 1e-12)
+    x1 <- pmax(x1_raw[is.finite(x1_raw) & !is.na(x1_raw)], 1e-12)
+  }
+
+  if (length(x0) < 5 || length(x1) < 5) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
+
+  m0 <- median(x0, na.rm = TRUE)
+  m1 <- median(x1, na.rm = TRUE)
   if (!is.finite(m0) || !is.finite(m1) || m0 <= 0 || m1 <= 0) return(c(est=NA_real_, L=NA_real_, U=NA_real_))
   est <- m1 / m0
 
-  se0 <- median_se_uncens(x0); se1 <- median_se_uncens(x1)
+  # If sample too small for CI -> return est only
+  if (length(x0) < 30 || length(x1) < 30) return(c(est=est, L=NA_real_, U=NA_real_))
+
+  se0 <- median_se_uncens(x0)
+  se1 <- median_se_uncens(x1)
   if (!is.finite(se0) || !is.finite(se1) || se0 <= 0 || se1 <= 0) return(c(est=est, L=NA_real_, U=NA_real_))
 
   if (!is.null(n_eff) && is.finite(n_eff) && n_eff > 0) {
@@ -238,12 +254,12 @@ ratio_ci_from_samples <- function(x0, x1, n_eff = NULL) {
     se1 <- se1 * sqrt(length(x1) / n_eff)
   }
 
-  se_log <- sqrt( (se1/m1)^2 + (se0/m0)^2 )
-  L <- exp(log(est) - 1.95996 * se_log)
-  U <- exp(log(est) + 1.95996 * se_log)
+  se_log <- sqrt((se1 / m1)^2 + (se0 / m0)^2)
+  z <- 1.95996
+  L <- exp(log(est) - z * se_log)
+  U <- exp(log(est) + z * se_log)
   c(est=est, L=L, U=U)
 }
-
 # -------------------------------------------------------------------------
 # Proposed TOTAL EFFECT AFs by counterfactual OS distributions
 # -------------------------------------------------------------------------
@@ -266,7 +282,16 @@ compute_prop_afs_counterfactual <- function(pseudo_base, fit_t1, fit_t2, fit_t1r
     max_res <- max(Data_cgp_logT1_resid, na.rm = TRUE)
     df$logT1_sim_resid <- pmax(min_res, pmin(max_res, df$logT1_sim_resid))
 
-    ns_sim <- tryCatch(predict(ns_obj, df$logT1_sim_resid), error = function(e) NULL)
+    ns_sim <- NULL
+    if (!is.null(ns_obj)) {
+      ns_sim <- tryCatch(predict(ns_obj, df$logT1_sim_resid), error = function(e) NULL)
+    }
+    if (is.null(ns_sim)) {
+      ns_sim <- matrix(0, nrow(df), length(ns_colnames))
+    } else {
+      ns_sim <- as.matrix(ns_sim)
+    }
+    colnames(ns_sim) <- ns_colnames
     if (is.null(ns_sim)) {
       ns_sim <- matrix(0, nrow(df), length(ns_colnames))
     } else {
