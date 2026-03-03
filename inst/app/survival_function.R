@@ -1168,27 +1168,23 @@ survival_compare_and_plot_CTx <- function(data,
                                           group_labels = NULL,
                                           weights_var = NULL) {
 
-  # 変数の明示的なマッピング
   data$time_pre <- data[[time_var1]]
   data$time_all <- data[[time_var2]]
 
-  # 【重要】coxphのロバスト標準誤差計算用に必須となるIDを付与
+  # coxphのロバスト標準誤差計算用に必須となるIDを付与
   data$pseudo_id <- seq_len(nrow(data))
 
   use_weights <- !is.null(weights_var) && (weights_var %in% colnames(data))
 
-  # formulaと重みの設定（環境評価エラーを防ぐためデータフレーム内に格納）
   if (use_weights) {
-    surv_formula <- as.formula(paste0("Surv(", time_var1, ", ", time_var2, ", ", status_var, ") ~ ", group_var))
-    Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", IPTW adjusted (months)")
+    # 【修正1】新手法(Proposed)に合わせ、左側切断を解除し time_all のみに変更
+    surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
+    Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", Age-calibrated (months)")
     data$w_vec <- data[[weights_var]]
   } else {
     if (adjustment) {
       surv_formula <- as.formula(paste0("Surv(", time_var1, ", ", time_var2, ", ", status_var, ") ~ ", group_var))
       Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", risk-set adjusted (months)")
-    } else if (plot_title == "Unbiased OS Simulation (IPTW + Left-Truncated Llogis + Rank Match)") {
-      surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
-      Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", simulation (months)")
     } else {
       surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
       Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", bias not adj (months)")
@@ -1196,10 +1192,11 @@ survival_compare_and_plot_CTx <- function(data,
     data$w_vec <- rep(1, nrow(data))
   }
 
-  # 生存曲線のフィッティング
-  surv_fit <- survival::survfit(surv_formula, data = data, weights = w_vec, conf.type = "log-log")
+  # 【修正2】ggsurvplotが環境を見失わないよう、callオブジェクトで明示的に関数を評価する
+  fit_call <- call("survfit", formula = surv_formula, data = quote(data), weights = quote(w_vec), conf.type = "log-log")
+  surv_fit <- eval(fit_call)
+  surv_fit$call$formula <- surv_formula # ggsurvplotのための保険
 
-  # プロットとcoxphの処理
   if (group_var == "1") {
     surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
   } else {
@@ -1208,11 +1205,13 @@ survival_compare_and_plot_CTx <- function(data,
     if (n_group <= 1) {
       surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
     } else {
-      # 【修正】エラーを完全に回避する直接的な呼び出し
+      # coxphもcallで安全に評価 (前回の cluster/id エラーもこれで完全に防げます)
       if (use_weights) {
-        diff_0 <- survival::coxph(surv_formula, data = data, weights = w_vec, robust = TRUE, id = pseudo_id)
+        cox_call <- call("coxph", formula = surv_formula, data = quote(data), weights = quote(w_vec), robust = TRUE, id = quote(pseudo_id))
+        diff_0 <- eval(cox_call)
       } else {
-        diff_0 <- survival::coxph(surv_formula, data = data, id = pseudo_id)
+        cox_call <- call("coxph", formula = surv_formula, data = quote(data), id = quote(pseudo_id))
+        diff_0 <- eval(cox_call)
       }
       surv_curv_CTx(surv_fit, data, plot_title, group_labels, diff_0, Xlab)
     }
