@@ -25,14 +25,14 @@ extract_age_num <- function(x) {
 
 make_age_class_6grp <- function(age_num) {
   dplyr::case_when(
-    is.na(age_num) ~ "Unknown",
+    is.na(age_num) ~ "全年齢",
     age_num < 40 ~ "40未満",
     age_num < 50 ~ "40代",
     age_num < 60 ~ "50代",
     age_num < 70 ~ "60代",
     age_num < 80 ~ "70代",
     age_num >= 80 ~ "80以上",
-    TRUE ~ "Unknown"
+    TRUE ~ "全年齢"
   )
 }
 

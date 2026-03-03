@@ -1171,6 +1171,9 @@ survival_compare_and_plot_CTx <- function(data,
   data$time_pre = data[[time_var1]]
   data$time_all = data[[time_var2]]
 
+  # 【追加】coxphのロバスト分散計算用に、各行に一意のIDを付与する
+  data$pseudo_id <- seq_len(nrow(data))
+
   # Check if valid weights are provided
   use_weights <- !is.null(weights_var) && (weights_var %in% colnames(data))
 
@@ -1214,7 +1217,8 @@ survival_compare_and_plot_CTx <- function(data,
     } else {
       # Use robust=TRUE when weights are applied
       if (use_weights) {
-        diff_0 <- coxph(surv_formula, data = data, weights = weight_vector, robust = TRUE)
+        # 【修正】id = pseudo_id を追加指定してエラーを回避
+        diff_0 <- coxph(surv_formula, data = data, weights = weight_vector, robust = TRUE, id = pseudo_id)
       } else {
         diff_0 <- coxph(surv_formula, data = data)
       }
