@@ -914,141 +914,7 @@ survival_compare_and_plot_match <- function(data,
                            group_labels, diff_0, diff_1, diff_2))
   }
 }
-# survival_compare_and_plot_match <- function(data,
-#                                             time_var = "time_enroll_final",
-#                                             status_var = "censor",
-#                                             group_var = "treatment",
-#                                             plot_title = "Survival curve",
-#                                             input_rmst_cgp = 2,
-#                                             group_labels = NULL,
-#                                             pair_var = NULL,     # ペアID列名（例 "pair_id" or "subclass"）
-#                                             n_boot = 1000,
-#                                             seed = 1) {
-#
-#   surv_formula <- as.formula(paste0("Surv(", time_var, ", ", status_var, ") ~ ", group_var))
-#   surv_fit <- eval(substitute(
-#     survfit(formula = FORMULA, data = data, conf.type = "log-log"),
-#     list(FORMULA = surv_formula)
-#   ))
-#
-#   if (group_var == "1") {
-#     return(surv_curv_entry(surv_fit, data, plot_title, NULL, NULL, NULL))
-#   }
-#
-#   group_vals <- unique(na.omit(data[[group_var]]))
-#   n_group <- length(group_vals)
-#
-#   if (n_group == 1) {
-#     return(surv_curv_entry(surv_fit, data, plot_title, NULL, NULL, NULL))
-#   }
-#
-#   # surv_obj は共通で使う
-#   surv_obj <- with(data, Surv(get(time_var), get(status_var)))
-#
-#   if (n_group == 2) {
-#
-#     data <- data %>%
-#       mutate(treatment_numeric = ifelse(.data[[group_var]] == group_vals[1], 0,
-#                                         ifelse(.data[[group_var]] == group_vals[2], 1, NA)))
-#
-#     tau0 <- max(data[data[[group_var]] == group_vals[1], ] %>% pull(!!sym(time_var)), na.rm = TRUE) / 365.25
-#     tau1 <- max(data[data[[group_var]] == group_vals[2], ] %>% pull(!!sym(time_var)), na.rm = TRUE) / 365.25
-#     tau  <- floor(min(tau0, tau1, input_rmst_cgp) * 10) / 10
-#
-#     # RMST point estimate
-#     rmst_result <- rmst2(
-#       time   = data[[time_var]],
-#       status = data[[status_var]],
-#       arm    = data$treatment_numeric,
-#       tau    = tau * 365.25
-#     )
-#     rmst_diff_point <- rmst_result$unadjusted.result[1]
-#
-#     # CI: pair bootstrap if pair_var is available
-#     if (!is.null(pair_var) && pair_var %in% names(data)) {
-#
-#       set.seed(seed)
-#       pairs <- unique(data[[pair_var]])
-#
-#       boot_rmst_diff <- function(d){
-#         if (length(unique(d$treatment_numeric)) < 2) return(NA_real_)
-#         out <- rmst2(
-#           time   = d[[time_var]],
-#           status = d[[status_var]],
-#           arm    = d$treatment_numeric,
-#           tau    = tau * 365.25
-#         )
-#         out$unadjusted.result[1]
-#       }
-#
-#       boot_vals <- replicate(n_boot, {
-#         sampled_pairs <- sample(pairs, size = length(pairs), replace = TRUE)
-#         d_boot <- data[data[[pair_var]] %in% sampled_pairs, , drop = FALSE]
-#         boot_rmst_diff(d_boot)
-#       })
-#
-#       boot_vals <- boot_vals[is.finite(boot_vals)]
-#       rmst_ll <- unname(quantile(boot_vals, 0.025, na.rm=TRUE))
-#       rmst_ul <- unname(quantile(boot_vals, 0.975, na.rm=TRUE))
-#
-#     } else {
-#       rmst_ll <- rmst_result$unadjusted.result[4]
-#       rmst_ul <- rmst_result$unadjusted.result[7]
-#     }
-#
-#     rmst_diff <- format_p(rmst_diff_point, digits = 1)
-#     rmst_ll_f <- format_p(rmst_ll, digits = 1)
-#     rmst_ul_f <- format_p(rmst_ul, digits = 1)
-#
-#     # log-rank / Wilcoxon
-#     diff_0 <- survdiff(surv_obj ~ data[[group_var]], rho = 0)
-#     diff_1 <- survdiff(surv_obj ~ data[[group_var]], rho = 1)
-#
-#     # ★ Cox: strata(pair_var) を条件付きで入れる
-#     if (!is.null(pair_var) && pair_var %in% names(data)) {
-#       cox_formula <- as.formula(
-#         paste0("Surv(", time_var, ", ", status_var, ") ~ ",
-#                group_var, " + strata(", pair_var, ")")
-#       )
-#       diff_2 <- coxph(cox_formula, data = data)
-#     } else {
-#       cox_formula <- as.formula(
-#         paste0("Surv(", time_var, ", ", status_var, ") ~ ", group_var)
-#       )
-#       diff_2 <- coxph(cox_formula, data = data)
-#     }
-#
-#     plot_title_full <- paste0(
-#       plot_title, ", ", tau, "-year RMST diff.: ",
-#       rmst_diff, " (", rmst_ll_f, "-", rmst_ul_f, ") days"
-#     )
-#
-#     return(surv_curv_entry(surv_fit, data, plot_title_full,
-#                            group_labels, diff_0, diff_1, diff_2))
-#
-#   } else {  # n_group > 2
-#
-#     diff_0 <- survdiff(surv_obj ~ data[[group_var]], rho = 0)
-#     diff_1 <- survdiff(surv_obj ~ data[[group_var]], rho = 1)
-#
-#     # ★ Cox: strata(pair_var) 条件付き
-#     if (!is.null(pair_var) && pair_var %in% names(data)) {
-#       cox_formula <- as.formula(
-#         paste0("Surv(", time_var, ", ", status_var, ") ~ ",
-#                group_var, " + strata(", pair_var, ")")
-#       )
-#       diff_2 <- coxph(cox_formula, data = data)
-#     } else {
-#       cox_formula <- as.formula(
-#         paste0("Surv(", time_var, ", ", status_var, ") ~ ", group_var)
-#       )
-#       diff_2 <- coxph(cox_formula, data = data)
-#     }
-#
-#     return(surv_curv_entry(surv_fit, data, plot_title,
-#                            group_labels, diff_0, diff_1, diff_2))
-#   }
-# }
+
 
 # --- KM step関数を tau_days まで「厳密に」積分して RMST(days) を返す ---
 rmst_from_survfit_step_exact <- function(sf, tau_days) {
@@ -1157,7 +1023,7 @@ rmst_diff_iptw_boot_ci <- function(data, time_var, status_var, group_var,
   list(point = point, ll = ll, ul = ul, boots = boots)
 }
 
-survival_compare_and_plot_CTxAAA <- function(data,
+survival_compare_and_plot_CTx <- function(data,
                                           time_var1 = "time_pre",
                                           time_var2 = "time_all",
                                           status_var = "censor",
