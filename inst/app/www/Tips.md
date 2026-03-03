@@ -1,12 +1,15 @@
 # 💡 FELIS 解析Tips集
-必要性の高いであろう解析について方法をまとめてみました。各項目をクリックして詳細な手順をご確認ください。
+> **【ご利用ガイド】**
+> 下記の各項目（**▶ 太字の部分**）をクリックすると、詳細な解析手順が展開されます。
+> もう一度クリックすると閉じます。
 
 ---
 
 ## 💊 薬剤奏効性解析
 
 <details>
-<summary><b>ある治療と、一つ前のラインの治療との効果比較をしたい</b></summary>
+<summary><b>▶ ある治療と、一つ前のラインの治療との効果比較をしたい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢などの絞り込みを行う
 2. **Results** -> **Drug response** -> **Settings** から薬剤の選択を行う
@@ -20,7 +23,8 @@
 </details>
 
 <details>
-<summary><b>二つの治療の治療効果比較をしたい</b></summary>
+<summary><b>▶ 二つの治療の治療効果比較をしたい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢などの絞り込みを行う
 2. **Results** -> **Drug response** -> **Settings** から薬剤の選択を行う
@@ -36,7 +40,8 @@
 </details>
 
 <details>
-<summary><b>組織型ごとの治療効果をみたい</b></summary>
+<summary><b>▶ 組織型ごとの治療効果をみたい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢などの絞り込みを行う
 2. **Results** -> **Drug response** -> **Settings** から薬剤の選択を行う
@@ -51,7 +56,8 @@
 </details>
 
 <details>
-<summary><b>ある薬剤の効果における遺伝子変異の有無の意義をみたい</b></summary>
+<summary><b>▶ ある薬剤の効果における遺伝子変異の有無の意義をみたい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢などの絞り込みを行う
 2. **Results** -> **Drug response** -> **Settings** から薬剤の選択を行う
@@ -67,7 +73,8 @@
 </details>
 
 <details>
-<summary><b>薬剤の効果と遺伝子変異の関係を volcano plot で網羅的に確認したい</b></summary>
+<summary><b>▶ 薬剤の効果と遺伝子変異の関係を volcano plot で網羅的に確認したい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢などの絞り込みを行う
 2. **Results** -> **Drug response** -> **Settings** から薬剤の選択を行う
@@ -85,7 +92,8 @@
 ## 📈 生存期間解析
 
 <details>
-<summary><b>CGP検査後の予後と遺伝子変異の関係をみたい</b></summary>
+<summary><b>▶ CGP検査後の予後と遺伝子変異の関係をみたい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢などの絞り込みを行う
 2. **Results** -> **Survival after CGP** -> **Survival analysis** -> **Survival after CGP and performance status** から指定遺伝子セットないのいずれかに変異があるか否かで群分けした生存曲線を確認する。
@@ -99,7 +107,8 @@
 </details>
 
 <details>
-<summary><b>緩和的化学療法導入後の予後と遺伝子変異の関係をみたい</b></summary>
+<summary><b>▶ 緩和的化学療法導入後の予後と遺伝子変異の関係をみたい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢、治療コースなどの絞り込みを行う。とくに **Genes of interest** で注目する遺伝子セットを指定する。
 2. **Results** -> **Overall survival with risk-set adjustment** -> **Survival and clinical information** -> **Entire cohort** で、cKendall tauが0付近で、妥当な生存期間が予測されているか確認する
@@ -114,7 +123,8 @@
 </details>
 
 <details>
-<summary><b>ある薬剤を生存中に使用したか否かでの生存期間の差をみたい</b></summary>
+<summary><b>▶ ある薬剤を生存中に使用したか否かでの生存期間の差をみたい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢などの絞り込みを行う
 2. **Results** -> **Drug response** -> **Settings** から薬剤の選択を行う
@@ -127,7 +137,8 @@
 </details>
 
 <details>
-<summary><b>ある薬剤をCGP検査後に使用したか否かでの生存期間の差をみたい</b></summary>
+<summary><b>▶ ある薬剤をCGP検査後に使用したか否かでの生存期間の差をみたい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢などの絞り込みを行う
 2. **Results** -> **Survival after CGP** -> **Survival analysis** -> **Custom survival analysis** で、薬剤の使用歴などで分けた2群間での生存曲線の比較を行う
@@ -138,7 +149,8 @@
 </details>
 
 <details>
-<summary><b>CGP検査後の死亡ハザードに関係する因子を抽出したい</b></summary>
+<summary><b>▶ CGP検査後の死亡ハザードに関係する因子を抽出したい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢などの絞り込みを行う。
 2. **Results** -> **Survival after CGP** -> **Survival analysis** -> **Hazard ratio** から、単変量解析・多変量解析でのハザード比に関係する臨床情報や遺伝子変異を検討する。
@@ -153,7 +165,8 @@
 ## 👥 患者背景
 
 <details>
-<summary><b>患者背景のTableが欲しい</b></summary>
+<summary><b>▶ 患者背景のTableが欲しい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢の絞り込みを行う
 2. **Results** -> **Case summary** から結果を確認する
@@ -165,7 +178,8 @@
 </details>
 
 <details>
-<summary><b>患者背景のFigureが欲しい</b></summary>
+<summary><b>▶ 患者背景のFigureが欲しい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢の絞り込みを行う
 2. **Results** -> **Clustering analysis** -> **Basic data** から結果を確認する
@@ -181,9 +195,8 @@
 </details>
 
 <details>
-<summary><b>オンコプリント（遺伝子変異の一覧表）が欲しい</b></summary>
-
-
+<summary><b>▶ オンコプリント（遺伝子変異の一覧表）が欲しい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢の絞り込みを行う
 2. **Results** -> **Oncoprint** -> **Figures** -> **Oncoprint** から結果を確認する
@@ -196,7 +209,8 @@
 </details>
 
 <details>
-<summary><b>ロリプロット（遺伝子のどのアミノ酸残基に変異が多いかの図）が欲しい</b></summary>
+<summary><b>▶ ロリプロット（遺伝子のどのアミノ酸残基に変異が多いかの図）が欲しい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢の絞り込みを行う
 4. **Results** -> **Oncoprint** -> **Figures** -> **Lolliplot for the selected gene** から遺伝子を選択し結果を確認する
@@ -207,7 +221,8 @@
 </details>
 
 <details>
-<summary><b>遺伝子間の相互排他性・共変異の情報が欲しい</b></summary>
+<summary><b>▶ 遺伝子間の相互排他性・共変異の情報が欲しい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢の絞り込みを行う
 3. **Results** -> **Mutually exclusivity** から結果を確認する
@@ -222,9 +237,8 @@
 ## 🎯 治療到達性解析
 
 <details>
-<summary><b>どのような患者にCGP検査を行うと治療到達率が高いのかを知りたい</b></summary>
-
-
+<summary><b>▶ どのような患者にCGP検査を行うと治療到達率が高いのかを知りたい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢、治療コースなどの絞り込みを行う。とくに **Genes of interest** で注目する遺伝子セットを指定する。
 2. **Results** -> **CGP benefit prediction** -> **Factors leading to treatment** -> **Factors leading to treatment, pre-CGP, Nomogram** から、検査前に得られる患者の臨床情報に基づいて治療到達率を予測するノモグラムを得る。
@@ -239,7 +253,8 @@
 </details>
 
 <details>
-<summary><b>CGP検査後の生存期間と治療到達率の関係性を知りたい</b></summary>
+<summary><b>▶ CGP検査後の生存期間と治療到達率の関係性を知りたい ▽</b></summary>
+<br>
 
 1. **Setting** から組織型や年齢、治療コースなどの絞り込みを行う。とくに **Genes of interest** で注目する遺伝子セットを指定する。
 2. **Results** -> **Survival after CGP** -> **Survival analysis** -> **Survival period and treatment reach rate** から、CGP検査後の生存期間と治療到達率について移動平均を取ったグラフを確認する。
@@ -254,9 +269,8 @@
 ## ⏳ 左側切断バイアスのシミュレーション
 
 <details>
-<summary><b>左側切断バイアスについて確認したい</b></summary>
-
-
+<summary><b>▶ 左側切断バイアスについて確認したい ▽</b></summary>
+<br>
 
 C-CATのデータのように、生存期間の測定開始日と検査日（観察開始日）が異なる場合、通常のカプラン・マイアー法では生存期間の推定が困難です。生存期間の測定開始日から検査日まで、全症例が生存している、Immortal biasが存在しているからです。
 生存期間の測定開始日から検査日までの生存期間と、検査日から最終観察日までの生存期間に分割すると、バイアスの一部が解消されます。
@@ -277,21 +291,24 @@ C-CATのデータのように、生存期間の測定開始日と検査日（観
 ## 💾 その他
 
 <details>
-<summary><b>図を保存したい</b></summary>
+<summary><b>▶ 図を保存したい ▽</b></summary>
+<br>
 
 図を右クリックし、拡張子を `.png` として名前をつけて保存して下さい。
 
 </details>
 
 <details>
-<summary><b>サマリーの表を保存したい</b></summary>
+<summary><b>▶ サマリーの表を保存したい ▽</b></summary>
+<br>
 
 画面上でテキストを選択し、コピーしてWordかExcelに貼り付けて保存して下さい。
 
 </details>
 
 <details>
-<summary><b>生データの表を保存したい</b></summary>
+<summary><b>▶ 生データの表を保存したい ▽</b></summary>
+<br>
 
 左上にあるボタンでエクセルファイルあるいはCSVファイルなどで名前をつけて保存して下さい。
 
