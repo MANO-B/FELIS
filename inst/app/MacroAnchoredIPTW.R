@@ -286,60 +286,53 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
 
   AF_total <- AF_bg * ifelse(X == 1, True_AF_X, 1.0)
 
+  # --- DGP: generate TRUE OS time T (depends on covariates incl X) ---
   u <- pmax(pmin(runif(N_macro), 0.999), 0.001)
   T_true_base <- (True_Med * 365.25) * ((1 - u) / u)^(1 / True_Shape)
 
+  # True OS time with covariate effects (AFT-style)
+  T_true <- T_true_base * AF_total
+
+  # --- Independent truncation world: generate T1 independent of T ---
+  # IMPORTANT: T1 must NOT depend on T_true_base or AF_total
   if (is.null(t1_pat)) t1_pat <- "indep"
+
+  min_days <- 30
+  jitter_days <- 7
+
+  # choose a fixed upper bound for entry-time distribution (independent of T)
+  # (you can tune; must not reference T_true)
+  max_entry_days <- 365.25 * 5   # e.g., allow CGP up to 5 years after diagnosis
+
   if (t1_pat == "early") {
-    T1_base <- runif(N_macro, 30, pmax(31, T_true_base * 0.3))
+    # earlier entry times (still independent of T)
+    T1_base <- runif(N_macro, min_days, min_days + 0.3 * (max_entry_days - min_days))
+
   } else if (t1_pat %in% c("dep_1yr", "real")) {
-    a <- 0.5; b <- 1         # later-biased; tweak
-    min_days <- 30
-    jitter_days <- 7
+    # later-biased (your "real" option) but independent of T
+    a <- 0.5; b <- 1
+    frac <- rbeta(N_macro, a, b)
+    T1_base <- min_days + frac * (max_entry_days - min_days)
 
-    frac <- rbeta(N_macro, a, b)             # in (0,1)
-    T1_base <- pmax(min_days, frac * T_true_base)
-
-    # optional: break ties / avoid spike at exactly 30
-    T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
   } else if (t1_pat %in% c("dep_2yr", "rev")) {
-    a <- 1; b <- 0.5         # later-biased; tweak
-    min_days <- 30
-    jitter_days <- 7
+    # later-biased (your "rev" option) but independent of T
+    a <- 1; b <- 0.5
+    frac <- rbeta(N_macro, a, b)
+    T1_base <- min_days + frac * (max_entry_days - min_days)
 
-    frac <- rbeta(N_macro, a, b)             # in (0,1)
-    T1_base <- pmax(min_days, frac * T_true_base)
-
-    # optional: break ties / avoid spike at exactly 30
-    T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
   } else {
-    # ------------------------------------------------------------
-    # Quasi-independent LT world:
-    #   T1_base generated independently of T_true_base
-    #   (later multiplied by AF_total, same as your current world)
-    # ------------------------------------------------------------
-    min_days <- 30
-    jitter_days <- 7
-
-    # independent draw from the *same family* as T_true_base (log-logistic)
-    # using its parameters (True_Med, True_Shape) but NOT using T_true_base itself
-    u1 <- pmax(pmin(runif(N_macro), 0.999), 0.001)
-    T1_base_raw <- (True_Med * 365.25) * ((1 - u1) / u1)^(1 / True_Shape)
-
-    # truncate to a realistic window (avoid extreme tails)
-    max_days <- 365.25 * 10
-    T1_base <- pmin(pmax(min_days, T1_base_raw), max_days)
-
-    # optional: break ties / avoid spike at exactly 30
-    T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
+    # quasi-uniform entry (independent of T)
+    T1_base <- runif(N_macro, min_days, max_entry_days)
   }
 
-  T2_base <- pmax(0.1, T_true_base - T1_base)
+  # avoid spike at exactly min_days
+  T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
 
-  # --- keep your world: T1 depends on AF_total (thus X/Histology) ---
-  T1 <- T1_base * AF_total
-  T2_true <- T2_base * AF_total
-  T_true <- T1 + T2_true
+  # observed entry time
+  T1 <- T1_base
+
+  # residual survival after entry (deterministic decomposition; independence is ensured by construction above)
+  T2_true <- pmax(0.1, T_true - T1)
 
   # Age class (external survival strata): <40, 40s, 50s, 60s, 70s, 80+
   Age_class_macro <- cut(
