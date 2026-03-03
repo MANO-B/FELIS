@@ -643,13 +643,19 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
     break.time.by = 365.25,
     xlab = "Time from diagnosis (years)",
     ylab = "Overall survival",
+    xscale = "d_y",
     ggtheme = ggplot2::theme_minimal(base_size = 15),
     legend = "bottom",
     legend.title = ""
   )
 
-  ext_df <- make_external_target_df(ref_surv_list, age_key = "全年齢")
-
+  ext_df <- make_external_mixture_target_df(
+    ref_surv_list = ref_surv_list,
+    age_class_vec = Data_model$age_class,   # <- ここが重要（描画対象の年齢構成）
+    t_max_years = 5,
+    dt_years = 0.05,
+    label_prefix = "External mixture target"
+  )
   # ---- overlay external target line with unambiguous legend ----
   gp$plot <- gp$plot +
     ggplot2::geom_line(
@@ -658,7 +664,7 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
       linewidth = 1.1,
       inherit.aes = FALSE
     ) +
-    ggplot2::scale_linetype_manual(values = c("External target (全年齢, llogis)" = "dashed")) +
+    ggplot2::scale_linetype_manual(values = c("External Cancer Registry Data" = "dashed")) +
     ggplot2::ggtitle(title_txt) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold", size = 14, lineheight = 1.05),
@@ -912,4 +918,52 @@ build_forest_plot_weighted_aft <- function(data_forest, covariates,
     )
 }
 
+make_external_mixture_target_df <- function(ref_surv_list,
+                                            age_class_vec,
+                                            t_max_years = 5,
+                                            dt_years = 0.05,
+                                            label_prefix = "External mixture target") {
 
+  age_class_vec <- as.character(age_class_vec)
+  age_class_vec <- age_class_vec[!is.na(age_class_vec) & age_class_vec != "全年齢"]
+
+  # age_classが空なら fallback
+  if (length(age_class_vec) == 0) {
+    return(make_external_target_df(ref_surv_list, age_key = "全年齢"))
+  }
+
+  # mixture weights (proportions in the plotting cohort)
+  wtab <- table(age_class_vec)
+  pi <- as.numeric(wtab) / sum(wtab)
+  names(pi) <- names(wtab)
+
+  # make sure each component exists in ref_surv_list
+  valid_keys <- intersect(names(pi), names(ref_surv_list))
+  if (length(valid_keys) == 0) {
+    return(make_external_target_df(ref_surv_list, age_key = "全年齢"))
+  }
+  pi <- pi[valid_keys]
+  pi <- pi / sum(pi)
+
+  # time grid
+  t <- seq(0, t_max_years, by = dt_years)
+
+  # compute mixture survival: S_mix(t) = Σ pi_a * S_a(t)
+  S_mix <- rep(0, length(t))
+  for (ag in names(pi)) {
+    pars <- fit_llogis_from_S15(ref_surv_list[[ag]])
+    S_ag <- llogis_surv(t, pars$shape, pars$scale)
+    S_mix <- S_mix + pi[ag] * S_ag
+  }
+
+  # label includes mixture composition (optional, short)
+  mix_txt <- paste0(names(pi), "=", sprintf("%.2f", pi), collapse = ",")
+  label <- paste0(label_prefix, " (", mix_txt, ")")
+
+  data.frame(
+    time_years = t,
+    surv = pmax(pmin(S_mix, 0.999), 0.001),
+    label = label,
+    stringsAsFactors = FALSE
+  )
+}
