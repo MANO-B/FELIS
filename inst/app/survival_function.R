@@ -1168,67 +1168,127 @@ survival_compare_and_plot_CTx <- function(data,
                                           group_labels = NULL,
                                           weights_var = NULL) {
 
-  # 1. 時間・イベント変数の設定
-  data$time_pre <- data[[time_var1]]
-  data$time_all <- data[[time_var2]]
+  message("\n==========================================")
+  message("DEBUG: survival_compare_and_plot_CTx START")
+  message("==========================================")
 
-  # 【重要】coxphのロバスト分散用クラスターIDを付与
+  # 1. 変数の準備
+  message("DEBUG 1: Setting up variables...")
+  message("=== [DEBUG] survival_compare_and_plot_CTx: start ===")
+  message(sprintf("[DEBUG] nrow(data)=%s", nrow(data)))
+  message(sprintf("[DEBUG] vars: time_var1=%s time_var2=%s status_var=%s group_var=%s weights_var=%s",
+                  time_var1, time_var2, status_var, group_var, ifelse(is.null(weights_var), "NULL", weights_var)))
+  message(sprintf("[DEBUG] colnames has time_pre? %s, time_all? %s, status? %s, group? %s",
+                  (time_var1 %in% names(data)), (time_var2 %in% names(data)),
+                  (status_var %in% names(data)), (group_var %in% names(data))))
+  data$time_pre <- data[[time_var1]]
+  message(sprintf("[DEBUG] time_all summary: min=%.3f med=%.3f max=%.3f NA=%d",
+                  suppressWarnings(min(data[[time_var2]], na.rm=TRUE)),
+                  suppressWarnings(stats::median(data[[time_var2]], na.rm=TRUE)),
+                  suppressWarnings(max(data[[time_var2]], na.rm=TRUE)),
+                  sum(is.na(data[[time_var2]]))))
+  message(sprintf("[DEBUG] time_pre summary: min=%.3f med=%.3f max=%.3f NA=%d",
+                  suppressWarnings(min(data[[time_var1]], na.rm=TRUE)),
+                  suppressWarnings(stats::median(data[[time_var1]], na.rm=TRUE)),
+                  suppressWarnings(max(data[[time_var1]], na.rm=TRUE)),
+                  sum(is.na(data[[time_var1]]))))
+  message(sprintf("[DEBUG] status(%s) table: %s",
+                  status_var,
+                  paste(capture.output(print(table(data[[status_var]], useNA="ifany"))), collapse=" ")))
+  message(sprintf("[DEBUG] group(%s) table: %s",
+                  group_var,
+                  paste(capture.output(print(table(data[[group_var]], useNA="ifany"))), collapse=" ")))
+  data$time_all <- data[[time_var2]]
   data$pseudo_id <- seq_len(nrow(data))
 
   use_weights <- !is.null(weights_var) && (weights_var %in% colnames(data))
+  message(sprintf("[DEBUG] use_weights=%s", use_weights))
+  if (use_weights) {
+    message(sprintf("[DEBUG] weights summary: min=%.6f med=%.6f max=%.6f NA=%d",
+                    suppressWarnings(min(data[[weights_var]], na.rm=TRUE)),
+                    suppressWarnings(stats::median(data[[weights_var]], na.rm=TRUE)),
+                    suppressWarnings(max(data[[weights_var]], na.rm=TRUE)),
+                    sum(is.na(data[[weights_var]]))))
+  }
+  message(sprintf("DEBUG 1b: use_weights = %s, weights_var = %s", use_weights, weights_var))
 
-  # 【重要】ggsurvplotが絶対に変失わないよう、固定名の重み列をデータフレーム内に作成する
   data$plot_weights <- if (use_weights) data[[weights_var]] else rep(1, nrow(data))
 
-  # 2. 計算式 (formula) と X軸ラベルの定義
+  # 2. Formulaの作成
+  message("DEBUG 2: Creating formulas...")
   if (use_weights) {
-    # 提案手法：時間補正済みのため time_all のみを使用
     surv_formula <- as.formula(paste0("Surv(time_all, censor) ~ ", group_var))
     Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", Age-calibrated (months)")
   } else {
     if (adjustment) {
-      # 従来手法：左側切断 (Left-Truncation)
       surv_formula <- as.formula(paste0("Surv(time_pre, time_all, censor) ~ ", group_var))
       Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", risk-set adjusted (months)")
     } else {
-      # 未補正
       surv_formula <- as.formula(paste0("Surv(time_all, censor) ~ ", group_var))
       Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", bias not adj (months)")
     }
   }
+  message(sprintf("DEBUG 2b: surv_formula = %s", deparse(surv_formula)))
 
-  # 3. survfit の実行 (ggsurvplotが認識できるよう plot_weights という列名を直接指定)
-  surv_fit <- survival::survfit(surv_formula, data = data, weights = plot_weights, conf.type = "log-log")
+  # 3. survfit の実行
+  message("DEBUG 3: Running survfit...")
+  surv_fit <- tryCatch({
+    survival::survfit(surv_formula, data = data, weights = plot_weights, conf.type = "log-log")
+  }, error = function(e) {
+    message("\n!!! ERROR IN survfit !!!")
+    message(e$message)
+    stop("survfit failed: ", e$message)
+  })
+  message("DEBUG 3b: survfit SUCCESS")
 
-  # 4. 生存曲線の描画と coxph (ハザード比) の計算
+  # 4. coxph の実行
+  message("DEBUG 4: Processing groups & running coxph...")
   if (group_var == "1") {
-    surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
+    diff_0 <- NULL
   } else {
     group_vals <- unique(na.omit(data[[group_var]]))
-
     if (length(group_vals) <= 1) {
-      surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
+      diff_0 <- NULL
     } else {
-      # 【最大の修正点】
-      # "one of cluster or id is needed" を完全に回避するため、
-      # coxph 用の formula の末尾に "+ cluster(pseudo_id)" を文字列として強制結合する。
-
-      if (use_weights) {
-        cox_formula <- as.formula(paste0("Surv(time_all, censor) ~ ", group_var, " + cluster(pseudo_id)"))
-        diff_0 <- survival::coxph(cox_formula, data = data, weights = plot_weights)
-      } else {
-        if (adjustment) {
-          cox_formula <- as.formula(paste0("Surv(time_pre, time_all, censor) ~ ", group_var, " + cluster(pseudo_id)"))
-          diff_0 <- survival::coxph(cox_formula, data = data)
+      diff_0 <- tryCatch({
+        if (use_weights) {
+          cox_formula <- as.formula(paste0("Surv(time_all, censor) ~ ", group_var, " + cluster(pseudo_id)"))
+          message(sprintf("DEBUG 4a: Running coxph (Weighted). Formula: %s", deparse(cox_formula)))
+          survival::coxph(cox_formula, data = data, weights = plot_weights)
         } else {
-          cox_formula <- surv_formula
-          diff_0 <- survival::coxph(cox_formula, data = data)
+          if (adjustment) {
+            cox_formula <- as.formula(paste0("Surv(time_pre, time_all, censor) ~ ", group_var, " + cluster(pseudo_id)"))
+            message(sprintf("DEBUG 4b: Running coxph (Left-Truncated). Formula: %s", deparse(cox_formula)))
+            survival::coxph(cox_formula, data = data)
+          } else {
+            cox_formula <- surv_formula
+            message(sprintf("DEBUG 4c: Running coxph (Simple). Formula: %s", deparse(cox_formula)))
+            survival::coxph(cox_formula, data = data)
+          }
         }
-      }
-
-      surv_curv_CTx(surv_fit, data, plot_title, group_labels, diff_0, Xlab)
+      }, error = function(e) {
+        message("\n!!! ERROR IN coxph !!!")
+        message(e$message)
+        stop("coxph failed: ", e$message)
+      })
+      message("DEBUG 4d: coxph SUCCESS")
     }
   }
+
+  # 5. surv_curv_CTx (ggsurvplot) の実行
+  message("DEBUG 5: Running surv_curv_CTx (ggsurvplot)...")
+  res <- tryCatch({
+    surv_curv_CTx(surv_fit, data, plot_title, group_labels, diff_0, Xlab)
+  }, error = function(e) {
+    message("\n!!! ERROR IN surv_curv_CTx (ggsurvplot) !!!")
+    message(e$message)
+    stop("ggsurvplot failed: ", e$message)
+  })
+
+  message("DEBUG 6: Function completed successfully")
+  message("==========================================\n")
+
+  return(res)
 }
 
 rename_factors_survival_CGP <- function(names_vec) {
