@@ -293,7 +293,7 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   if (t1_pat == "early") {
     T1_base <- runif(N_macro, 30, pmax(31, T_true_base * 0.3))
   } else if (t1_pat %in% c("dep_1yr", "real")) {
-    a <- 1; b <- 3         # later-biased; tweak
+    a <- 0.5; b <- 1         # later-biased; tweak
     min_days <- 30
     jitter_days <- 7
 
@@ -303,7 +303,7 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
     # optional: break ties / avoid spike at exactly 30
     T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
   } else if (t1_pat %in% c("dep_2yr", "rev")) {
-    a <- 3; b <- 1         # later-biased; tweak
+    a <- 1; b <- 0.5         # later-biased; tweak
     min_days <- 30
     jitter_days <- 7
 
@@ -313,7 +313,25 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
     # optional: break ties / avoid spike at exactly 30
     T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
   } else {
-    T1_base <- runif(N_macro, 30, pmax(31, T_true_base))
+    # ------------------------------------------------------------
+    # Quasi-independent LT world:
+    #   T1_base generated independently of T_true_base
+    #   (later multiplied by AF_total, same as your current world)
+    # ------------------------------------------------------------
+    min_days <- 30
+    jitter_days <- 7
+
+    # independent draw from the *same family* as T_true_base (log-logistic)
+    # using its parameters (True_Med, True_Shape) but NOT using T_true_base itself
+    u1 <- pmax(pmin(runif(N_macro), 0.999), 0.001)
+    T1_base_raw <- (True_Med * 365.25) * ((1 - u1) / u1)^(1 / True_Shape)
+
+    # truncate to a realistic window (avoid extreme tails)
+    max_days <- 365.25 * 10
+    T1_base <- pmin(pmax(min_days, T1_base_raw), max_days)
+
+    # optional: break ties / avoid spike at exactly 30
+    T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
   }
 
   T2_base <- pmax(0.1, T_true_base - T1_base)
@@ -343,7 +361,9 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   cgp_idx <- which(T_true > T1 & T1 <= 365.25 * 10)
   if (length(cgp_idx) < N_target) return(NULL)
 
-  prob_select <- ifelse(Age[cgp_idx] < 60, 0.6, 0.4)
+  age_cgp <- Age[cgp_idx]
+  prob_select <- plogis((60 - age_cgp) / 7)   # 60歳を境に滑らかに
+  prob_select <- 0.35 + 0.30 * prob_select    # -> おおむね [0.35, 0.65]
   sel <- sample(cgp_idx, size = N_target, prob = prob_select, replace = FALSE)
 
   Data_cgp <- data.frame(
@@ -766,7 +786,8 @@ observeEvent(input$run_sim_multi, {
       theme(
         plot.title.position = "plot",
         plot.title = element_text(face="bold", size=16, lineheight=1.05),
-        plot.margin = margin(t=10, r=10, b=10, l=10)
+        plot.margin = margin(t=10, r=10, b=10, l=10),
+        axis.text.x = element_text(angle = 15, hjust = 1)
       )
   })
 
