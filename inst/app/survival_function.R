@@ -1207,10 +1207,23 @@ survival_compare_and_plot_CTx <- function(data,
     } else {
       # coxphもcallで安全に評価 (前回の cluster/id エラーもこれで完全に防げます)
       if (use_weights) {
-        cox_call <- call("coxph", formula = surv_formula, data = quote(data), weights = quote(w_vec), robust = TRUE, id = quote(pseudo_id))
+        # robust sandwich SE needs cluster (or id); cluster is the safest here
+        cox_call <- call(
+          "coxph",
+          formula  = surv_formula,
+          data     = quote(data),
+          weights  = quote(w_vec),
+          robust   = TRUE,
+          cluster  = quote(pseudo_id)
+        )
         diff_0 <- eval(cox_call)
       } else {
-        cox_call <- call("coxph", formula = surv_formula, data = quote(data), id = quote(pseudo_id))
+        # keep as-is (no robust needed); cluster not required
+        cox_call <- call(
+          "coxph",
+          formula = surv_formula,
+          data    = quote(data)
+        )
         diff_0 <- eval(cox_call)
       }
       surv_curv_CTx(surv_fit, data, plot_title, group_labels, diff_0, Xlab)
