@@ -373,6 +373,11 @@ km_to_df <- function(km_fit, model_label) {
   )
 }
 
+# =========================================================================
+# PATCH: EP0 removed + ggsurvplot + title stats (median + HR with CI)
+# =========================================================================
+
+# ---- helper: external target curve (llogis) as data.frame ----
 make_external_target_df <- function(ref_surv_list, age_key = "全年齢") {
   if (!(age_key %in% names(ref_surv_list))) age_key <- names(ref_surv_list)[1]
   pars <- fit_llogis_from_S15(ref_surv_list[[age_key]])
@@ -380,232 +385,127 @@ make_external_target_df <- function(ref_surv_list, age_key = "全年齢") {
   data.frame(
     time_years = t,
     surv = llogis_surv(t, pars$shape, pars$scale),
-    strata = paste0("ExternalTarget(", age_key, ")"),
-    Model = "External target (llogis)",
+    label = paste0("External target (", age_key, ", llogis)"),
     stringsAsFactors = FALSE
   )
 }
 
-plot_survival_curves_real <- function(data_model, ref_surv_list,
-                                      group_var = "Group",
-                                      time_var = "time_all",
-                                      status_var = "censor",
-                                      weight_var = "iptw",
-                                      external_age_key = "全年齢",
-                                      show_unweighted = TRUE) {
-  # Data checks
-  stopifnot(all(c(group_var, time_var, status_var, weight_var) %in% names(data_model)))
-  data_model <- data_model %>%
+# ---- helper: weighted KM median per group (days->months) ----
+calc_weighted_median_months_by_group <- function(data, group_var = "Group",
+                                                 time_var = "time_all", status_var = "censor",
+                                                 weight_var = "iptw") {
+  data <- data %>% dplyr::filter(is.finite(.data[[time_var]]), .data[[time_var]] > 0,
+                                 is.finite(.data[[status_var]]),
+                                 !is.na(.data[[group_var]]))
+
+  sf <- tryCatch(
+    survival::survfit(
+      as.formula(paste0("survival::Surv(", time_var, ", ", status_var, ") ~ ", group_var)),
+      data = data,
+      weights = data[[weight_var]]
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(sf)) return(NULL)
+
+  tab <- tryCatch(summary(sf)$table, error = function(e) NULL)
+  if (is.null(tab)) return(NULL)
+
+  # summary(survfit)$table can be vector if only 1 stratum
+  if (is.null(dim(tab))) {
+    med_days <- unname(tab["median"])
+    out <- data.frame(Group = as.character(unique(data[[group_var]])[1]),
+                      Med_month = med_days / 365.25 * 12)
+    return(out)
+  }
+
+  med_days <- tab[, "median"]
+  grp <- rownames(tab)
+  grp <- ifelse(grepl("=", grp), sub(".*=", "", grp), grp)
+
+  data.frame(
+    Group = grp,
+    Med_month = as.numeric(med_days) / 365.25 * 12,
+    stringsAsFactors = FALSE
+  )
+}
+
+# ---- helper: weighted Cox HR between groups (robust SE) ----
+calc_weighted_hr <- function(data, group_var = "Group",
+                             time_var = "time_all", status_var = "censor",
+                             weight_var = "iptw") {
+  data <- data %>%
     dplyr::filter(is.finite(.data[[time_var]]), .data[[time_var]] > 0,
-                  is.finite(.data[[status_var]]))
-
-  # unweighted KM
-  km_unw <- tryCatch(
-    survival::survfit(as.formula(paste0("survival::Surv(", time_var, ", ", status_var, ") ~ ", group_var)),
-                      data = data_model),
-    error = function(e) NULL
-  )
-  # weighted KM
-  km_w <- tryCatch(
-    survival::survfit(as.formula(paste0("survival::Surv(", time_var, ", ", status_var, ") ~ ", group_var)),
-                      data = data_model, weights = data_model[[weight_var]]),
-    error = function(e) NULL
-  )
-
-  df_list <- list()
-  if (show_unweighted && !is.null(km_unw)) df_list[[length(df_list) + 1]] <- km_to_df(km_unw, "Unweighted KM")
-  if (!is.null(km_w)) df_list[[length(df_list) + 1]] <- km_to_df(km_w, "Calibrated weighted KM")
-
-  df_ext <- make_external_target_df(ref_surv_list, age_key = external_age_key)
-
-  plot_df <- dplyr::bind_rows(df_ext, dplyr::bind_rows(df_list)) %>%
+                  is.finite(.data[[status_var]]),
+                  !is.na(.data[[group_var]])) %>%
     dplyr::mutate(
-      # nicer strata label if it comes as "Group=EP0"
-      StrataLabel = dplyr::case_when(
-        grepl("=", strata) ~ sub(".*=", "", strata),
-        TRUE ~ strata
-      )
+      .Group = droplevels(as.factor(.data[[group_var]]))
     )
 
-  # External line: thick dashed, others: by Model + group
-  ggplot2::ggplot(plot_df, ggplot2::aes(x = time_years, y = surv)) +
-    ggplot2::geom_line(
-      data = dplyr::filter(plot_df, Model == "External target (llogis)"),
-      ggplot2::aes(linetype = Model),
-      linewidth = 1.3
-    ) +
-    ggplot2::geom_step(
-      data = dplyr::filter(plot_df, Model != "External target (llogis)"),
-      ggplot2::aes(color = StrataLabel, linetype = Model),
-      linewidth = 1.1
-    ) +
-    ggplot2::scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
-    ggplot2::scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1)) +
-    ggplot2::theme_minimal(base_size = 15) +
-    ggplot2::labs(
-      title = "Overall Survival (Real-Data Port)",
-      subtitle = paste0(
-        "External age-stratified target → calibrated weights on observed OS (time_all)\n",
-        "Solid/step: KM by group | Dashed: external target (llogis smoothed)"
-      ),
-      x = "Time from diagnosis (years)",
-      y = "Overall survival"
-    ) +
-    ggplot2::theme(
-      legend.position = "bottom",
-      legend.title = ggplot2::element_blank()
-    )
-}
+  lv <- levels(data$.Group)
+  if (length(lv) != 2) return(NULL)  # HRは2群比較に限定（1 vs 2想定）
 
-# =========================================================================
-# 4) Forest plot: Weighted AFT (llogis) on observed OS
-# =========================================================================
-build_forest_plot_weighted_aft <- function(data_forest, covariates,
-                                           time_var = "time_all", status_var = "censor",
-                                           weight_var = "iptw") {
-  shiny::validate(shiny::need(requireNamespace("patchwork", quietly = TRUE),
-                              "Please install the 'patchwork' package. Run: install.packages('patchwork')"))
-
-  form_final <- as.formula(
-    paste0("survival::Surv(", time_var, ", ", status_var, ") ~ ", paste(covariates, collapse = " + "))
-  )
-
+  # robust sandwich variance（weightsあり）
   fit <- tryCatch(
-    flexsurv::flexsurvreg(form_final, data = data_forest, weights = data_forest[[weight_var]], dist = "llogis"),
+    survival::coxph(
+      survival::Surv(.data[[time_var]], .data[[status_var]]) ~ .Group,
+      data = data,
+      weights = data[[weight_var]],
+      robust = TRUE
+    ),
     error = function(e) NULL
   )
-  shiny::validate(shiny::need(!is.null(fit), "Weighted AFT (llogis) failed to converge."))
+  if (is.null(fit)) return(NULL)
 
-  res <- fit$res
-  cov_names <- rownames(res)[!rownames(res) %in% c("shape", "scale")]
+  sm <- summary(fit)
+  hr <- unname(sm$coefficients[1, "exp(coef)"])
+  l  <- unname(sm$conf.int[1, "lower .95"])
+  u  <- unname(sm$conf.int[1, "upper .95"])
 
-  total_N <- nrow(data_forest)
-
-  plot_data <- data.frame(
-    Variable_Raw = cov_names,
-    Estimate = exp(res[cov_names, "est"]),
-    Lower = exp(res[cov_names, "L95%"]),
-    Upper = exp(res[cov_names, "U95%"]),
-    Category = "Others",
-    Label = cov_names,
-    Positive_N = NA_real_,
-    Total_N = total_N,
-    stringsAsFactors = FALSE
+  # 表示: level2 vs level1
+  list(
+    ref = lv[1],
+    comp = lv[2],
+    HR = hr, L = l, U = u
   )
+}
 
-  # Age per +10 years if present
-  for (i in seq_len(nrow(plot_data))) {
-    var <- plot_data$Variable_Raw[i]
-    if (grepl("^age_num", var)) {
-      plot_data$Estimate[i] <- exp(res[var, "est"] * 10)
-      plot_data$Lower[i]    <- exp(res[var, "L95%"] * 10)
-      plot_data$Upper[i]    <- exp(res[var, "U95%"] * 10)
-      plot_data$Label[i]    <- "Age (per +10 years)"
-      plot_data$Category[i] <- "Demographics"
-    }
-    if (grepl("^Sex", var)) plot_data$Category[i] <- "Demographics"
-    if (grepl("^Cancers", var)) plot_data$Category[i] <- "Histology"
-    if (grepl("^Gene_", var)) plot_data$Category[i] <- "Genomics"
+# ---- helper: build multi-line title (wrapped) ----
+build_surv_title <- function(med_df, hr_obj, ess, max_width = 60) {
+  # medians
+  med_txt <- "Median OS (months): "
+  if (is.null(med_df) || nrow(med_df) == 0) {
+    med_txt <- paste0(med_txt, "N/A")
+  } else {
+    med_df <- med_df %>% dplyr::arrange(Group)
+    med_pairs <- paste0(med_df$Group, "=", sprintf("%.1f", med_df$Med_month))
+    med_txt <- paste0(med_txt, paste(med_pairs, collapse = " | "))
   }
 
-  # Pretty labels + Positive_N
-  if ("Sex" %in% covariates && "Sex" %in% names(data_forest)) {
-    ref_sex <- levels(data_forest$Sex)[1]
-    for (i in seq_len(nrow(plot_data))) {
-      var <- plot_data$Variable_Raw[i]
-      if (grepl("^Sex", var)) {
-        lv <- sub("^Sex", "", var)
-        plot_data$Label[i] <- paste0("Sex: ", lv, " (vs ", ref_sex, ")")
-        plot_data$Positive_N[i] <- sum(data_forest$Sex == lv, na.rm = TRUE)
-      }
-    }
+  # HR
+  hr_txt <- "HR: N/A"
+  if (!is.null(hr_obj)) {
+    hr_txt <- sprintf("HR (%s vs %s)=%.2f (95%%CI %.2f–%.2f)",
+                      hr_obj$comp, hr_obj$ref, hr_obj$HR, hr_obj$L, hr_obj$U)
   }
 
-  if ("Cancers" %in% covariates && "Cancers" %in% names(data_forest)) {
-    ref_can <- levels(data_forest$Cancers)[1]
-    for (i in seq_len(nrow(plot_data))) {
-      var <- plot_data$Variable_Raw[i]
-      if (grepl("^Cancers", var)) {
-        lv <- sub("^Cancers", "", var)
-        plot_data$Label[i] <- paste0("Histology: ", lv, " (vs ", ref_can, ")")
-        plot_data$Positive_N[i] <- sum(data_forest$Cancers == lv, na.rm = TRUE)
-      }
-    }
-  }
+  ess_txt <- if (is.finite(ess)) sprintf("ESS=%.1f", ess) else "ESS=N/A"
 
-  for (i in seq_len(nrow(plot_data))) {
-    var <- plot_data$Variable_Raw[i]
-    if (grepl("^Gene_", var)) {
-      gene_nm <- sub("^Gene_", "", var)
-      gene_nm <- sub("Mutated$", "", gene_nm)
-      col_name <- paste0("Gene_", gene_nm)
-      plot_data$Label[i] <- paste0("Gene: ", gene_nm, " (Mutated vs WT)")
-      if (col_name %in% names(data_forest)) {
-        plot_data$Positive_N[i] <- sum(data_forest[[col_name]] == "Mutated", na.rm = TRUE)
-      }
-    }
-  }
-
-  plot_data$Text_CI <- sprintf("%.2f (%.2f-%.2f)", plot_data$Estimate, plot_data$Lower, plot_data$Upper)
-  plot_data$Text_PosN <- ifelse(is.na(plot_data$Positive_N), "-", as.character(plot_data$Positive_N))
-
-  plot_data$Category <- factor(plot_data$Category, levels = c("Genomics", "Demographics", "Histology", "Others"))
-  plot_data <- plot_data[order(plot_data$Category, plot_data$Estimate), ]
-  plot_data$Label <- factor(plot_data$Label, levels = plot_data$Label)
-
-  p_left <- ggplot2::ggplot(plot_data, ggplot2::aes(x = Estimate, y = Label, color = Category)) +
-    ggplot2::geom_errorbarh(ggplot2::aes(xmin = Lower, xmax = Upper), height = 0.3, linewidth = 0.8) +
-    ggplot2::geom_point(size = 3.8) +
-    ggplot2::geom_vline(xintercept = 1, linetype = "dashed", linewidth = 1) +
-    ggplot2::scale_x_log10(breaks = c(0.1, 0.2, 0.5, 1, 2, 5, 10)) +
-    ggplot2::theme_minimal(base_size = 14) +
-    ggplot2::labs(x = "Time Ratio (log scale, 95% CI)", y = "") +
-    ggplot2::theme(
-      panel.grid.minor = ggplot2::element_blank(),
-      axis.text.y = ggplot2::element_text(face = "bold", size = 11),
-      legend.position = "none"
-    )
-
-  p_right <- ggplot2::ggplot(plot_data, ggplot2::aes(y = Label)) +
-    ggplot2::geom_text(ggplot2::aes(x = 0, label = Total_N), hjust = 0.5, size = 4.2) +
-    ggplot2::geom_text(ggplot2::aes(x = 1, label = Text_PosN), hjust = 0.5, size = 4.2) +
-    ggplot2::geom_text(ggplot2::aes(x = 2, label = Text_CI), hjust = 0.5, size = 4.2) +
-    ggplot2::scale_x_continuous(limits = c(-0.5, 2.5), breaks = c(0, 1, 2),
-                                labels = c("Total N\n(Real)", "Positive N\n(Real)", "TR\n(95% CI)")) +
-    ggplot2::theme_minimal(base_size = 14) +
-    ggplot2::labs(x = "", y = "") +
-    ggplot2::theme(
-      panel.grid = ggplot2::element_blank(),
-      axis.text.y = ggplot2::element_blank(),
-      axis.ticks = ggplot2::element_blank()
-    )
-
-  p_left + p_right + patchwork::plot_layout(widths = c(2.0, 1.25)) +
-    patchwork::plot_annotation(
-      title = "Independent Prognostic Impact (Calibrated weighted AFT; llogis)",
-      subtitle = "TR > 1: prolonged survival | TR < 1: shortened survival\nWeights are learned by age-stratified matching of observed OS to external target OS",
-      theme = ggplot2::theme(
-        plot.title = ggplot2::element_text(face = "bold", size = 16),
-        plot.subtitle = ggplot2::element_text(size = 12)
-      )
-    )
+  # wrap each line
+  title1 <- paste(strwrap("Standardized OS (calibrated weighted KM; ggsurvplot)", width = max_width), collapse = "\n")
+  title2 <- paste(strwrap(paste(med_txt, hr_txt, ess_txt, sep = "  |  "), width = max_width), collapse = "\n")
+  paste(title1, title2, sep = "\n")
 }
 
 # =========================================================================
-# 5) Existing preprocessing logic control (UNCHANGED)
-#    - Keep your survival_CTx_analysis2_logic_control() as-is
-# =========================================================================
-# survival_CTx_analysis2_logic_control <- function() { ... }  # 既存のまま
-
-# =========================================================================
-# 6) Survival curve output: external target + (unweighted + calibrated weighted) KM
+# Survival curve output (EP0 removed, ggsurvplot, title stats)
 # =========================================================================
 output$figure_survival_CTx_interactive_1_control <- renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
       OUTPUT_DATA$figure_surv_CTx_Data_drug_control)
 
-  # Touch inputs for reactivity (same as your code)
+  # Touch inputs for reactivity (your original)
   lapply(1:2, function(i) {
     prefix <- paste0("gene_survival_interactive_", i, "_")
     list(
@@ -633,7 +533,7 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
       age_class = make_age_class_6grp(age_num)
     )
 
-  # --- Build external reference survival (1-5y) and ensure keys
+  # --- External reference + ensure keys
   ref_surv_list <- build_ref_surv_list_realdata(input)
   for (ag in unique(Data_survival_interactive$age_class)) {
     if (!ag %in% names(ref_surv_list)) {
@@ -642,10 +542,9 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
     }
   }
 
-  # --- Calibrated weights (THIS is the key alignment step)
+  # --- Calibrated weights on observed OS (time_all)
   Data_survival_interactive <- calculate_obs_matching_weights_real(Data_survival_interactive, ref_surv_list)
   ESS <- attr(Data_survival_interactive, "ESS")
-  message(sprintf("[CALIBRATION] ESS=%.1f (N=%d)", ESS, nrow(Data_survival_interactive)))
 
   # ========================================================
   # Extract Group IDs (same as your code)
@@ -699,31 +598,71 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
     dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% ID_2) %>%
     dplyr::mutate(Group = "2")
 
-  Data_EP0 <- Data_survival_interactive %>%
-    dplyr::filter(EP_treat == 0) %>%
-    dplyr::mutate(Group = "EP0")
-
-  Data_model <- dplyr::bind_rows(Data_EP0, Data_survival_1, Data_survival_2) %>%
+  # ---- EP0 removed: model cohort = Group 1 & 2 only ----
+  Data_model <- dplyr::bind_rows(Data_survival_1, Data_survival_2) %>%
     dplyr::mutate(
       Sex = as.factor(`症例.基本情報.性別.名称.`),
       Cancers = as.factor(Cancers)
     ) %>%
-    dplyr::filter(is.finite(time_pre), is.finite(time_all), is.finite(censor),
-                  time_pre > 0, time_all > time_pre)
+    dplyr::filter(is.finite(time_all), is.finite(censor), time_all > 0)
 
   shiny::validate(shiny::need(nrow(Data_model) > 30, "Not enough valid data to plot."))
+  Data_model$Group <- factor(Data_model$Group, levels = c("1", "2"))
+  shiny::validate(shiny::need(nlevels(Data_model$Group) == 2, "Need exactly 2 groups (1 and 2) for HR display."))
 
-  Data_model$Group <- factor(Data_model$Group, levels = c("EP0", "1", "2"))
+  # --- KM fits (unweighted + calibrated weighted)
+  km_unw <- survival::survfit(survival::Surv(time_all, censor) ~ Group, data = Data_model)
+  km_w   <- survival::survfit(survival::Surv(time_all, censor) ~ Group, data = Data_model, weights = Data_model$iptw)
 
-  # --- Plot survival curves (external target + KM curves)
-  plot_survival_curves_real(
-    data_model = Data_model,
-    ref_surv_list = ref_surv_list,
-    external_age_key = "全年齢",
-    show_unweighted = TRUE
+  # --- stats for title
+  med_df <- calc_weighted_median_months_by_group(Data_model, weight_var = "iptw")
+  hr_obj <- calc_weighted_hr(Data_model, weight_var = "iptw")
+  title_txt <- build_surv_title(med_df, hr_obj, ESS, max_width = 56)
+
+  # --- ggsurvplot (use weighted KM as main; add unweighted as faint if desired)
+  shiny::validate(shiny::need(requireNamespace("survminer", quietly = TRUE),
+                              "Please install the 'survminer' package. Run: install.packages('survminer')"))
+
+  gp <- survminer::ggsurvplot(
+    fit = km_w,
+    data = Data_model,
+    conf.int = FALSE,
+    risk.table = FALSE,
+    censor = TRUE,
+    xlim = c(0, 5 * 365.25),
+    break.time.by = 365.25,
+    xlab = "Time from diagnosis (years)",
+    ylab = "Overall survival",
+    ggtheme = ggplot2::theme_minimal(base_size = 15),
+    legend = "bottom",
+    legend.title = ""
   )
-})
 
+  # --- make the "external dashed line" unambiguous:
+  #     overlay explicit labeled external target curve (not a mysterious black dashed line)
+  ext_df <- make_external_target_df(ref_surv_list, age_key = "全年齢")
+
+  p <- gp$plot +
+    ggplot2::geom_line(
+      data = ext_df,
+      ggplot2::aes(x = time_years * 365.25, y = surv, linetype = label),
+      linewidth = 1.1
+    ) +
+    ggplot2::scale_linetype_manual(values = c("External target (全年齢, llogis)" = "dashed")) +
+    ggplot2::ggtitle(title_txt) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(face = "bold", size = 14, lineheight = 1.05),
+      plot.margin = ggplot2::margin(t = 10, r = 15, b = 10, l = 10),
+      legend.position = "bottom",
+      legend.box = "vertical"
+    )
+
+  # Optional: also overlay unweighted KM (same Group colors, different alpha/linetype)
+  #   - ggsurvplot object is ggplot; easiest is add another layer from km_unw via survminer::ggsurvplot_df
+  #   - keep it simple: omit unless you want. If you want, tell me and I’ll add a clean overlay.
+
+  p
+})
 # =========================================================================
 # 7) Forest plot output: weighted AFT on observed OS (time_all)
 # =========================================================================
