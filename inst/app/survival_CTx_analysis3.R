@@ -1,4 +1,178 @@
 # =========================================================================
+# Tamura & Ikegami Model Ver 2.3.2 (Real-Data Port)
+#  - censor == 1 means EVENT (death)
+#  - Keep output variable names: time_pre, time_all, censor, Group
+#  - Replaced downstream analysis/plotting with Proposed Simulation Pipeline:
+#    Age-stratified external OS curve matching via weights on T_obs (time_all),
+#    followed by weighted AFT modeling on observed data.
+# =========================================================================
+# =========================================================================
+# 1) Main Logic Control Function (Preprocessing)  --- UNCHANGED
+# =========================================================================
+survival_CTx_analysis2_logic_control <- function() {
+  analysis_env <- new.env()
+  clear_reactive_data(OUTPUT_DATA)
+  gc()
+
+  with(analysis_env, {
+    withProgress(message = sample(nietzsche)[1], {
+      Data_case_target = Data_case()
+
+      if (!is.null(input$gene_group_analysis) &&
+          input$gene_group_analysis %in% c("Only cases with mutations in the gene set are analyzed",
+                                           "Only cases without mutations in the gene set are analyzed")) {
+        Data_case_target = Data_case_target %>%
+          dplyr::filter(C.CAT調査結果.基本項目.ハッシュID %in% Data_report()$Tumor_Sample_Barcode)
+      }
+
+      Data_case_target = Data_case_target %>%
+        dplyr::select(
+          C.CAT調査結果.基本項目.ハッシュID,
+          症例.基本情報.年齢,
+          Lymph_met, Brain_met, Lung_met, Bone_met, Liver_met, Other_met,
+          EP_option, EP_treat, YoungOld,
+          症例.基本情報.性別.名称.,
+          症例.基本情報.がん種.OncoTree.,
+          症例.基本情報.がん種.OncoTree..名称.,
+          症例.基本情報.がん種.OncoTree.LEVEL1.,
+          症例.検体情報.パネル.名称.,
+          症例.背景情報.ECOG.PS.名称.,
+          症例.背景情報.喫煙歴有無.名称.,
+          症例.背景情報.アルコール多飲有無.名称.,
+          症例.背景情報.重複がん有無.異なる臓器..名称.,
+          症例.背景情報.多発がん有無.同一臓器..名称.,
+          HER2_IHC, MSI_PCR, MMR_IHC,
+          final_observe,
+          censor,
+          CTx_lines_before_CGP,
+          pre_CGP_best_RECIST,
+          treat_group, treat_group_2, treat_group_3,
+          time_enroll_final,
+          time_palliative_final,
+          time_palliative_enroll,
+          time_2L_final,
+          time_diagnosis_enroll,
+          time_diagnosis_final,
+          time_2L_enroll
+        )
+
+      if (input$HER2 == "No") {
+        Data_case_target = Data_case_target %>% dplyr::select(-HER2_IHC)
+      } else {
+        Data_case_target = Data_case_target %>% dplyr::filter(HER2_IHC != "Unknown")
+      }
+      if (input$MSI == "No") {
+        Data_case_target = Data_case_target %>% dplyr::select(-MSI_PCR)
+      } else {
+        Data_case_target = Data_case_target %>% dplyr::filter(MSI_PCR != "Unknown")
+      }
+      if (input$MMR == "No") {
+        Data_case_target = Data_case_target %>% dplyr::select(-MMR_IHC)
+      } else {
+        Data_case_target = Data_case_target %>% dplyr::filter(MMR_IHC != "Unknown")
+      }
+
+      Data_case_target$Cancers = Data_case_target$症例.基本情報.がん種.OncoTree.
+      incProgress(1 / 13)
+
+      Data_drug = Data_drug_raw()
+      OUTPUT_DATA$figure_surv_CTx_Data_drug_control = Data_drug
+
+      Data_case_target = Data_case_target %>%
+        dplyr::distinct(.keep_all = TRUE, C.CAT調査結果.基本項目.ハッシュID)
+
+      Data_MAF = Data_report() %>%
+        dplyr::filter(
+          !stringr::str_detect(Hugo_Symbol, ",") &
+            Hugo_Symbol != "" &
+            Evidence_level %in% c("", "A", "B", "C", "D", "E", "F") &
+            Variant_Classification != "expression"
+        ) %>%
+        dplyr::arrange(desc(Evidence_level)) %>%
+        dplyr::distinct(Tumor_Sample_Barcode, Hugo_Symbol, Start_Position, .keep_all = TRUE)
+
+      if (length(Data_MAF[Data_MAF$TMB > 30, ]$TMB) > 0) {
+        Data_MAF[Data_MAF$TMB > 30, ]$TMB = 30
+      }
+
+      if (nrow(Data_case_target) > 0) {
+        Data_report_TMB = Data_MAF %>%
+          dplyr::filter(Tumor_Sample_Barcode %in% Data_case_target$C.CAT調査結果.基本項目.ハッシュID) %>%
+          dplyr::select(Tumor_Sample_Barcode, TMB) %>%
+          dplyr::distinct(Tumor_Sample_Barcode, .keep_all = TRUE)
+
+        colnames(Data_report_TMB) = c("C.CAT調査結果.基本項目.ハッシュID", "TMB")
+        Data_case_target = dplyr::left_join(Data_case_target, Data_report_TMB, by = "C.CAT調査結果.基本項目.ハッシュID")
+
+        Data_MAF_target = Data_MAF %>%
+          dplyr::filter(Tumor_Sample_Barcode %in% Data_case_target$C.CAT調査結果.基本項目.ハッシュID)
+
+        if (input$patho == "Only pathogenic muts") {
+          Data_MAF_target = Data_MAF_target %>% dplyr::filter(Evidence_level == "F")
+        }
+
+        Data_MAF_target = Data_MAF_target %>%
+          dplyr::distinct(Tumor_Sample_Barcode, Hugo_Symbol, .keep_all = TRUE)
+
+        if (length(Data_case_target$censor[is.na(Data_case_target$censor)]) > 0) {
+          Data_case_target$censor[is.na(Data_case_target$censor)] = 0
+        }
+        incProgress(1 / 13)
+
+        Data_case_target$time_pre = Data_case_target$time_diagnosis_enroll
+        Data_case_target$time_all = Data_case_target$time_diagnosis_final
+        Data_case_target = Data_case_target %>% dplyr::filter(time_pre > 0)
+
+        adjustment = TRUE
+        OUTPUT_DATA$figure_surv_CTx_adjustment_control = adjustment
+
+        Data_case_target = Data_case_target %>% dplyr::filter(
+          !is.na(time_enroll_final) & is.finite(time_enroll_final) & time_enroll_final > 0 &
+            !is.na(time_pre) & is.finite(time_pre) &
+            !is.na(censor) & is.finite(censor)
+        )
+
+        Data_survival = Data_case_target
+
+        Data_MAF_target = Data_MAF_target %>%
+          dplyr::filter(Tumor_Sample_Barcode %in% Data_survival$C.CAT調査結果.基本項目.ハッシュID)
+
+        OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control = Data_MAF_target
+        incProgress(1 / 13)
+
+        Data_survival_interactive = Data_survival
+        OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control = Data_survival_interactive
+
+        candidate_genes = sort(unique(c(
+          Data_MAF_target$Hugo_Symbol,
+          paste0(input$special_gene, "_", input$special_gene_mutation_1_name),
+          paste0(input$special_gene, "_", input$special_gene_mutation_2_name),
+          paste0(input$special_gene, "_NOS")
+        )))
+        candidate_genes = candidate_genes[!candidate_genes %in% c("", "_", "_NOS", paste0(input$special_gene, "_"))]
+        candidate_genes = candidate_genes[!is.na(candidate_genes)]
+
+        Top_gene = unique(names(sort(table(Data_MAF_target$Hugo_Symbol), decreasing = TRUE)))
+        Top_gene = Top_gene[Top_gene %in% candidate_genes]
+
+        candidate_drugs = sort(unique(c(Data_drug$Drug)))
+
+        OUTPUT_DATA$figure_surv_interactive_Top_gene_control = Top_gene
+        OUTPUT_DATA$figure_surv_interactive_candidate_genes_control = candidate_genes
+        OUTPUT_DATA$figure_surv_interactive_candidate_drugs_control = candidate_drugs[!is.na(candidate_drugs)]
+        OUTPUT_DATA$figure_surv_interactive_candidate_Age_control = sort(unique(Data_survival_interactive$YoungOld))
+        OUTPUT_DATA$figure_surv_interactive_candidate_Sex_control = sort(unique(Data_survival_interactive$症例.基本情報.性別.名称.))
+        OUTPUT_DATA$figure_surv_interactive_candidate_Histology_control = sort(unique(Data_survival_interactive$Cancers))
+      }
+
+      incProgress(1 / 13)
+    })
+  })
+
+  rm(analysis_env)
+  gc()
+}
+# =========================================================================
 # Tamura & Ikegami Model Ver 2.4.0 (Real-Data Port)
 #  - censor == 1 means EVENT (death)
 #  - Keep output variable names: time_pre, time_all, censor, Group
