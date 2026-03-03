@@ -363,7 +363,6 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control,
       OUTPUT_DATA$figure_surv_CTx_Data_drug_control)
-  message("DEBUG: drawing start")
   # Force reactivity
   lapply(1:2, function(i) {
     prefix <- paste0("gene_survival_interactive_", i, "_")
@@ -474,7 +473,6 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 
   shiny::validate(shiny::need(nrow(Data_model %>% dplyr::filter(Group == "EP0")) >= 5,
                               "Not enough EP_treat == 0 patients to establish the reference baseline."))
-  message("DEBUG: survival_compare_and_plot_CTx start")
 
   # ========================================================
   # Plot using survival_compare_and_plot_CTx directly with weights
@@ -498,7 +496,6 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
 output$forest_plot_multivariate = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
       OUTPUT_DATA$figure_surv_CTx_Data_MAF_target_control)
-  message("DEBUG: Forest start")
 
   shiny::validate(shiny::need(requireNamespace("patchwork", quietly = TRUE),
                               "Please install the 'patchwork' package. Run: install.packages('patchwork')"))
