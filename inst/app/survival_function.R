@@ -1168,64 +1168,64 @@ survival_compare_and_plot_CTx <- function(data,
                                           group_labels = NULL,
                                           weights_var = NULL) {
 
+  # 1. 時間・イベント変数の設定
   data$time_pre <- data[[time_var1]]
   data$time_all <- data[[time_var2]]
 
-  # coxphのロバスト標準誤差計算用に必須となるIDを付与
+  # 【重要】coxphのロバスト分散用クラスターIDを付与
   data$pseudo_id <- seq_len(nrow(data))
 
   use_weights <- !is.null(weights_var) && (weights_var %in% colnames(data))
 
+  # 【重要】ggsurvplotが絶対に変失わないよう、固定名の重み列をデータフレーム内に作成する
+  data$plot_weights <- if (use_weights) data[[weights_var]] else rep(1, nrow(data))
+
+  # 2. 計算式 (formula) と X軸ラベルの定義
   if (use_weights) {
-    # 【修正1】新手法(Proposed)に合わせ、左側切断を解除し time_all のみに変更
-    surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
+    # 提案手法：時間補正済みのため time_all のみを使用
+    surv_formula <- as.formula(paste0("Surv(time_all, censor) ~ ", group_var))
     Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", Age-calibrated (months)")
-    data$w_vec <- data[[weights_var]]
   } else {
     if (adjustment) {
-      surv_formula <- as.formula(paste0("Surv(", time_var1, ", ", time_var2, ", ", status_var, ") ~ ", group_var))
+      # 従来手法：左側切断 (Left-Truncation)
+      surv_formula <- as.formula(paste0("Surv(time_pre, time_all, censor) ~ ", group_var))
       Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", risk-set adjusted (months)")
     } else {
-      surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
+      # 未補正
+      surv_formula <- as.formula(paste0("Surv(time_all, censor) ~ ", group_var))
       Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", bias not adj (months)")
     }
-    data$w_vec <- rep(1, nrow(data))
   }
 
-  # 【修正2】ggsurvplotが環境を見失わないよう、callオブジェクトで明示的に関数を評価する
-  fit_call <- call("survfit", formula = surv_formula, data = quote(data), weights = quote(w_vec), conf.type = "log-log")
-  surv_fit <- eval(fit_call)
-  surv_fit$call$formula <- surv_formula # ggsurvplotのための保険
+  # 3. survfit の実行 (ggsurvplotが認識できるよう plot_weights という列名を直接指定)
+  surv_fit <- survival::survfit(surv_formula, data = data, weights = plot_weights, conf.type = "log-log")
 
+  # 4. 生存曲線の描画と coxph (ハザード比) の計算
   if (group_var == "1") {
     surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
   } else {
     group_vals <- unique(na.omit(data[[group_var]]))
-    n_group <- length(group_vals)
-    if (n_group <= 1) {
+
+    if (length(group_vals) <= 1) {
       surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
     } else {
-      # coxphもcallで安全に評価 (前回の cluster/id エラーもこれで完全に防げます)
+      # 【最大の修正点】
+      # "one of cluster or id is needed" を完全に回避するため、
+      # coxph 用の formula の末尾に "+ cluster(pseudo_id)" を文字列として強制結合する。
+
       if (use_weights) {
-        # robust sandwich SE needs cluster (or id); cluster is the safest here
-        cox_call <- call(
-          "coxph",
-          formula  = surv_formula,
-          data     = quote(data),
-          weights  = quote(w_vec),
-          robust   = TRUE,
-          cluster  = quote(pseudo_id)
-        )
-        diff_0 <- eval(cox_call)
+        cox_formula <- as.formula(paste0("Surv(time_all, censor) ~ ", group_var, " + cluster(pseudo_id)"))
+        diff_0 <- survival::coxph(cox_formula, data = data, weights = plot_weights)
       } else {
-        # keep as-is (no robust needed); cluster not required
-        cox_call <- call(
-          "coxph",
-          formula = surv_formula,
-          data    = quote(data)
-        )
-        diff_0 <- eval(cox_call)
+        if (adjustment) {
+          cox_formula <- as.formula(paste0("Surv(time_pre, time_all, censor) ~ ", group_var, " + cluster(pseudo_id)"))
+          diff_0 <- survival::coxph(cox_formula, data = data)
+        } else {
+          cox_formula <- surv_formula
+          diff_0 <- survival::coxph(cox_formula, data = data)
+        }
       }
+
       surv_curv_CTx(surv_fit, data, plot_title, group_labels, diff_0, Xlab)
     }
   }
