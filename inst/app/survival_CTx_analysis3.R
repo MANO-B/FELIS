@@ -761,3 +761,136 @@ output$forest_plot_multivariate <- renderPlot({
   estimated_items <- 1 + 1 + (n_cancers - 1) + n_genes  # Age + Sex + cancers + genes
   max(500, estimated_items * 35 + 220)
 })
+
+build_forest_plot_weighted_aft <- function(data_forest, covariates,
+                                           time_var = "time_all", status_var = "censor",
+                                           weight_var = "iptw") {
+  shiny::validate(shiny::need(requireNamespace("patchwork", quietly = TRUE),
+                              "Please install the 'patchwork' package. Run: install.packages('patchwork')"))
+
+  form_final <- as.formula(
+    paste0("survival::Surv(", time_var, ", ", status_var, ") ~ ", paste(covariates, collapse = " + "))
+  )
+
+  fit <- tryCatch(
+    flexsurv::flexsurvreg(form_final, data = data_forest, weights = data_forest[[weight_var]], dist = "llogis"),
+    error = function(e) NULL
+  )
+  shiny::validate(shiny::need(!is.null(fit), "Weighted AFT (llogis) failed to converge."))
+
+  res <- fit$res
+  cov_names <- rownames(res)[!rownames(res) %in% c("shape", "scale")]
+
+  total_N <- nrow(data_forest)
+
+  plot_data <- data.frame(
+    Variable_Raw = cov_names,
+    Estimate = exp(res[cov_names, "est"]),
+    Lower = exp(res[cov_names, "L95%"]),
+    Upper = exp(res[cov_names, "U95%"]),
+    Category = "Others",
+    Label = cov_names,
+    Positive_N = NA_real_,
+    Total_N = total_N,
+    stringsAsFactors = FALSE
+  )
+
+  # Age per +10 years if present
+  for (i in seq_len(nrow(plot_data))) {
+    var <- plot_data$Variable_Raw[i]
+    if (grepl("^age_num", var)) {
+      plot_data$Estimate[i] <- exp(res[var, "est"] * 10)
+      plot_data$Lower[i]    <- exp(res[var, "L95%"] * 10)
+      plot_data$Upper[i]    <- exp(res[var, "U95%"] * 10)
+      plot_data$Label[i]    <- "Age (per +10 years)"
+      plot_data$Category[i] <- "Demographics"
+    }
+    if (grepl("^Sex", var)) plot_data$Category[i] <- "Demographics"
+    if (grepl("^Cancers", var)) plot_data$Category[i] <- "Histology"
+    if (grepl("^Gene_", var)) plot_data$Category[i] <- "Genomics"
+  }
+
+  # Pretty labels + Positive_N
+  if ("Sex" %in% covariates && "Sex" %in% names(data_forest)) {
+    ref_sex <- levels(data_forest$Sex)[1]
+    for (i in seq_len(nrow(plot_data))) {
+      var <- plot_data$Variable_Raw[i]
+      if (grepl("^Sex", var)) {
+        lv <- sub("^Sex", "", var)
+        plot_data$Label[i] <- paste0("Sex: ", lv, " (vs ", ref_sex, ")")
+        plot_data$Positive_N[i] <- sum(data_forest$Sex == lv, na.rm = TRUE)
+      }
+    }
+  }
+
+  if ("Cancers" %in% covariates && "Cancers" %in% names(data_forest)) {
+    ref_can <- levels(data_forest$Cancers)[1]
+    for (i in seq_len(nrow(plot_data))) {
+      var <- plot_data$Variable_Raw[i]
+      if (grepl("^Cancers", var)) {
+        lv <- sub("^Cancers", "", var)
+        plot_data$Label[i] <- paste0("Histology: ", lv, " (vs ", ref_can, ")")
+        plot_data$Positive_N[i] <- sum(data_forest$Cancers == lv, na.rm = TRUE)
+      }
+    }
+  }
+
+  for (i in seq_len(nrow(plot_data))) {
+    var <- plot_data$Variable_Raw[i]
+    if (grepl("^Gene_", var)) {
+      gene_nm <- sub("^Gene_", "", var)
+      gene_nm <- sub("Mutated$", "", gene_nm)
+      col_name <- paste0("Gene_", gene_nm)
+      plot_data$Label[i] <- paste0("Gene: ", gene_nm, " (Mutated vs WT)")
+      if (col_name %in% names(data_forest)) {
+        plot_data$Positive_N[i] <- sum(data_forest[[col_name]] == "Mutated", na.rm = TRUE)
+      }
+    }
+  }
+
+  plot_data$Text_CI <- sprintf("%.2f (%.2f-%.2f)", plot_data$Estimate, plot_data$Lower, plot_data$Upper)
+  plot_data$Text_PosN <- ifelse(is.na(plot_data$Positive_N), "-", as.character(plot_data$Positive_N))
+
+  plot_data$Category <- factor(plot_data$Category, levels = c("Genomics", "Demographics", "Histology", "Others"))
+  plot_data <- plot_data[order(plot_data$Category, plot_data$Estimate), ]
+  plot_data$Label <- factor(plot_data$Label, levels = plot_data$Label)
+
+  p_left <- ggplot2::ggplot(plot_data, ggplot2::aes(x = Estimate, y = Label, color = Category)) +
+    ggplot2::geom_errorbarh(ggplot2::aes(xmin = Lower, xmax = Upper), height = 0.3, linewidth = 0.8) +
+    ggplot2::geom_point(size = 3.8) +
+    ggplot2::geom_vline(xintercept = 1, linetype = "dashed", linewidth = 1) +
+    ggplot2::scale_x_log10(breaks = c(0.1, 0.2, 0.5, 1, 2, 5, 10)) +
+    ggplot2::theme_minimal(base_size = 14) +
+    ggplot2::labs(x = "Time Ratio (log scale, 95% CI)", y = "") +
+    ggplot2::theme(
+      panel.grid.minor = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_text(face = "bold", size = 11),
+      legend.position = "none"
+    )
+
+  p_right <- ggplot2::ggplot(plot_data, ggplot2::aes(y = Label)) +
+    ggplot2::geom_text(ggplot2::aes(x = 0, label = Total_N), hjust = 0.5, size = 4.2) +
+    ggplot2::geom_text(ggplot2::aes(x = 1, label = Text_PosN), hjust = 0.5, size = 4.2) +
+    ggplot2::geom_text(ggplot2::aes(x = 2, label = Text_CI), hjust = 0.5, size = 4.2) +
+    ggplot2::scale_x_continuous(limits = c(-0.5, 2.5), breaks = c(0, 1, 2),
+                                labels = c("Total N\n(Real)", "Positive N\n(Real)", "TR\n(95% CI)")) +
+    ggplot2::theme_minimal(base_size = 14) +
+    ggplot2::labs(x = "", y = "") +
+    ggplot2::theme(
+      panel.grid = ggplot2::element_blank(),
+      axis.text.y = ggplot2::element_blank(),
+      axis.ticks = ggplot2::element_blank()
+    )
+
+  p_left + p_right + patchwork::plot_layout(widths = c(2.0, 1.25)) +
+    patchwork::plot_annotation(
+      title = "Independent Prognostic Impact (Calibrated weighted AFT; llogis)",
+      subtitle = "TR > 1: prolonged survival | TR < 1: shortened survival\nWeights are learned by age-stratified matching of observed OS to external target OS",
+      theme = ggplot2::theme(
+        plot.title = ggplot2::element_text(face = "bold", size = 16),
+        plot.subtitle = ggplot2::element_text(size = 12)
+      )
+    )
+}
+
+
