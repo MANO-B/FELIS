@@ -7,14 +7,6 @@
 #  - Goal: estimate conditional AF (AFT regression coefficients) for OS
 # =========================================================================
 
-suppressPackageStartupMessages({
-  library(dplyr)
-  library(flexsurv)
-  library(survival)
-  library(ggplot2)
-  library(scales)
-})
-
 # -------------------------------------------------------------------------
 # Utility: Censoring parameter finder
 # -------------------------------------------------------------------------
