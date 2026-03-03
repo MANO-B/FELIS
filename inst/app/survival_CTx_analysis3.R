@@ -29,6 +29,7 @@ survival_CTx_analysis2_logic_control <- function() {
         dplyr::select(
           C.CAT調査結果.基本項目.ハッシュID,
           症例.基本情報.年齢,
+          症例.背景情報.初回治療前のステージ分類.名称.,
           Lymph_met, Brain_met, Lung_met, Bone_met, Liver_met, Other_met,
           EP_option, EP_treat, YoungOld,
           症例.基本情報.性別.名称.,
@@ -54,7 +55,8 @@ survival_CTx_analysis2_logic_control <- function() {
           time_diagnosis_enroll,
           time_diagnosis_final,
           time_2L_enroll
-        )
+        ) %>%
+        dplyr::filter(症例.背景情報.初回治療前のステージ分類.名称. == "4")
 
       if (input$HER2 == "No") {
         Data_case_target = Data_case_target %>% dplyr::select(-HER2_IHC)
