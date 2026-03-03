@@ -1171,18 +1171,14 @@ survival_compare_and_plot_CTx <- function(data,
   data$time_pre = data[[time_var1]]
   data$time_all = data[[time_var2]]
 
-  # 【追加】coxphのロバスト分散計算用に、各行に一意のIDを付与する
+  # 【重要】Start-Stop形式（time_pre, time_all）を使用する際、
+  # coxphは各患者が独立していることを認識するために id の指定が必須です。
   data$pseudo_id <- seq_len(nrow(data))
 
   # Check if valid weights are provided
   use_weights <- !is.null(weights_var) && (weights_var %in% colnames(data))
 
   if (use_weights) {
-    # =========================================================================
-    # FIX: Use Left Truncation (time_pre, time_all) combined with IPTW weights.
-    # This prevents the Immortal Time Bias (which caused the 5-year median OS),
-    # while the IPTW weights prevent the hazard explosion of the standard model.
-    # =========================================================================
     surv_formula <- as.formula(paste0("Surv(", time_var1, ", ", time_var2, ", ", status_var, ") ~ ", group_var))
     Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", IPTW adjusted (months)")
     weight_vector <- data[[weights_var]]
@@ -1215,12 +1211,18 @@ survival_compare_and_plot_CTx <- function(data,
     if (n_group == 1) {
       surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
     } else {
-      # Use robust=TRUE when weights are applied
+      # 【修正】重みの有無に関わらず `id = pseudo_id` を付与し、
+      # 環境評価エラー（object not found）を防ぐために eval(substitute()) を使用
       if (use_weights) {
-        # 【修正】id = pseudo_id を追加指定してエラーを回避
-        diff_0 <- coxph(surv_formula, data = data, weights = weight_vector, robust = TRUE, id = pseudo_id)
+        diff_0 <- eval(substitute(
+          coxph(formula = FORMULA, data = data, weights = WEIGHTS, robust = TRUE, id = pseudo_id),
+          list(FORMULA = surv_formula, WEIGHTS = weight_vector)
+        ))
       } else {
-        diff_0 <- coxph(surv_formula, data = data)
+        diff_0 <- eval(substitute(
+          coxph(formula = FORMULA, data = data, id = pseudo_id),
+          list(FORMULA = surv_formula)
+        ))
       }
       surv_curv_CTx(surv_fit, data, plot_title, group_labels, diff_0, Xlab)
     }
