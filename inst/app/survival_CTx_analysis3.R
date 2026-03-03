@@ -635,9 +635,9 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
     fit = km_w,
     data = Data_model,
     conf.int = FALSE,
-    risk.table = TRUE,          # ★追加
-    risk.table.height = 0.25,   # ★タイトルはみ出し抑制にも効く
-    risk.table.y.text = FALSE,  # 表が縦に長くなるのを抑える（好み）
+    risk.table = TRUE,
+    risk.table.height = 0.28,
+    risk.table.y.text = FALSE,
     censor = TRUE,
     xlim = c(0, 5 * 365.25),
     break.time.by = 365.25,
@@ -650,12 +650,13 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
 
   ext_df <- make_external_target_df(ref_surv_list, age_key = "全年齢")
 
-  # ggsurvplotは list(plot=, table=) なので両方にタイトル余白をつける
+  # ---- overlay external target line with unambiguous legend ----
   gp$plot <- gp$plot +
     ggplot2::geom_line(
       data = ext_df,
       ggplot2::aes(x = time_years * 365.25, y = surv, linetype = label),
-      linewidth = 1.1
+      linewidth = 1.1,
+      inherit.aes = FALSE
     ) +
     ggplot2::scale_linetype_manual(values = c("External target (全年齢, llogis)" = "dashed")) +
     ggplot2::ggtitle(title_txt) +
@@ -671,7 +672,15 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
       plot.margin = ggplot2::margin(t = 0, r = 15, b = 10, l = 10)
     )
 
-  survminer::arrange_ggsurvplots(gp, ncol = 1, nrow = 1, heights = c(0.72, 0.28))
+  # ---- IMPORTANT FIX: arrange_ggsurvplots needs a LIST of ggsurvplot objects ----
+  arranged <- survminer::arrange_ggsurvplots(
+    ggsurvplots = list(gp),
+    ncol = 1, nrow = 1,
+    heights = c(0.72, 0.28)
+  )
+
+  # In renderPlot, explicitly print the arranged grob
+  print(arranged)
 })
 # =========================================================================
 # 7) Forest plot output: weighted AFT on observed OS (time_all)
