@@ -108,7 +108,7 @@ FELISは、その二次利用データを対象に、以下のプロセスをノ
 
 ### ■ Survival after CTx with control cohort data（experimental）
 * **Custom survival analysis**
-  院内がん登録を対照コホート情報として用いた実験的解析手法。
+  院内がん登録を対照コホート情報として用いた実験的解析手法。現状はSettingsでStage4患者のみを選択する必要があり、また診断後の生存期間解析に限定。
 
 ### ■ Bias correction simulation（シミュレーション）
 * **Left-truncation bias adjustment simulation**
