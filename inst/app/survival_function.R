@@ -1168,22 +1168,21 @@ survival_compare_and_plot_CTx <- function(data,
                                           group_labels = NULL,
                                           weights_var = NULL) {
 
-  data$time_pre = data[[time_var1]]
-  data$time_all = data[[time_var2]]
+  # 変数の明示的なマッピング
+  data$time_pre <- data[[time_var1]]
+  data$time_all <- data[[time_var2]]
 
-  # 【重要】Start-Stop形式（time_pre, time_all）を使用する際、
-  # coxphは各患者が独立していることを認識するために id の指定が必須です。
+  # 【重要】coxphのロバスト標準誤差計算用に必須となるIDを付与
   data$pseudo_id <- seq_len(nrow(data))
 
-  # Check if valid weights are provided
   use_weights <- !is.null(weights_var) && (weights_var %in% colnames(data))
 
+  # formulaと重みの設定（環境評価エラーを防ぐためデータフレーム内に格納）
   if (use_weights) {
     surv_formula <- as.formula(paste0("Surv(", time_var1, ", ", time_var2, ", ", status_var, ") ~ ", group_var))
     Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", IPTW adjusted (months)")
-    weight_vector <- data[[weights_var]]
+    data$w_vec <- data[[weights_var]]
   } else {
-    # Traditional behavior (supports older function calls)
     if (adjustment) {
       surv_formula <- as.formula(paste0("Surv(", time_var1, ", ", time_var2, ", ", status_var, ") ~ ", group_var))
       Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", risk-set adjusted (months)")
@@ -1194,35 +1193,26 @@ survival_compare_and_plot_CTx <- function(data,
       surv_formula <- as.formula(paste0("Surv(", time_var2, ", ", status_var, ") ~ ", group_var))
       Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", bias not adj (months)")
     }
-    weight_vector <- rep(1, nrow(data))
+    data$w_vec <- rep(1, nrow(data))
   }
 
-  # Fit model
-  surv_fit <- eval(substitute(
-    survfit(formula = FORMULA, data = data, weights = WEIGHTS, conf.type = "log-log"),
-    list(FORMULA = surv_formula, WEIGHTS = weight_vector)
-  ))
+  # 生存曲線のフィッティング
+  surv_fit <- survival::survfit(surv_formula, data = data, weights = w_vec, conf.type = "log-log")
 
-  if(group_var == "1"){
+  # プロットとcoxphの処理
+  if (group_var == "1") {
     surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
   } else {
     group_vals <- unique(na.omit(data[[group_var]]))
     n_group <- length(group_vals)
-    if (n_group == 1) {
+    if (n_group <= 1) {
       surv_curv_CTx(surv_fit, data, plot_title, NULL, NULL, Xlab)
     } else {
-      # 【修正】重みの有無に関わらず `id = pseudo_id` を付与し、
-      # 環境評価エラー（object not found）を防ぐために eval(substitute()) を使用
+      # 【修正】エラーを完全に回避する直接的な呼び出し
       if (use_weights) {
-        diff_0 <- eval(substitute(
-          coxph(formula = FORMULA, data = data, weights = WEIGHTS, robust = TRUE, id = pseudo_id),
-          list(FORMULA = surv_formula, WEIGHTS = weight_vector)
-        ))
+        diff_0 <- survival::coxph(surv_formula, data = data, weights = w_vec, robust = TRUE, id = pseudo_id)
       } else {
-        diff_0 <- eval(substitute(
-          coxph(formula = FORMULA, data = data, id = pseudo_id),
-          list(FORMULA = surv_formula)
-        ))
+        diff_0 <- survival::coxph(surv_formula, data = data, id = pseudo_id)
       }
       surv_curv_CTx(surv_fit, data, plot_title, group_labels, diff_0, Xlab)
     }
