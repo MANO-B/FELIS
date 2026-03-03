@@ -290,49 +290,36 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   u <- pmax(pmin(runif(N_macro), 0.999), 0.001)
   T_true_base <- (True_Med * 365.25) * ((1 - u) / u)^(1 / True_Shape)
 
-  # True OS time with covariate effects (AFT-style)
-  T_true <- T_true_base * AF_total
-
-  # --- Independent truncation world: generate T1 independent of T ---
-  # IMPORTANT: T1 must NOT depend on T_true_base or AF_total
+  # --- T1 generation: CGP timing as a fraction of each individual's survival ---
+  # (This intentionally creates dependent truncation: T1 depends on T_true_base)
   if (is.null(t1_pat)) t1_pat <- "indep"
-
   min_days <- 30
   jitter_days <- 7
 
-  # choose a fixed upper bound for entry-time distribution (independent of T)
-  # (you can tune; must not reference T_true)
-  max_entry_days <- 365.25 * 5   # e.g., allow CGP up to 5 years after diagnosis
-
   if (t1_pat == "early") {
-    # earlier entry times (still independent of T)
-    T1_base <- runif(N_macro, min_days, min_days + 0.3 * (max_entry_days - min_days))
-
+    # early within survival
+    frac <- runif(N_macro, 0.02, 0.30)
+    T1_base <- pmax(min_days, frac * T_true_base)
   } else if (t1_pat %in% c("dep_1yr", "real")) {
-    # later-biased (your "real" option) but independent of T
+    # later-biased within survival (your current tweak)
     a <- 0.5; b <- 1
     frac <- rbeta(N_macro, a, b)
-    T1_base <- min_days + frac * (max_entry_days - min_days)
-
+    T1_base <- pmax(min_days, frac * T_true_base)
   } else if (t1_pat %in% c("dep_2yr", "rev")) {
-    # later-biased (your "rev" option) but independent of T
     a <- 1; b <- 0.5
     frac <- rbeta(N_macro, a, b)
-    T1_base <- min_days + frac * (max_entry_days - min_days)
-
+    T1_base <- pmax(min_days, frac * T_true_base)
   } else {
-    # quasi-uniform entry (independent of T)
+    # quasi-independent entry time (independent of T_true_base)
+    max_entry_days <- 365.25 * 10   # same as your CGP-eligibility window
     T1_base <- runif(N_macro, min_days, max_entry_days)
   }
-
-  # avoid spike at exactly min_days
   T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
 
-  # observed entry time
-  T1 <- T1_base
-
-  # residual survival after entry (deterministic decomposition; independence is ensured by construction above)
-  T2_true <- pmax(0.1, T_true - T1)
+  # keep your world: T1 depends on AF_total (thus X/Histology)  ※ここはあなたの現行方針どおり
+  T1 <- T1_base * AF_total
+  T2_true <- pmax(0.1, (T_true_base - T1_base) * AF_total)
+  T_true <- T1 + T2_true
 
   # Age class (external survival strata): <40, 40s, 50s, 60s, 70s, 80+
   Age_class_macro <- cut(
