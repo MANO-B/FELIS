@@ -477,6 +477,168 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   # ========================================================
   # Plot using survival_compare_and_plot_CTx directly with weights
   # ========================================================
+  survival_compare_and_plot_CTx <- function(data,
+                                            time_var1 = "time_pre",
+                                            time_var2 = "time_all",
+                                            status_var = "censor",
+                                            group_var = "treatment",
+                                            plot_title = "Survival curve",
+                                            adjustment = TRUE,
+                                            color_var_surv_CTx_1 = "CTx",
+                                            group_labels = NULL,
+                                            weights_var = NULL) {
+
+    dbg <- function(...) message(sprintf(...))
+
+    dbg("\n==========================================")
+    dbg("DEBUG: survival_compare_and_plot_CTx START")
+    dbg("==========================================")
+
+    # ---------- 0) basic checks ----------
+    dbg("[DEBUG] nrow(data)=%d", nrow(data))
+    dbg("[DEBUG] args: time_var1=%s time_var2=%s status_var=%s group_var=%s adjustment=%s weights_var=%s",
+        time_var1, time_var2, status_var, group_var, adjustment,
+        ifelse(is.null(weights_var), "NULL", weights_var))
+
+    required_cols <- c(time_var1, time_var2, status_var, group_var)
+    missing_cols <- required_cols[!required_cols %in% names(data)]
+    if (length(missing_cols) > 0) {
+      dbg("[DEBUG][FATAL] missing columns: %s", paste(missing_cols, collapse = ", "))
+      stop("Missing required columns: ", paste(missing_cols, collapse = ", "))
+    }
+
+    # ---------- 1) prepare variables ----------
+    data$time_pre <- suppressWarnings(as.numeric(data[[time_var1]]))
+    data$time_all <- suppressWarnings(as.numeric(data[[time_var2]]))
+    data$censor   <- data[[status_var]]  # keep original coding (user says: 1=death)
+    data$pseudo_id <- seq_len(nrow(data))
+
+    use_weights <- !is.null(weights_var) && (weights_var %in% names(data))
+    dbg("[DEBUG] use_weights=%s", use_weights)
+
+    if (use_weights) {
+      data$plot_weights <- suppressWarnings(as.numeric(data[[weights_var]]))
+    } else {
+      data$plot_weights <- rep(1, nrow(data))
+    }
+
+    # Weight sanity
+    dbg("[DEBUG] weights summary: min=%s med=%s max=%s NA=%d <=0=%d",
+        format(suppressWarnings(min(data$plot_weights, na.rm=TRUE)), digits = 6),
+        format(suppressWarnings(stats::median(data$plot_weights, na.rm=TRUE)), digits = 6),
+        format(suppressWarnings(max(data$plot_weights, na.rm=TRUE)), digits = 6),
+        sum(is.na(data$plot_weights)),
+        sum(!is.na(data$plot_weights) & data$plot_weights <= 0))
+
+    # time/status/group sanity
+    dbg("[DEBUG] time_all summary(days): min=%.3f med=%.3f max=%.3f NA=%d",
+        suppressWarnings(min(data$time_all, na.rm=TRUE)),
+        suppressWarnings(stats::median(data$time_all, na.rm=TRUE)),
+        suppressWarnings(max(data$time_all, na.rm=TRUE)),
+        sum(is.na(data$time_all)))
+
+    dbg("[DEBUG] time_pre summary(days): min=%.3f med=%.3f max=%.3f NA=%d",
+        suppressWarnings(min(data$time_pre, na.rm=TRUE)),
+        suppressWarnings(stats::median(data$time_pre, na.rm=TRUE)),
+        suppressWarnings(max(data$time_pre, na.rm=TRUE)),
+        sum(is.na(data$time_pre)))
+
+    dbg("[DEBUG] status(%s) table:\n%s",
+        status_var,
+        paste(capture.output(print(table(data$censor, useNA = "ifany"))), collapse = "\n"))
+
+    dbg("[DEBUG] group(%s) table:\n%s",
+        group_var,
+        paste(capture.output(print(table(data[[group_var]], useNA = "ifany"))), collapse = "\n"))
+
+    # basic invalid rows (do NOT drop silently; just report)
+    n_bad_time <- sum(!is.na(data$time_all) & data$time_all <= 0)
+    n_bad_lt   <- sum(is.finite(data$time_pre) & is.finite(data$time_all) & data$time_all <= data$time_pre)
+    dbg("[DEBUG] invalid rows count: time_all<=0: %d | time_all<=time_pre: %d", n_bad_time, n_bad_lt)
+
+    # ---------- 2) build formulas ----------
+    if (use_weights) {
+      # Proposed curve: no LT in plotting
+      surv_formula <- as.formula(paste0("Surv(time_all, censor) ~ ", group_var))
+      Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", Age-calibrated (months)")
+    } else {
+      if (adjustment) {
+        surv_formula <- as.formula(paste0("Surv(time_pre, time_all, censor) ~ ", group_var))
+        Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", risk-set adjusted (months)")
+      } else {
+        surv_formula <- as.formula(paste0("Surv(time_all, censor) ~ ", group_var))
+        Xlab <- paste0("Time from ", color_var_surv_CTx_1, ", bias not adj (months)")
+      }
+    }
+    dbg("[DEBUG] surv_formula = %s", paste(deparse(surv_formula), collapse=" "))
+
+    # ---------- 3) survfit ----------
+    surv_fit <- tryCatch({
+      dbg("[DEBUG] calling survfit ...")
+      fit <- survival::survfit(surv_formula, data = data, weights = plot_weights, conf.type = "log-log")
+      dbg("[DEBUG] survfit OK: n=%d, events=%s",
+          fit$n, ifelse(!is.null(fit$n.event), paste(sum(fit$n.event), collapse=""), "NA"))
+      fit
+    }, error = function(e) {
+      dbg("[DEBUG][ERROR] survfit failed: %s", conditionMessage(e))
+      dbg("[DEBUG][ERROR] survfit formula was: %s", paste(deparse(surv_formula), collapse=" "))
+      stop(e)
+    })
+
+    # ---------- 4) coxph (for HR/p only); do not block curve ----------
+    diff_0 <- NULL
+    group_vals <- unique(na.omit(data[[group_var]]))
+    dbg("[DEBUG] group unique non-NA count = %d", length(group_vals))
+
+    if (length(group_vals) > 1) {
+      diff_0 <- tryCatch({
+        dbg("[DEBUG] calling coxph ...")
+        if (use_weights) {
+          # ensure robust SE; cluster(pseudo_id) in formula
+          cox_formula <- as.formula(paste0("Surv(time_all, censor) ~ ", group_var, " + cluster(pseudo_id)"))
+          dbg("[DEBUG] cox_formula(weighted) = %s", paste(deparse(cox_formula), collapse=" "))
+          survival::coxph(cox_formula, data = data, weights = plot_weights)
+        } else {
+          if (adjustment) {
+            cox_formula <- as.formula(paste0("Surv(time_pre, time_all, censor) ~ ", group_var, " + cluster(pseudo_id)"))
+            dbg("[DEBUG] cox_formula(LT) = %s", paste(deparse(cox_formula), collapse=" "))
+            survival::coxph(cox_formula, data = data)
+          } else {
+            cox_formula <- as.formula(paste0("Surv(time_all, censor) ~ ", group_var))
+            dbg("[DEBUG] cox_formula(simple) = %s", paste(deparse(cox_formula), collapse=" "))
+            survival::coxph(cox_formula, data = data)
+          }
+        }
+      }, error = function(e) {
+        dbg("[DEBUG][WARN] coxph failed but will continue WITHOUT HR/p: %s", conditionMessage(e))
+        dbg("[DEBUG][WARN] (This should not block plotting.)")
+        NULL
+      })
+      dbg("[DEBUG] coxph done. diff_0 is NULL? %s", is.null(diff_0))
+    } else {
+      dbg("[DEBUG] coxph skipped: only one group.")
+    }
+
+    # ---------- 5) ggsurvplot via your wrapper ----------
+    res <- tryCatch({
+      dbg("[DEBUG] calling surv_curv_CTx (ggsurvplot wrapper) ...")
+      out <- surv_curv_CTx(surv_fit, data, plot_title, group_labels, diff_0, Xlab)
+      dbg("[DEBUG] surv_curv_CTx OK")
+      out
+    }, error = function(e) {
+      dbg("[DEBUG][ERROR] surv_curv_CTx / ggsurvplot failed: %s", conditionMessage(e))
+      # print useful object summaries
+      dbg("[DEBUG] survfit summary(table):")
+      dbg("%s", paste(capture.output(print(tryCatch(summary(surv_fit)$table, error=function(x) "summary(table) failed"))),
+                      collapse="\n"))
+      stop(e)
+    })
+
+    dbg("DEBUG: survival_compare_and_plot_CTx END")
+    dbg("==========================================\n")
+    return(res)
+  }
+
   survival_compare_and_plot_CTx(
     data = Data_model,
     time_var1 = "time_pre",
