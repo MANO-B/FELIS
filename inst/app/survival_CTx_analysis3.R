@@ -477,7 +477,7 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
   # ========================================================
   # Plot using survival_compare_and_plot_CTx directly with weights
   # ========================================================
-  survival_compare_and_plot_CTx_AA <- function(data,
+  survival_compare_and_plot_CTx <- function(data,
                                             time_var1 = "time_pre",
                                             time_var2 = "time_all",
                                             status_var = "censor",
