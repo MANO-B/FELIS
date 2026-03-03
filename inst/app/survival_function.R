@@ -1157,7 +1157,7 @@ rmst_diff_iptw_boot_ci <- function(data, time_var, status_var, group_var,
   list(point = point, ll = ll, ul = ul, boots = boots)
 }
 
-survival_compare_and_plot_CTx <- function(data,
+survival_compare_and_plot_CTxAAA <- function(data,
                                           time_var1 = "time_pre",
                                           time_var2 = "time_all",
                                           status_var = "censor",
