@@ -1477,15 +1477,15 @@ ui <- dashboardPage(
                     numericInput("sim_mut_freq", "Target Gene Mutation Frequency (%):", 20, min = 1, max = 100, step = 1),
                     numericInput("sim_true_af", "True Target Gene AF (Time Ratio):", 1.5, min = 0.1, max = 5.0, step = 0.1),
 
-                    numericInput("sim_true_med", "True Baseline Median OS (Years):", 3.0, min = 0.5, max = 10.0, step = 0.5),
-                    numericInput("sim_true_shape", "True Baseline Shape (Log-logistic):", 1.5, min = 0.5, max = 5.0, step = 0.1),
+                    numericInput("sim_true_med", "True Baseline Median OS (Years):", 2.0, min = 0.5, max = 10.0, step = 0.5),
+                    numericInput("sim_true_shape", "True Baseline Shape (Log-logistic):", 2.0, min = 0.5, max = 5.0, step = 0.1),
 
                     h4("Left-Truncation (T1) Pattern"),
                     radioButtons("sim_t1_pattern", "Timing of CGP test (T1):",
                                  choices = c("Quasi-independent (Random during survival)" = "indep",
-                                             "Early phase of survival" = "early",
-                                             "Dependent Truncation (~1 year before death)" = "dep_1yr",
-                                             "Dependent Truncation (~2 years before death)" = "dep_2yr")),
+                                             "Early phase (~30% of total survival)of survival" = "early",
+                                             "Dependent Truncation (early phase)" = "dep_1yr",
+                                             "Dependent Truncation (late phase)" = "dep_2yr")),
 
                     h4("Censoring Pattern (C2)"),
                     radioButtons("sim_cens_pattern", "Timing of Censoring:",

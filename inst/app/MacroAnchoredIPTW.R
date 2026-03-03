@@ -293,9 +293,25 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   if (t1_pat == "early") {
     T1_base <- runif(N_macro, 30, pmax(31, T_true_base * 0.3))
   } else if (t1_pat %in% c("dep_1yr", "real")) {
-    T1_base <- pmax(30, T_true_base - rlnorm(N_macro, log(365.25 * 1.0), 0.4))
+    a <- 2; b <- 6         # later-biased; tweak
+    min_days <- 30
+    jitter_days <- 7
+
+    frac <- rbeta(N_macro, a, b)             # in (0,1)
+    T1_base <- pmax(min_days, frac * T_true_base)
+
+    # optional: break ties / avoid spike at exactly 30
+    T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
   } else if (t1_pat %in% c("dep_2yr", "rev")) {
-    T1_base <- pmax(30, T_true_base - rlnorm(N_macro, log(365.25 * 2.0), 0.4))
+    a <- 6; b <- 2         # later-biased; tweak
+    min_days <- 30
+    jitter_days <- 7
+
+    frac <- rbeta(N_macro, a, b)             # in (0,1)
+    T1_base <- pmax(min_days, frac * T_true_base)
+
+    # optional: break ties / avoid spike at exactly 30
+    T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
   } else {
     T1_base <- runif(N_macro, 30, pmax(31, T_true_base))
   }
@@ -684,18 +700,24 @@ observeEvent(input$run_sim_multi, {
       ))
     )
 
+    title_txt <- paste(strwrap("Figure 1: Reconstructed Marginal Survival Curves", width = 38), collapse = "\n")
+    sub_txt   <- paste(strwrap("Averaged across iterations", width = 42), collapse = "\n")
+
     ggplot(plot_df1, aes(x = Time, y = Survival, color = Model, linetype = Model)) +
       geom_line(linewidth = 1.2) +
       scale_y_continuous(limits = c(0, 1), labels = scales::percent_format()) +
       theme_minimal(base_size = 15) +
       labs(
-        title = "Figure 1: Reconstructed Marginal Survival Curves",
-        subtitle = "Averaged across iterations",
+        title = title_txt,
+        subtitle = sub_txt,
         x = "Time from Diagnosis (Years)",
         y = "Overall Survival Probability"
       ) +
       theme(
-        plot.title = element_text(face = "bold"),
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold", size = 16, lineheight = 1.05),
+        plot.subtitle = element_text(size = 12, lineheight = 1.05),
+        plot.margin = margin(t = 10, r = 10, b = 10, l = 10),
         legend.position = "bottom",
         legend.direction = "vertical",
         legend.title = element_blank()
@@ -716,18 +738,19 @@ observeEvent(input$run_sim_multi, {
       ), levels = c("Naive AFT", "Standard LT AFT", "Proposed (Weighted AFT)"))
     )
 
+    title_txt <- paste(strwrap("Figure 2: Distribution of Estimated AF (Dashed line = True AF)", width = 38), collapse = "\n")
+
     ggplot(plot_df2, aes(x = Model, y = AF, fill = Model)) +
       geom_boxplot(alpha = 0.8, outlier.shape = 1) +
       geom_hline(yintercept = True_AF, color = "black", linetype = "dashed", linewidth = 1.2) +
       coord_cartesian(ylim = c(0, max(True_AF * 2.5, 3))) +
-      theme_minimal(base_size = 15) +
-      labs(
-        title = "Figure 2: Distribution of Estimated AF (X)",
-        subtitle = "Dashed line = True AF",
-        x = "",
-        y = "Estimated AF"
-      ) +
-      theme(plot.title = element_text(face = "bold"), legend.position = "none")
+      theme_minimal(base_size = 15)+
+      labs(title = title_txt, x = "", y = "Estimated AF") +
+      theme(
+        plot.title.position = "plot",
+        plot.title = element_text(face="bold", size=16, lineheight=1.05),
+        plot.margin = margin(t=10, r=10, b=10, l=10)
+      )
   })
 
   # Fig3: dependence scatter (T1 vs T2_true)
@@ -736,16 +759,17 @@ observeEvent(input$run_sim_multi, {
     t2_samp <- results[[1]]$sample_t2 / 365.25
     plot_df3 <- data.frame(T1 = t1_samp, T2 = t2_samp)
 
+    title_txt <- paste(strwrap("Figure 3: Dependent Truncation Structure (Correlation between T1 and residual survival)", width = 38), collapse = "\n")
+
     ggplot(plot_df3, aes(x = T1, y = T2)) +
       geom_point(color = "black", alpha = 0.4, size = 2) +
       geom_smooth(method = "lm", color = "black", linetype = "dashed", linewidth = 1.2, se = TRUE) +
       theme_minimal(base_size = 15) +
-      labs(
-        title = "Figure 3: Dependent Truncation Structure (True)",
-        subtitle = "Correlation between T1 and residual survival (T2_true)",
-        x = "Time to CGP Test (T1, Years)",
-        y = "Residual Survival Time (T2, Years)"
-      ) +
-      theme(plot.title = element_text(face = "bold"))
+      labs(title = title_txt, x = "Time to CGP Test (T1, Years)", y = "Residual Survival Time (T2, Years)") +
+      theme(
+        plot.title.position = "plot",
+        plot.title = element_text(face="bold", size=16, lineheight=1.05),
+        plot.margin = margin(t=10, r=10, b=10, l=10)
+      )
   })
 })
