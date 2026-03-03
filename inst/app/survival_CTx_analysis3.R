@@ -2,65 +2,21 @@
 # Tamura & Ikegami Model Ver 2.3.2 (Real-Data Port)
 #  - censor == 1 means EVENT (death)
 #  - Keep output variable names: time_pre, time_all, censor, Group
-#  - Replace downstream analysis/plotting with "Calibrated G-computation (T1/T2)" pipeline
+#  - Replaced downstream analysis/plotting with Proposed Simulation Pipeline:
+#    Age-stratified external OS curve matching via weights on T_obs (time_all),
+#    followed by weighted AFT modeling on observed data.
 # =========================================================================
 
 library(dplyr)
 library(survival)
 library(flexsurv)
 library(ggplot2)
-library(splines)
 library(rlang)
+library(patchwork)
 
 # =========================================================================
 # 0) Helpers
 # =========================================================================
-
-# Robust simulation from flexsurvreg fits (Weibull / Log-logistic)
-# - supports arbitrary covariates via model.matrix using stored formula
-gen_sim_times_robust <- function(fit, newdata, dist_type = c("weibull", "llogis")) {
-  dist_type <- match.arg(dist_type)
-  if (is.null(fit) || nrow(newdata) == 0) return(rep(NA_real_, nrow(newdata)))
-
-  res_m <- fit$res
-  if (!all(c("shape", "scale") %in% rownames(res_m))) return(rep(NA_real_, nrow(newdata)))
-
-  shape <- res_m["shape", "est"]
-  base_scale <- res_m["scale", "est"]
-
-  form <- fit$my_formula
-  if (is.null(form)) {
-    form <- tryCatch(eval(fit$call$formula, envir = parent.frame()), error = function(e) fit$call$formula)
-  }
-
-  # No covariates (only shape & scale)
-  if (length(fit$coefficients) <= 2) {
-    scale_vec <- rep(base_scale, nrow(newdata))
-  } else {
-    form_str <- as.character(form)
-    rhs_str <- if (length(form_str) == 3) form_str[3] else form_str[2]
-    form_right <- as.formula(paste("~", rhs_str))
-
-    mf <- model.frame(form_right, data = newdata, xlev = fit$xlevels, na.action = na.pass)
-    mm <- model.matrix(form_right, mf, contrasts.arg = fit$contrasts)
-
-    # align coefficients (exclude intercept)
-    cov_names <- colnames(mm)[-1]
-    cov_coefs <- fit$coefficients[cov_names]
-    cov_coefs[is.na(cov_coefs)] <- 0
-
-    eta <- as.numeric(mm[, -1, drop = FALSE] %*% cov_coefs)
-    scale_vec <- base_scale * exp(eta)
-  }
-
-  u <- pmax(pmin(runif(nrow(newdata)), 0.9999), 0.0001)
-
-  if (dist_type == "weibull") {
-    return(scale_vec * (-log(u))^(1 / shape))
-  } else {
-    return(scale_vec * ((1 - u) / u)^(1 / shape))
-  }
-}
 
 # Robust age parsing (e.g., "60代" -> 60)
 extract_age_num <- function(x) {
@@ -87,7 +43,6 @@ build_ref_surv_list_realdata <- function(input) {
   if (!is.null(input$survival_data_source)) {
     if (input$survival_data_source == "registry") {
       cancer_data <- Data_age_survival_5_year[[input$registry_cancer_type]]
-      age_groups_all <- c("40未満","40代","50代","60代","70代","80以上","全年齢")
       fallback_surv <- cancer_data[["全年齢"]]
       for (ag in age_groups_all) {
         if (!is.null(cancer_data[[ag]]) && length(cancer_data[[ag]]) == 5) {
@@ -124,141 +79,114 @@ build_ref_surv_list_realdata <- function(input) {
   ref_surv_list
 }
 
-# Calibrated IPTW (Ver 2.3.2 style): match macro S(t) at 1..5y by age_class
-# IMPORTANT: censor==1 means death event
-calculate_calibrated_iptw_real <- function(data, ref_surv_list) {
+# =========================================================================
+# Simulation Pipeline Port: External survival llogis smoothing
+# =========================================================================
+fit_llogis_from_S15 <- function(S_y_percent) {
+  t_years <- 1:5
+  S <- pmax(pmin(as.numeric(S_y_percent) / 100, 0.999), 0.001)
+
+  obj <- function(par) {
+    log_shape <- par[1]
+    log_scale <- par[2]
+    shape <- exp(log_shape)
+    scale <- exp(log_scale)
+    S_hat <- 1 / (1 + (t_years / scale)^shape)
+    sum((S_hat - S)^2)
+  }
+
+  init <- c(log(1.5), log(3))
+  opt <- tryCatch(
+    optim(init, obj, method = "Nelder-Mead", control = list(maxit = 2000)),
+    error = function(e) NULL
+  )
+  if (is.null(opt) || any(!is.finite(opt$par))) {
+    return(list(shape = 1.5, scale = 3.0))
+  }
+  list(shape = exp(opt$par[1]), scale = exp(opt$par[2]))
+}
+
+llogis_surv <- function(t_years, shape, scale) {
+  t_years <- pmax(t_years, 1e-8)
+  1 / (1 + (t_years / scale)^shape)
+}
+
+# =========================================================================
+# Simulation Pipeline Port: Direct T_obs Curve Matching (Age-stratified)
+# IMPORTANT: censor==1 means death event, time_all is T_obs
+# =========================================================================
+calculate_obs_matching_weights_real <- function(data, ref_surv_list) {
   data$iptw <- 1.0
-  t_points_days <- (1:5) * 365.25
+
+  # 0.5-year grid up to 5 years (10 points)
+  t_points_years <- seq(0.5, 5.0, by = 0.5)
+  t_points_days  <- t_points_years * 365.25
 
   if (!("age_class" %in% names(data))) stop("age_class missing")
-  if (!all(c("time_pre", "time_all", "censor") %in% names(data))) stop("time_pre/time_all/censor missing")
+  if (!all(c("time_all", "censor") %in% names(data))) stop("time_all/censor missing")
 
   for (ag in unique(data$age_class)) {
     if (!(ag %in% names(ref_surv_list))) next
 
-    S_macro_target <- pmax(pmin(ref_surv_list[[ag]][1:5] / 100, 0.999), 0.001)
     ag_idx <- which(data$age_class == ag)
+    if (length(ag_idx) < 10) next
     ag_data <- data[ag_idx, , drop = FALSE]
-    if (nrow(ag_data) < 10) next
 
-    log_t1 <- log(pmax(ag_data$time_pre / 365.25, 1e-6))
-    log_t1_sq <- log_t1^2
+    # ---- build target curve from external 1–5y points (smoothed by llogis) ----
+    pars <- fit_llogis_from_S15(ref_surv_list[[ag]])
+    S_target <- llogis_surv(t_points_years, pars$shape, pars$scale)
+    S_target[!is.finite(S_target)] <- 0
+    S_target <- pmax(pmin(S_target, 0.999), 0.001)
+
+    # ---- smooth weight function of time_all (polynomial of log time) ----
+    log_t <- log(pmax(ag_data$time_all / 365.25, 1e-6))
+    log_t2 <- log_t^2
+    log_t3 <- log_t^3
 
     obj_func <- function(theta) {
-      w <- exp(theta[1] * log_t1 + theta[2] * log_t1_sq)
-      w <- pmax(w, 1e-4)
+      w <- exp(theta[1] * log_t + theta[2] * log_t2 + theta[3] * log_t3)
+      w <- pmax(w, 1e-6)
       w <- w / mean(w)
 
-      # censor==1 is death event
       km <- tryCatch(
         survival::survfit(survival::Surv(time_all, censor) ~ 1, data = ag_data, weights = w),
         error = function(e) NULL
       )
-      if (is.null(km)) return(1e6)
+      if (is.null(km)) return(1e9)
 
       S_est <- approx(km$time, km$surv, xout = t_points_days, method = "constant", f = 0, rule = 2)$y
-      S_est[is.na(S_est)] <- min(S_est, na.rm = TRUE)
-      sum((S_est - S_macro_target)^2) + 0.001 * sum(theta^2)
+      S_est[!is.finite(S_est)] <- 0
+      S_est <- pmax(pmin(S_est, 0.999), 0.001)
+
+      loss <- sum((S_est - S_target)^2)
+      loss + 0.001 * sum(theta^2)
     }
 
-    opt <- tryCatch(optim(c(0, 0), obj_func, method = "BFGS"), error = function(e) list(par = c(0, 0)))
-    theta_hat <- opt$par
+    opt <- tryCatch(
+      optim(c(0, 0, 0), obj_func, method = "Nelder-Mead", control = list(maxit = 2000)),
+      error = function(e) list(par = c(0, 0, 0))
+    )
+    th <- opt$par
 
-    w_opt <- pmax(exp(theta_hat[1] * log_t1 + theta_hat[2] * log_t1_sq), 1e-4)
-    lower_bound <- as.numeric(stats::quantile(w_opt, 0.01, na.rm = TRUE))
-    upper_bound <- as.numeric(stats::quantile(w_opt, 0.99, na.rm = TRUE))
-    w_opt <- pmax(lower_bound, pmin(w_opt, upper_bound))
+    w_opt <- exp(th[1] * log_t + th[2] * log_t2 + th[3] * log_t3)
+    w_opt <- pmax(w_opt, 1e-6)
+
+    # winsorize
+    lb <- stats::quantile(w_opt, 0.01, na.rm = TRUE)
+    ub <- stats::quantile(w_opt, 0.99, na.rm = TRUE)
+    w_opt <- pmax(lb, pmin(w_opt, ub))
 
     data$iptw[ag_idx] <- w_opt / mean(w_opt)
   }
 
+  # normalize weights
   data$iptw <- as.numeric(data$iptw)
   data$iptw <- ifelse(is.na(data$iptw) | data$iptw <= 0, 1.0, data$iptw)
+  data$iptw <- data$iptw / mean(data$iptw)
 
   ess <- (sum(data$iptw, na.rm = TRUE)^2) / sum(data$iptw^2, na.rm = TRUE)
   attr(data, "ESS") <- ess
   data
-}
-
-# Proposed pipeline: fit T1 (weibull) + T2 (llogis) with ns(logT1) then simulate OS
-# - expects: time_pre, time_all, censor(1=death), iptw, Group, covariates in data
-fit_and_simulate_proposed_real <- function(Data_model, covariates, ns_df = 3, M_pseudo = 5000, cap_years = 10) {
-  if (nrow(Data_model) == 0) return(NULL)
-
-  Data_model <- Data_model %>%
-    dplyr::mutate(
-      time_t2 = pmax(time_all - time_pre, 0.1),
-      time_pre_event = 1
-    ) %>%
-    dplyr::filter(is.finite(time_pre), is.finite(time_all), is.finite(censor),
-                  time_pre > 0, time_all > time_pre)
-
-  if (!("iptw" %in% names(Data_model))) Data_model$iptw <- 1.0
-  Data_model$iptw <- as.numeric(Data_model$iptw)
-  Data_model$iptw <- ifelse(is.na(Data_model$iptw) | Data_model$iptw <= 0, 1.0, Data_model$iptw)
-
-  # spline on log(T1)
-  Data_model$logT1_scale <- log(pmax(Data_model$time_pre / 365.25, 1e-6))
-  ns_obj <- splines::ns(Data_model$logT1_scale, df = ns_df)
-  ns_mat <- as.matrix(ns_obj)
-  colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
-  for (j in seq_len(ncol(ns_mat))) Data_model[[colnames(ns_mat)[j]]] <- ns_mat[, j]
-
-  # Build formulas
-  form_t1 <- as.formula(paste("survival::Surv(time_pre, time_pre_event) ~", paste(covariates, collapse = " + ")))
-  fit_t1 <- tryCatch(flexsurv::flexsurvreg(form_t1, data = Data_model, weights = iptw, dist = "weibull"),
-                     error = function(e) NULL)
-  if (!is.null(fit_t1)) fit_t1$my_formula <- form_t1
-
-  # IMPORTANT: censor==1 is death event
-  form_t2 <- as.formula(paste("survival::Surv(time_t2, censor) ~", paste(c(covariates, colnames(ns_mat)), collapse = " + ")))
-  fit_t2 <- tryCatch(flexsurv::flexsurvreg(form_t2, data = Data_model, weights = iptw, dist = "llogis"),
-                     error = function(e) NULL)
-  if (!is.null(fit_t2)) fit_t2$my_formula <- form_t2
-
-  if (is.null(fit_t1) || is.null(fit_t2)) return(NULL)
-
-  set.seed(2024)
-  idx <- sample(seq_len(nrow(Data_model)), size = M_pseudo, replace = TRUE, prob = Data_model$iptw)
-  pseudo_base <- Data_model[idx, , drop = FALSE]
-
-  cap_days <- cap_years * 365.25
-  sim_list <- list()
-
-  # simulate only groups other than EP0 (your plot expects Group in c("1","2"))
-  for (g in setdiff(levels(Data_model$Group), "EP0")) {
-    pseudo_g <- pseudo_base
-    pseudo_g$Group <- factor(g, levels = levels(Data_model$Group))
-
-    sim_T1 <- gen_sim_times_robust(fit_t1, pseudo_g, dist_type = "weibull")
-    pseudo_g$logT1_scale <- log(pmax(sim_T1 / 365.25, 1e-6))
-
-    ns_sim <- tryCatch(predict(ns_obj, pseudo_g$logT1_scale),
-                       error = function(e) matrix(0, nrow(pseudo_g), attr(ns_obj, "df")))
-    colnames(ns_sim) <- paste0("ns", seq_len(ncol(ns_sim)))
-    for (j in seq_len(ncol(ns_sim))) pseudo_g[[colnames(ns_sim)[j]]] <- ns_sim[, j]
-
-    sim_T2 <- gen_sim_times_robust(fit_t2, pseudo_g, dist_type = "llogis")
-    sim_OS <- sim_T1 + sim_T2
-
-    # admin censoring at 10y: if exceeded -> censored (censor=0), else death observed (censor=1)
-    final_censor <- ifelse(sim_OS > cap_days, 0, 1)
-    final_os <- pmin(sim_OS, cap_days)
-    final_t1 <- pmin(sim_T1, cap_days - 0.1)
-
-    sim_list[[length(sim_list) + 1]] <- data.frame(
-      C.CAT調査結果.基本項目.ハッシュID = pseudo_g$C.CAT調査結果.基本項目.ハッシュID,
-      time_pre = final_t1,
-      time_all = final_os,
-      censor = final_censor,
-      Group = as.character(g)
-    )
-  }
-
-  simdat <- dplyr::bind_rows(sim_list) %>%
-    dplyr::filter(is.finite(time_all), time_all > 0, time_all > time_pre)
-
-  list(simdat = simdat, fit_t1 = fit_t1, fit_t2 = fit_t2, ns_obj = ns_obj)
 }
 
 # =========================================================================
@@ -429,7 +357,7 @@ survival_CTx_analysis2_logic_control <- function() {
 }
 
 # =========================================================================
-# 2) Survival Plot: Replace with Proposed (Ver 2.3.2) Calibrated G-comp
+# 2) Survival Plot: Replaced with Proposed Age-stratified matching via weights
 # =========================================================================
 output$figure_survival_CTx_interactive_1_control = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
@@ -465,11 +393,9 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     )
 
   # --- Build macro reference survival
-  # NOTE: if Data_age_survival_5_year exists in your server env, this will use it
   ref_surv_list <- build_ref_surv_list_realdata(input)
 
   # Ensure keys exist for the age classes we generate
-  # (fallback: use "全年齢" if missing)
   for (ag in unique(Data_survival_interactive$age_class)) {
     if (!ag %in% names(ref_surv_list)) {
       if ("全年齢" %in% names(ref_surv_list)) ref_surv_list[[ag]] <- ref_surv_list[["全年齢"]]
@@ -477,13 +403,11 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
     }
   }
 
-  # --- Calibrated IPTW (Ver 2.3.2)
-  Data_survival_interactive <- calculate_calibrated_iptw_real(Data_survival_interactive, ref_surv_list)
-  Data_survival_interactive$iptw <- as.numeric(Data_survival_interactive$iptw)
-  Data_survival_interactive$iptw <- ifelse(is.na(Data_survival_interactive$iptw) | Data_survival_interactive$iptw <= 0, 1.0, Data_survival_interactive$iptw)
+  # --- Calculate Matching Weights (Proposed Pipeline)
+  Data_survival_interactive <- calculate_obs_matching_weights_real(Data_survival_interactive, ref_surv_list)
 
   # ========================================================
-  # Extract Group IDs (same logic, unchanged outputs)
+  # Extract Group IDs
   # ========================================================
   extract_group_ids <- function(group_num) {
     IDs <- unique(Data_survival_interactive$C.CAT調査結果.基本項目.ハッシュID)
@@ -552,47 +476,23 @@ output$figure_survival_CTx_interactive_1_control = renderPlot({
                               "Not enough EP_treat == 0 patients to establish the reference baseline."))
 
   # ========================================================
-  # Proposed (Ver 2.3.2): T1/T2 + Calibrated G-comp
-  # ========================================================
-  # covariates (match sim-study spirit): Group + age_num + Sex + Cancers (only if varying)
-  potential_covs <- c("Group", "age_num", "Sex", "Cancers")
-  covariates <- c()
-  for (v in potential_covs) {
-    if (v %in% names(Data_model) && length(unique(stats::na.omit(Data_model[[v]]))) > 1) covariates <- c(covariates, v)
-  }
-  if (!("Group" %in% covariates)) covariates <- c("Group", covariates)
-
-  fit_res <- fit_and_simulate_proposed_real(
-    Data_model = Data_model,
-    covariates = covariates,
-    ns_df = 3,
-    M_pseudo = 5000,
-    cap_years = 10
-  )
-
-  shiny::validate(shiny::need(!is.null(fit_res) && nrow(fit_res$simdat) > 0,
-                              "Model fitting / simulation failed. Dataset may be too sparse."))
-
-  Data_survival_simulated <- fit_res$simdat
-
-  # ========================================================
-  # Plot (existing function kept)
+  # Plot using survival_compare_and_plot_CTx directly with weights
   # ========================================================
   survival_compare_and_plot_CTx(
-    data = Data_survival_simulated,
+    data = Data_model,
     time_var1 = "time_pre",
     time_var2 = "time_all",
     status_var = "censor",     # censor==1 means death event
     group_var = "Group",
-    plot_title = "Standardized OS (Ver 2.3.2: Calibrated G-computation)",
+    plot_title = "Standardized OS (Proposed: Age-stratified matching via weights)",
     adjustment = FALSE,
     color_var_surv_CTx_1 = "diagnosis",
-    weights_var = NULL
+    weights_var = "iptw"
   )
 })
 
 # =========================================================================
-# 3) Forest Plot: Replace with Proposed (Ver 2.3.2) synchronized AFT on simulated OS
+# 3) Forest Plot: Replaced with Proposed Weighted AFT on Observed OS
 # =========================================================================
 output$forest_plot_multivariate = renderPlot({
   req(OUTPUT_DATA$figure_surv_CTx_Data_survival_interactive_control,
@@ -617,7 +517,7 @@ output$forest_plot_multivariate = renderPlot({
       Cancers = as.character(Cancers)
     )
 
-  # --- Macro reference + calibrated IPTW
+  # --- Macro reference + Calculate Matching Weights (Proposed Pipeline)
   ref_surv_list <- build_ref_surv_list_realdata(input)
   for (ag in unique(Data_survival_interactive$age_class)) {
     if (!ag %in% names(ref_surv_list)) {
@@ -625,14 +525,11 @@ output$forest_plot_multivariate = renderPlot({
       else ref_surv_list[[ag]] <- ref_surv_list[[1]]
     }
   }
-  Data_survival_interactive <- calculate_calibrated_iptw_real(Data_survival_interactive, ref_surv_list)
-
-  Data_survival_interactive$iptw <- as.numeric(Data_survival_interactive$iptw)
-  Data_survival_interactive$iptw <- ifelse(is.na(Data_survival_interactive$iptw) | Data_survival_interactive$iptw <= 0, 1.0, Data_survival_interactive$iptw)
+  Data_survival_interactive <- calculate_obs_matching_weights_real(Data_survival_interactive, ref_surv_list)
 
   # --- Prepare modeling cohort
   Data_forest <- Data_survival_interactive %>%
-    dplyr::filter(time_pre > 0, time_all > time_pre) %>%
+    dplyr::filter(is.finite(time_pre), is.finite(time_all), is.finite(censor), time_all > time_pre) %>%
     dplyr::mutate(
       Cancers = as.character(Cancers)
     )
@@ -669,7 +566,7 @@ output$forest_plot_multivariate = renderPlot({
     }
   }
 
-  # --- Build covariates for proposed pipeline (no Group here)
+  # --- Build covariates
   base_covariates <- c("age_num", "Sex", "Cancers")
   all_covariates <- c()
   for (v in base_covariates) {
@@ -679,66 +576,14 @@ output$forest_plot_multivariate = renderPlot({
   shiny::validate(shiny::need(length(all_covariates) > 0, "No valid covariates found."))
 
   # ========================================================
-  # Proposed (Ver 2.3.2) Forest:
-  #   1) Fit T1 (weibull) with iptw
-  #   2) Fit T2 (llogis) with ns(logT1) + iptw  [censor==1 death]
-  #   3) Pseudo-resample by iptw -> simulate OS
-  #   4) Fit final synchronized AFT on sim_OS (Event=1)
+  # Proposed (Weighted AFT) Modeling:
+  # Fit single synchronized model on observed OS (time_all)
   # ========================================================
-  Data_forest <- Data_forest %>%
-    dplyr::mutate(
-      time_t2 = pmax(time_all - time_pre, 0.1),
-      time_pre_event = 1
-    ) %>%
-    dplyr::filter(is.finite(time_pre), is.finite(time_all), is.finite(censor), time_all > time_pre)
-
-  # spline on log(T1)
-  Data_forest$logT1_scale <- log(pmax(Data_forest$time_pre / 365.25, 1e-6))
-  ns_obj <- splines::ns(Data_forest$logT1_scale, df = 3)
-  ns_mat <- as.matrix(ns_obj)
-  colnames(ns_mat) <- paste0("ns", seq_len(ncol(ns_mat)))
-  for (j in seq_len(ncol(ns_mat))) Data_forest[[colnames(ns_mat)[j]]] <- ns_mat[, j]
-
-  # fit T1
-  form_t1 <- as.formula(paste("survival::Surv(time_pre, time_pre_event) ~", paste(all_covariates, collapse = " + ")))
-  fit_t1 <- tryCatch(flexsurv::flexsurvreg(form_t1, data = Data_forest, weights = iptw, dist = "weibull"),
-                     error = function(e) NULL)
-  if (!is.null(fit_t1)) fit_t1$my_formula <- form_t1
-
-  # fit T2 (IMPORTANT: censor==1 is death)
-  form_t2 <- as.formula(paste("survival::Surv(time_t2, censor) ~", paste(c(all_covariates, colnames(ns_mat)), collapse = " + ")))
-  fit_t2 <- tryCatch(flexsurv::flexsurvreg(form_t2, data = Data_forest, weights = iptw, dist = "llogis"),
-                     error = function(e) NULL)
-  if (!is.null(fit_t2)) fit_t2$my_formula <- form_t2
-
-  shiny::validate(shiny::need(!is.null(fit_t1) && !is.null(fit_t2),
-                              "T1/T2 modeling failed. Matrix may be singular or events too few."))
-
-  # pseudo resample
-  set.seed(2024)
-  M_pseudo <- 10000
-  idx <- sample(seq_len(nrow(Data_forest)), size = M_pseudo, replace = TRUE, prob = Data_forest$iptw)
-  pseudo <- Data_forest[idx, , drop = FALSE]
-
-  # simulate T1
-  pseudo$sim_T1 <- gen_sim_times_robust(fit_t1, pseudo, dist_type = "weibull")
-  pseudo$logT1_sim_scale <- log(pmax(pseudo$sim_T1 / 365.25, 1e-6))
-
-  # predict ns terms for sim_T1
-  ns_sim <- tryCatch(predict(ns_obj, pseudo$logT1_sim_scale),
-                     error = function(e) matrix(0, nrow(pseudo), attr(ns_obj, "df")))
-  colnames(ns_sim) <- paste0("ns", seq_len(ncol(ns_sim)))
-  for (j in seq_len(ncol(ns_sim))) pseudo[[colnames(ns_sim)[j]]] <- ns_sim[, j]
-
-  # simulate T2 and OS
-  pseudo$sim_T2 <- gen_sim_times_robust(fit_t2, pseudo, dist_type = "llogis")
-  pseudo$sim_OS <- pseudo$sim_T1 + pseudo$sim_T2
-  pseudo$sim_Event <- 1
-
-  # final synchronized model on simulated OS
-  form_final <- as.formula(paste("survival::Surv(sim_OS, sim_Event) ~", paste(all_covariates, collapse = " + ")))
-  fit_forest <- tryCatch(flexsurv::flexsurvreg(form_final, data = pseudo, dist = "llogis"),
-                         error = function(e) NULL)
+  form_final <- as.formula(paste("survival::Surv(time_all, censor) ~", paste(all_covariates, collapse = " + ")))
+  fit_forest <- tryCatch(
+    flexsurv::flexsurvreg(form_final, data = Data_forest, weights = iptw, dist = "llogis"),
+    error = function(e) NULL
+  )
 
   shiny::validate(shiny::need(!is.null(fit_forest), "Final synchronized multivariate model failed to converge."))
 
@@ -762,8 +607,8 @@ output$forest_plot_multivariate = renderPlot({
     var <- plot_data$Variable_Raw[i]
     if (grepl("^age_num", var)) {
       plot_data$Estimate[i] <- exp(res[var, "est"] * 10)
-      plot_data$Lower[i] <- exp(res[var, "L95%"] * 10)
-      plot_data$Upper[i] <- exp(res[var, "U95%"] * 10)
+      plot_data$Lower[i]  <- exp(res[var, "L95%"] * 10)
+      plot_data$Upper[i]  <- exp(res[var, "U95%"] * 10)
     }
   }
   plot_data$Text_CI <- sprintf("%.2f (%.2f-%.2f)", plot_data$Estimate, plot_data$Lower, plot_data$Upper)
@@ -811,10 +656,8 @@ output$forest_plot_multivariate = renderPlot({
   plot_data$Text_PosN <- ifelse(is.na(plot_data$Positive_N), "-", as.character(plot_data$Positive_N))
 
   # ========================================================
-  # Plot (same layout as your current one)
+  # Plot
   # ========================================================
-  library(patchwork)
-
   p_left <- ggplot(plot_data, aes(x = Estimate, y = Label, color = Category)) +
     geom_errorbarh(aes(xmin = Lower, xmax = Upper), height = 0.3, linewidth = 0.8) +
     geom_point(size = 4) +
@@ -848,7 +691,7 @@ output$forest_plot_multivariate = renderPlot({
   final_plot <- p_left + p_right + plot_layout(widths = c(2, 1.2)) +
     plot_annotation(
       title = "Independent Prognostic Impact (Standardized AFT Model)",
-      subtitle = "Computed via Calibrated G-computation (Ver 2.3.2) correcting Immortal Time & Dependent Truncation\nTR > 1: Prolonged Survival | TR < 1: Shortened Survival",
+      subtitle = "Computed via Age-stratified External OS Matching correcting Immortal Time & Dependent Truncation\nTR > 1: Prolonged Survival | TR < 1: Shortened Survival",
       theme = theme(
         plot.title = element_text(face = "bold", size = 16),
         plot.subtitle = element_text(size = 13, color = "#34495e")
