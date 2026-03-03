@@ -330,8 +330,13 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   )
 
   # External info (fixed): only 1–5y survival by age strata (5 points)
-  # Use JSON: Data_age_survival_5_year[["大腸がん(大腸癌)"]][["40代"]] etc.
-  macro_S15_by_ageclass <- Data_age_survival_5_year[["大腸がん(大腸癌)"]]
+  macro_S15_by_ageclass <- lapply(split(T_true, Age_class_macro), function(tt) {
+    sapply(1:5, function(y) mean(tt > y * 365.25) * 100)
+  })
+  macro_S15_by_ageclass <- lapply(macro_S15_by_ageclass, function(v) {
+    noise <- rnorm(length(v), mean = 0, sd = 1.0)  # ±1%程度
+    pmax(0, pmin(100, v + noise))
+  })
 
   # Safety: ensure required keys exist
   required_age_keys <- c("40未満","40代","50代","60代","70代","80以上")
