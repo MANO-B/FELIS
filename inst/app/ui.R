@@ -1406,51 +1406,136 @@ ui <- dashboardPage(
                        htmlOutput("select_gene_survival_interactive_2_H_control")
                 )
               ),
-              # プロット出力の近くに配置するUIコード
+              # プロット出力の近くに配置するUIコード（改善版：年齢階級別OSキャリブレーション + mixture target 表示に整合）
               tags$details(
                 style = "background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-top: 15px; margin-bottom: 20px;",
 
                 tags$summary(
                   style = "font-weight: bold; font-size: 16px; cursor: pointer; color: #2c3e50; outline: none;",
-                  icon("circle-info"), " この解析・シミュレーション手法について（クリックして詳細を表示）"
+                  icon("circle-info"), " この解析手法について（クリックして詳細を表示）"
                 ),
 
                 tags$div(
                   style = "margin-top: 15px; font-size: 14px; color: #333333; line-height: 1.6;",
 
                   tags$p(
-                    "本アプリでは、リアルワールドデータ（RWD）であるCGP検査コホートから", tags$strong("「真の治療効果・遺伝子変異の予後インパクト」"),
-                    "を抽出するため、Accelerated failure time modelによる疫学的なバイアスを排除した生存期間解析のシミュレーションを行っています。",
-                    "ただし、例えば膵がんのFOLFILINOXとGEM+nab-PTXを比較すると前者の方が生存期間が長くなりますが、これはデータベースの情報から",
-                    "知ることができない患者選択バイアス（より負担の大きいFOLFILINOXに耐える患者が治療を受けた）が大きいと考えられます。",
-                    "因果推論ではなく相関関係をみているものと理解ください。生存期間の予測モデル作成には有用とも言えます。"
+                    "本アプリでは、リアルワールドデータ（RWD）であるCGP検査コホートの生存期間を、院内がん登録（マクロデータ）で得られる",
+                    tags$strong("年齢階級別（1～5年）OS"),
+                    "に整合するように補正し、遺伝子変異や臨床因子の",
+                    tags$strong("独立した予後インパクト（Time Ratio; TR）"),
+                    "を推定します。"
                   ),
 
-                  tags$h4(style = "color: #2980b9; font-size: 15px; font-weight: bold; margin-top: 20px;", "克服している3つの重大なバイアス"),
-                  tags$ul(
-                    tags$li(tags$strong("生存者バイアス（左側切断）: "), "CGP検査を受けた患者は「検査に到達できるまで長生きできた」という特殊な集団です。そのまま一般集団（院内がん登録）と比較すると不当に予後が良く見えてしまいます。"),
-                    tags$li(tags$strong("患者背景のズレ: "), "CGPコホートは一般集団に比べて若年層が多いなどの偏りがあります。"),
-                    tags$li(tags$strong("進行スピードの相関: "), "診断からCGP検査までが短い（進行が早い）患者は、検査後の余命も短いという自然な生物学的相関があります。")
-                  ),
-
-                  tags$h4(style = "color: #2980b9; font-size: 15px; font-weight: bold; margin-top: 20px;", "解析のアプローチ（Doubly Robust Estimation）"),
-                  tags$ol(
-                    tags$li(tags$strong("IPTW（逆確率重み付け）による背景の標準化: "), "院内がん登録（マクロデータ）の生存率を基準に、CGP患者の「年齢」と「検査到達タイミング」を一般集団の分布に強制的に一致させる重み付けを行います。"),
-                    tags$li(tags$strong("多変量加速モデル（Multivariate AFT Model）: "), "年齢・性別・組織型という強力な交絡因子を多変量モデルで差し引き、「特定の遺伝子変異」が独立して生存期間に与える純粋な影響を抽出します。"),
-                    tags$li(tags$strong("絶対時間の再構築（シミュレーション）: "), "一般集団の期待生存日数をベースに、抽出した効果を掛け合わせ、臨床的な相関を保ちながら「もしこの患者たちが一般集団だったら」という仮想的なカプランマイヤー曲線を再構築します。")
-                  ),
-
-                  tags$h4(style = "color: #e74c3c; font-size: 15px; font-weight: bold; margin-top: 20px;", " フォレストプロットの見方：Time Ratio (TR) とは？"),
                   tags$p(
-                    "一般的なハザード比（HR）とは異なり、この解析では", tags$strong("「Time Ratio（時間比・加速係数）」"), "を算出しています。これは「本来生きられるはずだった寿命が、何倍に伸縮するか」を表す直感的な指標です。"
+                    "ただし、観測できない背景因子（例：PS、臓器機能、治療適格性、医師の選択）に由来する",
+                    tags$strong("残余交絡"),
+                    "は完全には除去できません。したがって本解析は「因果効果の断定」ではなく、",
+                    tags$strong("観測可能な範囲で標準化した上での関連（予後インパクト）"),
+                    "として解釈してください。"
+                  ),
+
+                  tags$h4(style = "color: #2980b9; font-size: 15px; font-weight: bold; margin-top: 20px;",
+                          "補正で扱っている3つの主要な歪み"),
+                  tags$ul(
+                    tags$li(
+                      tags$strong("年齢構成の違い（Case-mixのズレ）: "),
+                      "CGPコホートは一般集団（院内がん登録）と年齢分布が異なることが多く、そのまま比較すると生存曲線が歪みます。"
+                    ),
+                    tags$li(
+                      tags$strong("CGP到達の選択（生存者バイアス／左側切断に類似）: "),
+                      "CGP検査を受けた患者は「検査に到達できるまで生存した」集団であり、診断直後に死亡した患者は観測されません。"
+                    ),
+                    tags$li(
+                      tags$strong("検査到達時期と予後の相関（Dependent truncation）: "),
+                      "診断からCGPまでが短い患者は進行が速いことが多く、検査後の余命も短いという生物学的な相関が生じます。"
+                    )
+                  ),
+
+                  tags$h4(style = "color: #2980b9; font-size: 15px; font-weight: bold; margin-top: 20px;",
+                          "改善した補正アプローチ：年齢階級別OSキャリブレーション + モデル推定"),
+                  tags$ol(
+                    tags$li(
+                      tags$strong("外部情報（院内がん登録）の取り込み: "),
+                      "院内がん登録から得られる「年齢階級別の1～5年OS（5点）」を参照情報として使用します。"
+                    ),
+                    tags$li(
+                      tags$strong("年齢階級ごとのキャリブレーション重み（Curve matching）: "),
+                      "CGPコホートの観測OS（time_all）に対し、年齢階級ごとに重み（iptw）を最適化し、",
+                      "重み付きKM曲線が外部の1～5年OS点（平滑化した曲線）に一致するように調整します。",
+                      tags$br(),
+                      tags$span(style="font-size: 13px; color: #7f8c8d;",
+                                "※ 重みは「年齢階級別の曲線」を合わせるため、単一の全年齢曲線に必ず一致するわけではありません。")
+                    ),
+                    tags$li(
+                      tags$strong("Mixture target（混合ターゲット）での可視化: "),
+                      "可視化では、解析対象集団（例：Group 1/2）の年齢構成に合わせて、",
+                      "年齢階級別の外部曲線を混合した",
+                      tags$strong("mixture target"),
+                      "（外部期待曲線）を重ねて表示します。これにより「年齢構成の違い」による見かけのズレを抑えた比較ができます。"
+                    ),
+                    tags$li(
+                      tags$strong("群間比較（HR）と指標表示: "),
+                      "群間の差は、重み付きCoxモデル（ロバスト分散）で",
+                      tags$strong("ハザード比（HR）"),
+                      "を推定し、95%信頼区間とともにタイトルに表示します。",
+                      tags$br(),
+                      tags$span(style="font-size: 13px; color: #7f8c8d;",
+                                "※ どちらかの群でイベントが極端に少ない場合、HRが不安定/推定不能（NA）になることがあります。")
+                    ),
+                    tags$li(
+                      tags$strong("中央値OS（95%CI）の表示: "),
+                      "重み付きKMから群ごとの中央値OSと95%CIを算出し、タイトルに表示します。"
+                    )
+                  ),
+
+                  tags$h4(style = "color: #e67e22; font-size: 15px; font-weight: bold; margin-top: 20px;",
+                          "ESS（Effective Sample Size; 有効サンプルサイズ）とは？"),
+                  tags$p(
+                    "重み付けにより一部の症例が大きな重みを持つと、推定の不確実性が増えます。ESSは",
+                    tags$strong("「重み付き解析が、何人分の情報量に相当するか」"),
+                    "を表す指標で、概ね",
+                    tags$code("ESS=(Σw)^2/Σ(w^2)"),
+                    "で計算します。"
+                  ),
+                  tags$ul(
+                    tags$li(tags$strong("ESS ≈ N: "), "重みがほぼ均一で情報損失が小さい（安定）。"),
+                    tags$li(tags$strong("ESS が小さい: "), "少数の症例が推定を支配しやすく、結果が不安定になりやすい。"),
+                    tags$li(tags$strong("小数でも正常: "), "ESSは「等価サンプルサイズ」であり連続量なので小数になります。")
+                  ),
+
+                  tags$h4(style = "color: #e74c3c; font-size: 15px; font-weight: bold; margin-top: 20px;",
+                          "フォレストプロットの見方：Time Ratio (TR) とは？"),
+                  tags$p(
+                    "フォレストプロットでは、CoxモデルのHRではなく、AFTモデルに基づく",
+                    tags$strong("Time Ratio（時間比・加速係数; TR）"),
+                    "を用います。TRは「生存時間が何倍に伸縮するか」を表す直感的な指標です。"
                   ),
                   tags$ul(
                     tags$li(tags$strong("TR > 1.0 : 予後良好"), "（例：TR=1.5なら、生存期間が1.5倍に延びる）"),
                     tags$li(tags$strong("TR < 1.0 : 予後不良"), "（例：TR=0.5なら、生存期間が半分に縮む）"),
                     tags$li(tags$strong("TR = 1.0 : 影響なし"))
                   ),
-                  tags$p(style = "font-size: 13px; color: #7f8c8d; margin-top: 10px;",
-                         "※ プロットの点は点推定値、エラーバーは95%信頼区間を示します。TRが1.0の点線を跨いでいなければ、統計的に有意な独立因子であることを意味します。")
+                  tags$p(
+                    style = "font-size: 13px; color: #7f8c8d; margin-top: 10px;",
+                    "※ 点は点推定値、エラーバーは95%信頼区間を示します。TR=1.0を跨がなければ統計的に有意な関連が示唆されます。"
+                  ),
+
+                  tags$h4(style = "color: #34495e; font-size: 15px; font-weight: bold; margin-top: 20px;",
+                          "重要な注意点（解釈）"),
+                  tags$ul(
+                    tags$li(
+                      tags$strong("曲線が一致しない＝即バイアス除去失敗、とは限りません: "),
+                      "年齢階級別に合わせている場合、全年齢の外部曲線と一致しないことがあります。必ずmixture targetとの比較で確認してください。"
+                    ),
+                    tags$li(
+                      tags$strong("残余交絡の可能性: "),
+                      "年齢以外（PS、治療適格性、重症度など）の未観測因子が群間で異なる場合、補正後も差が残る可能性があります。"
+                    ),
+                    tags$li(
+                      tags$strong("イベントが少ない群では推定が不安定: "),
+                      "HRや中央値CIが広くなる、あるいは推定不能になる場合があります。"
+                    )
+                  )
                 )
               ),
               plotOutput("forest_plot_multivariate"),
@@ -1468,7 +1553,7 @@ ui <- dashboardPage(
       ),
       tabItem("Simulation_Study",
               fluidPage(
-                titlePanel("Simulation Study: Tamura & Ikegami Model Ver 2.3.2"),
+                titlePanel("Simulation Study: External data based calibration"),
 
                 sidebarLayout(
                   sidebarPanel(
