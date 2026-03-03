@@ -674,7 +674,7 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
 
   # ---- IMPORTANT FIX: arrange_ggsurvplots needs a LIST of ggsurvplot objects ----
   arranged <- survminer::arrange_ggsurvplots(
-    ggsurvplots = list(gp),
+    list(gp),
     ncol = 1, nrow = 1,
     heights = c(0.72, 0.28)
   )
