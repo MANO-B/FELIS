@@ -293,7 +293,7 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   if (t1_pat == "early") {
     T1_base <- runif(N_macro, 30, pmax(31, T_true_base * 0.3))
   } else if (t1_pat %in% c("dep_1yr", "real")) {
-    a <- 2; b <- 6         # later-biased; tweak
+    a <- 1; b <- 3         # later-biased; tweak
     min_days <- 30
     jitter_days <- 7
 
@@ -303,7 +303,7 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
     # optional: break ties / avoid spike at exactly 30
     T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
   } else if (t1_pat %in% c("dep_2yr", "rev")) {
-    a <- 6; b <- 2         # later-biased; tweak
+    a <- 3; b <- 1         # later-biased; tweak
     min_days <- 30
     jitter_days <- 7
 
@@ -323,26 +323,43 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
   T2_true <- T2_base * AF_total
   T_true <- T1 + T2_true
 
-  # Age class: for external info (here just Young/Old, but you can refine)
-  Age_class_macro <- ifelse(Age < 60, "Young", "Old")
-
-  # External info: only 1–5y survival by age (5 points)
-  macro_S15_by_ageclass <- list(
-    Young = sapply(1:5, function(y) mean(T_true[Age_class_macro == "Young"] > y * 365.25) * 100),
-    Old   = sapply(1:5, function(y) mean(T_true[Age_class_macro == "Old"]   > y * 365.25) * 100)
+  # Age class (external survival strata): <40, 40s, 50s, 60s, 70s, 80+
+  Age_class_macro <- cut(
+    Age,
+    breaks = c(-Inf, 39, 49, 59, 69, 79, Inf),
+    labels = c("40未満", "40代", "50代", "60代", "70代", "80以上"),
+    right = TRUE
   )
+
+  # External info (fixed): only 1–5y survival by age strata (5 points)
+  # Use JSON: Data_age_survival_5_year[["大腸がん(大腸癌)"]][["40代"]] etc.
+  macro_S15_by_ageclass <- Data_age_survival_5_year[["大腸がん(大腸癌)"]]
+
+  # Safety: ensure required keys exist
+  required_age_keys <- c("40未満","40代","50代","60代","70代","80以上")
+  macro_S15_by_ageclass <- macro_S15_by_ageclass[required_age_keys]
 
   # --- Select CGP cohort (as before) ---
   cgp_idx <- which(T_true > T1 & T1 <= 365.25 * 10)
   if (length(cgp_idx) < N_target) return(NULL)
 
-  prob_select <- ifelse(Age[cgp_idx] < 60, 0.9, 0.1)
+  prob_select <- ifelse(Age[cgp_idx] < 60, 0.6, 0.4)
   sel <- sample(cgp_idx, size = N_target, prob = prob_select, replace = FALSE)
 
   Data_cgp <- data.frame(
     ID = 1:N_target,
     Age = Age[sel],
-    Age_class = ifelse(Age[sel] < 60, "Young", "Old"),
+    Age_class = {
+      age_tmp <- Age[sel]
+      out <- cut(
+        age_tmp,
+        breaks = c(-Inf, 39, 49, 59, 69, 79, Inf),
+        labels = c("40未満", "40代", "50代", "60代", "70代", "80以上"),
+        right = TRUE
+      )
+      out[is.na(age_tmp)] <- "全年齢"
+      factor(out, levels = c("40未満","40代","50代","60代","70代","80以上","全年齢"))
+    },
     Sex = factor(Sex[sel], levels = c("Male", "Female")),
     Histology = factor(Histology[sel], levels = c("COAD", "READ", "COADREAD")),
     X = factor(ifelse(X[sel] == 1, "Mutated", "WT"), levels = c("WT", "Mutated")),
@@ -576,7 +593,7 @@ observeEvent(input$run_sim, {
 observeEvent(input$run_sim_multi, {
   req(input$sim_n, input$sim_true_af, input$sim_cens_rate, input$sim_mut_freq, input$sim_true_med, input$sim_true_shape)
 
-  n_sims <- 400
+  n_sims <- 100
   results <- list()
 
   withProgress(message = "Running 400 Simulations...", value = 0, {
