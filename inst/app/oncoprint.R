@@ -371,6 +371,9 @@ output$figure_lolliplot2 = renderGirafe({
         } else if(file.exists(paste0(tempdir(), "/", lolliplot_gene_raw, ".rda"))){
           load(paste0(tempdir(), "/", lolliplot_gene_raw, ".rda"))
           flag_lolliplot = 1
+        } else if(file.exists(paste0("source/lolliplot/", lolliplot_gene_raw, ".rda"))){
+          load(paste0("source/lolliplot/", lolliplot_gene_raw, ".rda"))
+          flag_lolliplot = 1
         } else {
           prots_feat<-try(GET(URL,accept_json()), silent = FALSE)
           if (class(prots_feat) != "try-error"){
