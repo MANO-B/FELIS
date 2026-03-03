@@ -286,61 +286,71 @@ run_sim_iteration <- function(N_target, True_AF_X, Mut_Freq, True_Med, True_Shap
 
   AF_total <- AF_bg * ifelse(X == 1, True_AF_X, 1.0)
 
-  # --- DGP: generate TRUE OS time T (depends on covariates incl X) ---
+  # --- DGP: TRUE survival first (always defined once) ---
   u <- pmax(pmin(runif(N_macro), 0.999), 0.001)
   T_true_base <- (True_Med * 365.25) * ((1 - u) / u)^(1 / True_Shape)
 
-  # --- T1 generation: CGP timing as a fraction of each individual's survival ---
-  # (This intentionally creates dependent truncation: T1 depends on T_true_base)
+  # --- frailty U (unmeasured prognosis) ---
+  sigma_u <- 0.25   # heterogeneity strength (small)
+  gamma_u <- 0.20   # strength of effect of U on T1 (small)
+
+  U <- rnorm(N_macro, mean = 0, sd = sigma_u)
+
+  # 真のOSにfrailtyを掛ける
+  T_true <- T_true_base * AF_total * exp(U)
+
+
+  # --- T1 generation ---
   if (is.null(t1_pat)) t1_pat <- "indep"
+
   min_days <- 30
   jitter_days <- 7
+  max_entry_days <- 365.25 * 10
 
   if (t1_pat == "early") {
-    # early within survival
+
+    # Early within survival (dependent truncation)
     frac <- runif(N_macro, 0.02, 0.30)
-    T1_base <- pmax(min_days, frac * T_true_base)
-    T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
-    T1 <- T1_base * AF_total
-    T2_true <- pmax(0.1, (T_true_base - T1_base) * AF_total)
-    T_true <- T1 + T2_true
+    T1_base <- frac * T_true_base
+
   } else if (t1_pat %in% c("dep_1yr", "real")) {
-    # later-biased within survival (your current tweak)
+
+    # Later-biased within survival (dependent)
     a <- 0.5; b <- 1
     frac <- rbeta(N_macro, a, b)
-    T1_base <- pmax(min_days, frac * T_true_base)
-    T1 <- T1_base * AF_total
-    T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
-    T2_true <- pmax(0.1, (T_true_base - T1_base) * AF_total)
-    T_true <- T1 + T2_true
+    T1_base <- frac * T_true_base
+
   } else if (t1_pat %in% c("dep_2yr", "rev")) {
+
+    # Stronger late bias (dependent)
     a <- 1; b <- 0.5
     frac <- rbeta(N_macro, a, b)
-    T1_base <- pmax(min_days, frac * T_true_base)
-    T1 <- T1_base * AF_total
-    T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
-    T2_true <- pmax(0.1, (T_true_base - T1_base) * AF_total)
-    T_true <- T1 + T2_true
+    T1_base <- frac * T_true_base
+
   } else {
-    # quasi-independent entry time (independent of T_true_base)
-    # 1) true survival first
-    uT <- pmax(pmin(runif(N_macro), 0.999), 0.001)
-    T_true_base <- (True_Med * 365.25) * ((1 - uT) / uT)^(1 / True_Shape)
-    T_true <- T_true_base * AF_total
 
-    # 2) entry time (can depend on covariates via AF_total) BUT independent noise
-    min_days <- 30
-    max_entry_days <- 365.25 * 10
-    jitter_days <- 7
+    # --- quasi-independent entry ---
+    # independent of survival
+    T1_base <- runif(N_macro, min_days, max_entry_days)
 
-    T1_base <- runif(N_macro, min_days, max_entry_days)   # independent of uT
-    T1_base <- ifelse(T1_base <= min_days, min_days + runif(N_macro, 0, jitter_days), T1_base)
-
-    T1 <- T1_base * AF_total   # ← これは「無条件独立」を壊すが「条件付き独立」ならOK
-
-    # 3) define T2_true after the fact
-    T2_true <- pmax(0.1, T_true - T1)     # ← 重要： (T_true_base - T1_base)*AF_total をやめる
   }
+
+  # enforce minimum
+  T1_base <- pmax(T1_base, min_days)
+
+  # jitter small ties
+  T1_base <- ifelse(
+    T1_base <= min_days,
+    min_days + runif(N_macro, 0, jitter_days),
+    T1_base
+  )
+
+  # --- Apply covariate acceleration + frailty dependence on entry ---
+  # U < 0 (poor prognosis) → earlier entry
+  T1 <- T1_base * AF_total * exp(-gamma_u * U)
+
+  # --- Residual survival ---
+  T2_true <- pmax(0.1, T_true - T1)
 
   # Age class (external survival strata): <40, 40s, 50s, 60s, 70s, 80+
   Age_class_macro <- cut(
