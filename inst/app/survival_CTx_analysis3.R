@@ -664,7 +664,7 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
       linewidth = 1.1,
       inherit.aes = FALSE
     ) +
-    ggplot2::scale_linetype_manual(values = c("External Cancer Registry Data" = "dashed")) +
+    ggplot2::scale_linetype_manual(values = setNames("dashed", ext_df$label[1])) +
     ggplot2::ggtitle(title_txt) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold", size = 14, lineheight = 1.05),
