@@ -1130,7 +1130,13 @@ survival_compare_and_plot_CTx <- function(data,
     dbg("[DEBUG][ERROR] survfit formula was: %s", paste(deparse(surv_formula), collapse=" "))
     stop(e)
   })
-
+  # ===== PATCH START: ggsurvplot fixes for Shiny =====
+  # ggsurvplot sometimes tries to subset fit$call$data (which is a symbol) -> crash.
+  # Force it to be an actual data.frame.
+  surv_fit$call$data <- data
+  surv_fit$call$formula <- surv_formula
+  surv_fit$call$weights <- data$plot_weights
+  # ===== PATCH END =====
   # ---------- 4) coxph (for HR/p only); do not block curve ----------
   diff_0 <- NULL
   group_vals <- unique(na.omit(data[[group_var]]))
