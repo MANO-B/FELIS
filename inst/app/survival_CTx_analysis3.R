@@ -390,99 +390,112 @@ make_external_target_df <- function(ref_surv_list, age_key = "全年齢") {
   )
 }
 
-# ---- helper: weighted KM median per group (days->months) ----
-calc_weighted_median_months_by_group <- function(data, group_var = "Group",
-                                                 time_var = "time_all", status_var = "censor",
-                                                 weight_var = "iptw") {
-  data <- data %>% dplyr::filter(is.finite(.data[[time_var]]), .data[[time_var]] > 0,
-                                 is.finite(.data[[status_var]]),
-                                 !is.na(.data[[group_var]]))
+# ---- helper: weighted KM median (+95%CI) per group (months) ----
+calc_weighted_median_ci_months_by_group <- function(data, group_var = "Group",
+                                                    time_var = "time_all", status_var = "censor",
+                                                    weight_var = "iptw") {
+  shiny::validate(shiny::need(requireNamespace("survminer", quietly = TRUE),
+                              "Please install the 'survminer' package. Run: install.packages('survminer')"))
+
+  data <- data %>%
+    dplyr::filter(is.finite(.data[[time_var]]), .data[[time_var]] > 0,
+                  is.finite(.data[[status_var]]), !is.na(.data[[group_var]]))
 
   sf <- tryCatch(
     survival::survfit(
       as.formula(paste0("survival::Surv(", time_var, ", ", status_var, ") ~ ", group_var)),
       data = data,
-      weights = data[[weight_var]]
+      weights = data[[weight_var]],
+      conf.type = "log"   # 安定（好みで "plain" など）
     ),
     error = function(e) NULL
   )
   if (is.null(sf)) return(NULL)
 
-  tab <- tryCatch(summary(sf)$table, error = function(e) NULL)
-  if (is.null(tab)) return(NULL)
+  md <- tryCatch(survminer::surv_median(sf), error = function(e) NULL)
+  if (is.null(md) || nrow(md) == 0) return(NULL)
 
-  # summary(survfit)$table can be vector if only 1 stratum
-  if (is.null(dim(tab))) {
-    med_days <- unname(tab["median"])
-    out <- data.frame(Group = as.character(unique(data[[group_var]])[1]),
-                      Med_month = med_days / 365.25 * 12)
-    return(out)
-  }
-
-  med_days <- tab[, "median"]
-  grp <- rownames(tab)
-  grp <- ifelse(grepl("=", grp), sub(".*=", "", grp), grp)
+  # strata の "Group=1" みたいな表記を "1" に
+  md$Group <- ifelse(grepl("=", md$strata), sub(".*=", "", md$strata), md$strata)
 
   data.frame(
-    Group = grp,
-    Med_month = as.numeric(med_days) / 365.25 * 12,
+    Group = md$Group,
+    Med_month = md$median / 365.25 * 12,
+    L_month   = md$lower  / 365.25 * 12,
+    U_month   = md$upper  / 365.25 * 12,
     stringsAsFactors = FALSE
   )
 }
 
-# ---- helper: weighted Cox HR between groups (robust SE) ----
+# ---- helper: weighted Cox HR (robust SE) between 2 groups ----
 calc_weighted_hr <- function(data, group_var = "Group",
                              time_var = "time_all", status_var = "censor",
-                             weight_var = "iptw") {
+                             weight_var = "iptw", min_events_per_group = 5) {
   data <- data %>%
     dplyr::filter(is.finite(.data[[time_var]]), .data[[time_var]] > 0,
                   is.finite(.data[[status_var]]),
+                  is.finite(.data[[weight_var]]), .data[[weight_var]] > 0,
                   !is.na(.data[[group_var]])) %>%
     dplyr::mutate(
-      .Group = droplevels(as.factor(.data[[group_var]]))
+      Group2 = droplevels(as.factor(.data[[group_var]]))
     )
 
-  lv <- levels(data$.Group)
-  if (length(lv) != 2) return(NULL)  # HRは2群比較に限定（1 vs 2想定）
+  lv <- levels(data$Group2)
+  if (length(lv) != 2) return(NULL)
 
-  # robust sandwich variance（weightsあり）
+  # 参照を固定（例： "1" をrefにしたいなら levels順をここで設定）
+  # data$Group2 <- relevel(data$Group2, ref = lv[1])
+
+  # イベント数チェック（censor==1がイベント）
+  ev_by_g <- tapply(data[[status_var]], data$Group2, function(x) sum(x == 1, na.rm = TRUE))
+  if (any(is.na(ev_by_g)) || any(ev_by_g < min_events_per_group)) {
+    message(sprintf("[HR] Too few events: %s", paste(names(ev_by_g), ev_by_g, sep="=", collapse=" | ")))
+    return(NULL)
+  }
+
   fit <- tryCatch(
     survival::coxph(
-      survival::Surv(.data[[time_var]], .data[[status_var]]) ~ .Group,
+      survival::Surv(data[[time_var]], data[[status_var]]) ~ Group2,
       data = data,
       weights = data[[weight_var]],
-      robust = TRUE
+      robust = TRUE,
+      ties = "efron"
     ),
-    error = function(e) NULL
+    error = function(e) { message("[HR] coxph error: ", e$message); NULL }
   )
   if (is.null(fit)) return(NULL)
 
   sm <- summary(fit)
-  hr <- unname(sm$coefficients[1, "exp(coef)"])
-  l  <- unname(sm$conf.int[1, "lower .95"])
-  u  <- unname(sm$conf.int[1, "upper .95"])
+  if (any(!is.finite(sm$coefficients[1, c("exp(coef)")])) ||
+      any(!is.finite(sm$conf.int[1, c("lower .95","upper .95")]))) {
+    message("[HR] Non-finite HR/CI produced (separation or numerical issue).")
+    return(NULL)
+  }
 
-  # 表示: level2 vs level1
   list(
-    ref = lv[1],
+    ref  = lv[1],
     comp = lv[2],
-    HR = hr, L = l, U = u
+    HR = unname(sm$coefficients[1, "exp(coef)"]),
+    L  = unname(sm$conf.int[1, "lower .95"]),
+    U  = unname(sm$conf.int[1, "upper .95"])
   )
 }
 
 # ---- helper: build multi-line title (wrapped) ----
-build_surv_title <- function(med_df, hr_obj, ess, max_width = 60) {
-  # medians
-  med_txt <- "Median OS (months): "
+build_surv_title <- function(med_df, hr_obj, ess, max_width = 56) {
+  # medians with CI
   if (is.null(med_df) || nrow(med_df) == 0) {
-    med_txt <- paste0(med_txt, "N/A")
+    med_txt <- "Median OS (months): N/A"
   } else {
     med_df <- med_df %>% dplyr::arrange(Group)
-    med_pairs <- paste0(med_df$Group, "=", sprintf("%.1f", med_df$Med_month))
-    med_txt <- paste0(med_txt, paste(med_pairs, collapse = " | "))
+    med_pairs <- paste0(
+      med_df$Group, "=",
+      sprintf("%.1f", med_df$Med_month),
+      " (", sprintf("%.1f", med_df$L_month), "–", sprintf("%.1f", med_df$U_month), ")"
+    )
+    med_txt <- paste0("Median OS (months, 95%CI): ", paste(med_pairs, collapse = " | "))
   }
 
-  # HR
   hr_txt <- "HR: N/A"
   if (!is.null(hr_obj)) {
     hr_txt <- sprintf("HR (%s vs %s)=%.2f (95%%CI %.2f–%.2f)",
@@ -491,7 +504,6 @@ build_surv_title <- function(med_df, hr_obj, ess, max_width = 60) {
 
   ess_txt <- if (is.finite(ess)) sprintf("ESS=%.1f", ess) else "ESS=N/A"
 
-  # wrap each line
   title1 <- paste(strwrap("Standardized OS (calibrated weighted KM; ggsurvplot)", width = max_width), collapse = "\n")
   title2 <- paste(strwrap(paste(med_txt, hr_txt, ess_txt, sep = "  |  "), width = max_width), collapse = "\n")
   paste(title1, title2, sep = "\n")
@@ -615,19 +627,17 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
   km_w   <- survival::survfit(survival::Surv(time_all, censor) ~ Group, data = Data_model, weights = Data_model$iptw)
 
   # --- stats for title
-  med_df <- calc_weighted_median_months_by_group(Data_model, weight_var = "iptw")
+  med_df <- calc_weighted_median_ci_months_by_group(Data_model, weight_var = "iptw")
   hr_obj <- calc_weighted_hr(Data_model, weight_var = "iptw")
   title_txt <- build_surv_title(med_df, hr_obj, ESS, max_width = 56)
-
-  # --- ggsurvplot (use weighted KM as main; add unweighted as faint if desired)
-  shiny::validate(shiny::need(requireNamespace("survminer", quietly = TRUE),
-                              "Please install the 'survminer' package. Run: install.packages('survminer')"))
 
   gp <- survminer::ggsurvplot(
     fit = km_w,
     data = Data_model,
     conf.int = FALSE,
-    risk.table = FALSE,
+    risk.table = TRUE,          # ★追加
+    risk.table.height = 0.25,   # ★タイトルはみ出し抑制にも効く
+    risk.table.y.text = FALSE,  # 表が縦に長くなるのを抑える（好み）
     censor = TRUE,
     xlim = c(0, 5 * 365.25),
     break.time.by = 365.25,
@@ -638,11 +648,10 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
     legend.title = ""
   )
 
-  # --- make the "external dashed line" unambiguous:
-  #     overlay explicit labeled external target curve (not a mysterious black dashed line)
   ext_df <- make_external_target_df(ref_surv_list, age_key = "全年齢")
 
-  p <- gp$plot +
+  # ggsurvplotは list(plot=, table=) なので両方にタイトル余白をつける
+  gp$plot <- gp$plot +
     ggplot2::geom_line(
       data = ext_df,
       ggplot2::aes(x = time_years * 365.25, y = surv, linetype = label),
@@ -652,16 +661,17 @@ output$figure_survival_CTx_interactive_1_control <- renderPlot({
     ggplot2::ggtitle(title_txt) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold", size = 14, lineheight = 1.05),
-      plot.margin = ggplot2::margin(t = 10, r = 15, b = 10, l = 10),
+      plot.margin = ggplot2::margin(t = 10, r = 15, b = 5, l = 10),
       legend.position = "bottom",
       legend.box = "vertical"
     )
 
-  # Optional: also overlay unweighted KM (same Group colors, different alpha/linetype)
-  #   - ggsurvplot object is ggplot; easiest is add another layer from km_unw via survminer::ggsurvplot_df
-  #   - keep it simple: omit unless you want. If you want, tell me and I’ll add a clean overlay.
+  gp$table <- gp$table +
+    ggplot2::theme(
+      plot.margin = ggplot2::margin(t = 0, r = 15, b = 10, l = 10)
+    )
 
-  p
+  survminer::arrange_ggsurvplots(gp, ncol = 1, nrow = 1, heights = c(0.72, 0.28))
 })
 # =========================================================================
 # 7) Forest plot output: weighted AFT on observed OS (time_all)
