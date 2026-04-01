@@ -1,5 +1,5 @@
-SOFT_VERSION = "4.2.10"
-DATA_VERSION = "20260227"
+SOFT_VERSION = "4.2.11"
+DATA_VERSION = "20260316"
 
 app_dir <- Sys.getenv("FELIS_DATA_ROOT", unset = getOption("felis_data_root", tempdir()))
 CCAT_FLAG <- file.exists(file.path(app_dir, "ccat"))
