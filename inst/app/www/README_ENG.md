@@ -3,7 +3,7 @@
 
 FELIS is a local-execution Web application (R/Shiny) designed for researchers to perform cohort definition, visualization, and bias-aware outcome analysis using C-CAT secondary use data.
 
-> **Note**: This software is intended only for those who can legally obtain C-CAT secondary use data. Please comply with ethical reviews and data usage terms.
+> **Note**: This software is intended only for those who can legally obtain C-CAT secondary use data. Please comply with ethical reviews and data usage terms. The user of this program shall indemnify C-CAT and NCC against any claims by third parties for direct or indirect damages arising from the use of this program. Such User shall not prevent C-CAT and NCC from exercising its right of recourse against claims for damages by third parties arising from the use of such program.
 
 ---
 

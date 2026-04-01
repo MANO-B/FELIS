@@ -2572,7 +2572,7 @@ output$select_gene_survival_interactive_1_P_1_control = renderUI({
   pickerInput("gene_survival_interactive_1_P_1_control", "Pathogenic variant in any genes",
               OUTPUT_DATA$figure_surv_interactive_candidate_genes_control,
               options = list(`actions-box` = TRUE, `live-search`=TRUE),
-              selected = OUTPUT_DATA$figure_surv_interactive_Top_gene[1],
+              selected = OUTPUT_DATA$figure_surv_interactive_Top_gene_control[1],
               multiple = TRUE)
 })
 output$select_gene_survival_interactive_1_P_2_control = renderUI({
@@ -2660,6 +2660,6 @@ output$select_gene_survival_interactive_1_P_1_control_forest = renderUI({
   pickerInput("gene_survival_interactive_1_P_1_control_forest", "Select genes w/ or w/o pathogenic varian for forest plot",
               OUTPUT_DATA$figure_surv_interactive_candidate_genes_control,
               options = list(`actions-box` = TRUE, `live-search`=TRUE),
-              selected = OUTPUT_DATA$figure_surv_interactive_Top_gene[1],
+              selected = OUTPUT_DATA$figure_surv_interactive_Top_gene_control[1],
               multiple = TRUE)
 })

@@ -346,8 +346,9 @@ weighted_survdiff_like <- function(time, status, group, weights, rho = 0) {
   list(chisq = chisq, n = as.numeric(table(g)))
 }
 
-surv_curv_CTx <- function(fit, data, title, legend_, diff_0, Xlab = "Time from CTx start, risk-set adjusted (months)"){
-  g = ggsurvplot(
+surv_curv_CTx <- function(fit, data, title, legend_, diff_0, Xlab = "Time from CTx start, risk-set adjusted (months)") {
+  # Generate the base ggsurvplot
+  g <- ggsurvplot(
     fit = fit,
     combine = TRUE,
     data = data,
@@ -370,65 +371,59 @@ surv_curv_CTx <- function(fit, data, title, legend_, diff_0, Xlab = "Time from C
     cumevents = FALSE,
     cumcensor = FALSE,
     tables.theme = clean_theme(),
-    legend = c(0.8,0.8),
-    xlim = c(0, min(365.25*10, max(data$time_all, na.rm = T)) * 1.05),
+    legend = c(0.8, 0.8),
+    xlim = c(0, min(365.25 * 10, max(data$time_all, na.rm = TRUE)) * 1.05),
     xscale = "d_m",
-    # break.x.by = 12 * 365.25 / 12,
     break.x.by = max(6 * 365.25 / 12, ceiling(max(data$time_all) / 365.25 / 6) * 365.25 / 2),
     legend.labs = legend_
   )
-  if(is.null(diff_0)){
-    tmp = summary(fit)$table
-    legends = paste0(
-      format_p(digits = 1, tmp[[7]] / 365.25 * 12),
+
+  # Handle Median OS labels (Always convert to data.frame to handle 1-group vs multi-group)
+  fit_table <- as.data.frame(summary(fit)$table)
+
+  # Helper to format survival metrics
+  format_median_ci <- function(row) {
+    paste0(
+      format_p(digits = 1, row["median"] / 365.25 * 12),
       " (",
-      format_p(digits = 1, tmp[[8]] / 365.25 * 12),
+      format_p(digits = 1, row["0.95LCL"] / 365.25 * 12),
       "-",
-      format_p(digits = 1, tmp[[9]] / 365.25 * 12),
+      format_p(digits = 1, row["0.95UCL"] / 365.25 * 12),
       ")"
     )
+  }
+
+  # Construct median OS strings for all groups
+  median_texts <- apply(fit_table, 1, format_median_ci)
+  legends_combined <- paste(median_texts, collapse = ", ")
+
+  # Handle Title and HR display
+  if (is.null(diff_0)) {
+    # No comparison (Single group or Cox failed)
     g$plot <- g$plot +
       labs(title = title,
-           subtitle = paste0("Median OS, ", legends, " months"))
-  } else{
-    tmp = data.frame(summary(fit)$table)
-    legends = paste0(
-      format_p(digits = 1, tmp$median[1] / 365.25 * 12),
-      " (",
-      format_p(digits = 1, tmp$X0.95LCL[1] / 365.25 * 12),
-      "-",
-      format_p(digits = 1, tmp$X0.95UCL[1] / 365.25 * 12),
-      ")"
-    )
-    for(i in 2:nrow(tmp)){
-      legends = paste(
-        legends,
-        paste0(
-          format_p(digits = 1, tmp$median[i] / 365.25 * 12),
-          " (",
-          format_p(digits = 1, tmp$X0.95LCL[i] / 365.25 * 12),
-          "-",
-          format_p(digits = 1, tmp$X0.95UCL[i] / 365.25 * 12),
-          ")"
-        ),
-        sep = ", "
-      )
-    }
-    data_tmp = tidy(diff_0, exponentiate=TRUE, conf.int=TRUE)
-    title_HR = NULL
-    if(nrow(data_tmp) > 0){
-      for(i in 1:nrow(data_tmp)){
-        title_HR = c(title_HR,
-                     paste0(format_p(data_tmp$estimate[i],digits=2), " (",
-                            format_p(data_tmp$conf.low[i],digits=2), "-",
-                            format_p(data_tmp$conf.high[i],digits=2), ") ",
-                            "p=", format_p(data_tmp$p.value[i],digits=2)))
+           subtitle = paste0("Median OS, ", legends_combined, " months"))
+  } else {
+    # Multiple groups with Cox comparison
+    data_tmp <- tidy(diff_0, exponentiate = TRUE, conf.int = TRUE)
+    title_HR <- NULL
+
+    if (nrow(data_tmp) > 0) {
+      for (i in 1:nrow(data_tmp)) {
+        title_HR <- c(title_HR,
+                      paste0(format_p(data_tmp$estimate[i], digits = 2), " (",
+                             format_p(data_tmp$conf.low[i], digits = 2), "-",
+                             format_p(data_tmp$conf.high[i], digits = 2), ") ",
+                             "p=", format_p(data_tmp$p.value[i], digits = 2)))
       }
     }
+
+    full_title <- paste0(title, ": \nhazard ratio (vs 1st group)=", paste(title_HR, collapse = "/"))
     g$plot <- g$plot +
-      labs(title = paste0(title, ": \nhazard ratio (vs 1st group)=", paste(title_HR, collapse = "/")),
-           subtitle = paste0("Median OS, ", legends, " months"))
+      labs(title = full_title,
+           subtitle = paste0("Median OS, ", legends_combined, " months"))
   }
+
   g$table <- g$table + theme(plot.title = element_blank(),
                              plot.subtitle = element_blank())
   return(g)
