@@ -412,9 +412,18 @@ surv_curv_CTx <- function(fit, data, title, legend_, diff_0, Xlab = "Time from C
   # Handle Title and HR display
   if (is.null(diff_0) || n_strata <= 1) {
     # No comparison (Single group or Cox failed)
+    tmp = summary(fit)$table
+    legends = paste0(
+      format_p(digits = 1, tmp[[7]] / 365.25 * 12),
+      " (",
+      format_p(digits = 1, tmp[[8]] / 365.25 * 12),
+      "-",
+      format_p(digits = 1, tmp[[9]] / 365.25 * 12),
+      ")"
+    )
     g$plot <- g$plot +
       labs(title = title,
-           subtitle = paste0("Median OS, ", legends_combined, " months"))
+           subtitle = paste0("Median OS, ", legends, " months"))
   } else {
     # Multiple groups with Cox comparison
     data_tmp <- tidy(diff_0, exponentiate = TRUE, conf.int = TRUE)
