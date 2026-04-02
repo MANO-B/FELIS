@@ -86,7 +86,6 @@ ui <- dashboardPage(
                menuSubItem("Survival and clinical information", tabName = "SurvivalandtreatmentafterCTx", icon = icon("angle-right")),
                hr(),
                p("Survival analysis"),
-               hr(),
                menuSubItem("Custom survival analysis", tabName = "SurvivalandtreatmentafterCTx2", icon = icon("angle-right")),
                menuSubItem("Frequent variants and survival", tabName = "Geneticvariantsandsurvivalforestplot2", icon = icon("angle-right")),
                menuSubItem("Diagnosis and survival", tabName = "Diagnosisandsurvivalforestplot2", icon = icon("angle-right")),
