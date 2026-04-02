@@ -385,17 +385,26 @@ surv_curv_CTx <- function(fit, data, title, legend_, diff_0, Xlab = "Time from C
   fit_table <- summary(fit)$table
   if (is.null(dim(fit_table))) fit_table <- as.data.frame(as.list(fit_table)) else fit_table <- as.data.frame(fit_table)
   # Helper to format survival metrics
-  format_median_ci <- function(row) {
+  get_col <- function(df, name) {
+    if (name %in% colnames(df)) return(df[[name]])
+    if (paste0("X", name) %in% colnames(df)) return(df[[paste0("X", name)]])
+    return(rep(NA_real_, nrow(df)))
+  }
+
+  median_vals <- get_col(fit_table, "median")
+  lcl_vals    <- get_col(fit_table, "0.95LCL")
+  ucl_vals    <- get_col(fit_table, "0.95UCL")
+
+  format_median_ci <- function(i) {
     paste0(
-      format_p(digits = 1, row["median"] / 365.25 * 12),
+      format_p(digits = 1, median_vals[i] / 365.25 * 12),
       " (",
-      format_p(digits = 1, row["0.95LCL"] / 365.25 * 12),
+      format_p(digits = 1, lcl_vals[i] / 365.25 * 12),
       "-",
-      format_p(digits = 1, row["0.95UCL"] / 365.25 * 12),
+      format_p(digits = 1, ucl_vals[i] / 365.25 * 12),
       ")"
     )
   }
-
   # Construct median OS strings for all groups
   median_texts <- apply(fit_table, 1, format_median_ci)
   legends_combined <- paste(median_texts, collapse = ", ")
