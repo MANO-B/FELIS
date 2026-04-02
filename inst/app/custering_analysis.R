@@ -1118,11 +1118,16 @@ output$figure_cluster_subtype = renderGirafe({
       plot.margin = margin(10, 10, 10, 10)
     )
   if(input$color_var_cluster == "cluster"){
+    present_clusters <- sort(unique(as.character(na.omit(Data_case_target$cluster))))
+    all_clusters <- as.character(seq_along(selected_genes))
+
     g = g +
-      guides(color = guide_legend(title = "TOP3 histology/mutated gene", nrow=30)) +
-      scale_color_discrete_interactive(labels = selected_genes)
-  } else {
-    g = g +
+      guides(color = guide_legend(title = "TOP3 histology/mutated gene", nrow = 30)) +
+      scale_color_discrete_interactive(
+        breaks = present_clusters,
+        labels = selected_genes[match(present_clusters, all_clusters)]
+      )
+  } else {    g = g +
       guides(color = guide_legend(title = ifelse(input$color_var_cluster == "YoungOld", "Age",
                                                  ifelse(input$color_var_cluster == "Cancers", "Histology",
                                                         ifelse(input$color_var_cluster == "EP_option", "Treatment option recommended","Recommended treatment done")))))
