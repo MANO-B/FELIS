@@ -348,6 +348,9 @@ weighted_survdiff_like <- function(time, status, group, weights, rho = 0) {
 
 surv_curv_CTx <- function(fit, data, title, legend_, diff_0, Xlab = "Time from CTx start, risk-set adjusted (months)") {
   # Generate the base ggsurvplot
+  n_strata <- if (is.null(fit$strata)) 1 else length(fit$strata)
+  legend_arg <- if (!is.null(legend_) && length(legend_) == n_strata) legend_ else NULL
+
   g <- ggsurvplot(
     fit = fit,
     combine = TRUE,
@@ -375,12 +378,12 @@ surv_curv_CTx <- function(fit, data, title, legend_, diff_0, Xlab = "Time from C
     xlim = c(0, min(365.25 * 10, max(data$time_all, na.rm = TRUE)) * 1.05),
     xscale = "d_m",
     break.x.by = max(6 * 365.25 / 12, ceiling(max(data$time_all) / 365.25 / 6) * 365.25 / 2),
-    legend.labs = legend_
+    legend.labs = legend_arg
   )
 
   # Handle Median OS labels (Always convert to data.frame to handle 1-group vs multi-group)
-  fit_table <- as.data.frame(summary(fit)$table)
-
+  fit_table <- summary(fit)$table
+  if (is.null(dim(fit_table))) fit_table <- as.data.frame(as.list(fit_table)) else fit_table <- as.data.frame(fit_table)
   # Helper to format survival metrics
   format_median_ci <- function(row) {
     paste0(
@@ -398,7 +401,7 @@ surv_curv_CTx <- function(fit, data, title, legend_, diff_0, Xlab = "Time from C
   legends_combined <- paste(median_texts, collapse = ", ")
 
   # Handle Title and HR display
-  if (is.null(diff_0)) {
+  if (is.null(diff_0) || n_strata <= 1) {
     # No comparison (Single group or Cox failed)
     g$plot <- g$plot +
       labs(title = title,
@@ -1029,6 +1032,7 @@ survival_compare_and_plot_CTx <- function(data,
                                           group_labels = NULL,
                                           weights_var = NULL) {
 
+  no_group <- identical(group_var, "1")
   dbg <- function(...) message(sprintf(...))
 
   dbg("\n==========================================")
@@ -1041,7 +1045,9 @@ survival_compare_and_plot_CTx <- function(data,
       time_var1, time_var2, status_var, group_var, adjustment,
       ifelse(is.null(weights_var), "NULL", weights_var))
 
-  required_cols <- c(time_var1, time_var2, status_var, group_var)
+  required_cols <- c(time_var1, time_var2, status_var)
+  if (!no_group) required_cols <- c(required_cols, group_var)
+
   missing_cols <- required_cols[!required_cols %in% names(data)]
   if (length(missing_cols) > 0) {
     dbg("[DEBUG][FATAL] missing columns: %s", paste(missing_cols, collapse = ", "))
@@ -1088,9 +1094,13 @@ survival_compare_and_plot_CTx <- function(data,
       status_var,
       paste(capture.output(print(table(data$censor, useNA = "ifany"))), collapse = "\n"))
 
-  dbg("[DEBUG] group(%s) table:\n%s",
-      group_var,
-      paste(capture.output(print(table(data[[group_var]], useNA = "ifany"))), collapse = "\n"))
+  if (!no_group) {
+    dbg("[DEBUG] group(%s) table:\n%s",
+        group_var,
+        paste(capture.output(print(table(data[[group_var]], useNA = "ifany"))), collapse = "\n"))
+  } else {
+    dbg("[DEBUG] single-group mode: Surv(...) ~ 1")
+  }
 
   # basic invalid rows (do NOT drop silently; just report)
   n_bad_time <- sum(!is.na(data$time_all) & data$time_all <= 0)
@@ -1134,10 +1144,10 @@ survival_compare_and_plot_CTx <- function(data,
   # ===== PATCH END =====
   # ---------- 4) coxph (for HR/p only); do not block curve ----------
   diff_0 <- NULL
-  group_vals <- unique(na.omit(data[[group_var]]))
+  group_vals <- if (!no_group) unique(na.omit(data[[group_var]])) else 1
   dbg("[DEBUG] group unique non-NA count = %d", length(group_vals))
 
-  if (length(group_vals) > 1) {
+  if (!no_group && length(group_vals) > 1) {
     diff_0 <- tryCatch({
       dbg("[DEBUG] calling coxph ...")
       if (use_weights) {

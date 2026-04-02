@@ -77,6 +77,10 @@ Data_cluster_ID = reactive({
         Data_mutation_cord$C.CAT調査結果.基本項目.ハッシュID = rownames(Data_mutation)
         Data_mutation_cord$driver_mutations = rowSums(Data_mutation)
         Data_mutation_cord$cluster = dbscan_res_changed$cluster
+        q <- quantile(Data_mutation_cord$V1, probs = c(0.001, 0.999), na.rm = TRUE)
+        Data_mutation_cord$V1 <- pmin(pmax(Data_mutation_cord$V1, q[1]), q[2])
+        q <- quantile(Data_mutation_cord$V2, probs = c(0.001, 0.999), na.rm = TRUE)
+        Data_mutation_cord$V2 <- pmin(pmax(Data_mutation_cord$V2, q[1]), q[2])
         if(input$clustering == "Fixed to the 1st analysis"){
           QS_SAVE(nthreads = max(1, parallel::detectCores() - 1, na.rm = TRUE), Data_mutation_cord, file=file.path(tempdir(), "Data_mutation_cord.qs"))
         }
